@@ -282,6 +282,178 @@ def max_abs_sum_change(prices):
                 best_range = (i, j)
     return max_sum, best_range
 
+@app.route('/leetcode/stock', methods=['POST'])
+def leetcode_stock():
+    data = request.json
+    problem = data.get('problem')
+    prices = data.get('prices', [])
+    k = data.get('k', 2)
+    fee = data.get('fee', 0)
+    result = None
+    code = ''
+    time_complexity = ''
+    space_complexity = ''
+    explanation = ''
+    if problem == '121':
+        # LeetCode 121: Best Time to Buy and Sell Stock (one transaction)
+        min_price = float('inf')
+        max_profit = 0
+        for price in prices:
+            if price < min_price:
+                min_price = price
+            elif price - min_price > max_profit:
+                max_profit = price - min_price
+        result = max_profit
+        code = '''def maxProfit(prices):
+    min_price = float('inf')
+    max_profit = 0
+    for price in prices:
+        if price < min_price:
+            min_price = price
+        elif price - min_price > max_profit:
+            max_profit = price - min_price
+    return max_profit'''
+        time_complexity = 'O(n)'
+        space_complexity = 'O(1)'
+        explanation = 'Track the minimum price and the maximum profit as you iterate.'
+    elif problem == '122':
+        # LeetCode 122: Best Time to Buy and Sell Stock II (unlimited transactions)
+        profit = 0
+        for i in range(1, len(prices)):
+            if prices[i] > prices[i-1]:
+                profit += prices[i] - prices[i-1]
+        result = profit
+        code = '''def maxProfit(prices):
+    profit = 0
+    for i in range(1, len(prices)):
+        if prices[i] > prices[i-1]:
+            profit += prices[i] - prices[i-1]
+    return profit'''
+        time_complexity = 'O(n)'
+        space_complexity = 'O(1)'
+        explanation = 'Sum all positive price differences.'
+    elif problem == '123':
+        # LeetCode 123: Best Time to Buy and Sell Stock III (at most two transactions)
+        buy1 = buy2 = float('inf')
+        profit1 = profit2 = 0
+        for price in prices:
+            buy1 = min(buy1, price)
+            profit1 = max(profit1, price - buy1)
+            buy2 = min(buy2, price - profit1)
+            profit2 = max(profit2, price - buy2)
+        result = profit2
+        code = '''def maxProfit(prices):
+    buy1 = buy2 = float('inf')
+    profit1 = profit2 = 0
+    for price in prices:
+        buy1 = min(buy1, price)
+        profit1 = max(profit1, price - buy1)
+        buy2 = min(buy2, price - profit1)
+        profit2 = max(profit2, price - buy2)
+    return profit2'''
+        time_complexity = 'O(n)'
+        space_complexity = 'O(1)'
+        explanation = 'Track two buys and two profits for two transactions.'
+    elif problem == '188':
+        # LeetCode 188: Best Time to Buy and Sell Stock IV (at most k transactions)
+        if not prices or k == 0:
+            result = 0
+        elif k >= len(prices) // 2:
+            profit = 0
+            for i in range(1, len(prices)):
+                if prices[i] > prices[i-1]:
+                    profit += prices[i] - prices[i-1]
+            result = profit
+        else:
+            dp = [[0] * len(prices) for _ in range(k+1)]
+            for t in range(1, k+1):
+                max_diff = -prices[0]
+                for d in range(1, len(prices)):
+                    dp[t][d] = max(dp[t][d-1], prices[d] + max_diff)
+                    max_diff = max(max_diff, dp[t-1][d] - prices[d])
+            result = dp[k][-1]
+        code = '''def maxProfit(k, prices):
+    if not prices or k == 0:
+        return 0
+    if k >= len(prices) // 2:
+        profit = 0
+        for i in range(1, len(prices)):
+            if prices[i] > prices[i-1]:
+                profit += prices[i] - prices[i-1]
+        return profit
+    dp = [[0] * len(prices) for _ in range(k+1)]
+    for t in range(1, k+1):
+        max_diff = -prices[0]
+        for d in range(1, len(prices)):
+            dp[t][d] = max(dp[t][d-1], prices[d] + max_diff)
+            max_diff = max(max_diff, dp[t-1][d] - prices[d])
+    return dp[k][-1]'''
+        time_complexity = 'O(kn)'
+        space_complexity = 'O(kn)'
+        explanation = 'DP for at most k transactions.'
+    elif problem == '309':
+        # LeetCode 309: Best Time to Buy and Sell Stock with Cooldown
+        if not prices:
+            result = 0
+        else:
+            n = len(prices)
+            hold = [0]*n
+            sold = [0]*n
+            rest = [0]*n
+            hold[0] = -prices[0]
+            for i in range(1, n):
+                hold[i] = max(hold[i-1], rest[i-1] - prices[i])
+                sold[i] = hold[i-1] + prices[i]
+                rest[i] = max(rest[i-1], sold[i-1])
+            result = max(sold[-1], rest[-1])
+        code = '''def maxProfit(prices):
+    if not prices:
+        return 0
+    n = len(prices)
+    hold = [0]*n
+    sold = [0]*n
+    rest = [0]*n
+    hold[0] = -prices[0]
+    for i in range(1, n):
+        hold[i] = max(hold[i-1], rest[i-1] - prices[i])
+        sold[i] = hold[i-1] + prices[i]
+        rest[i] = max(rest[i-1], sold[i-1])
+    return max(sold[-1], rest[-1])'''
+        time_complexity = 'O(n)'
+        space_complexity = 'O(n)'
+        explanation = 'DP with three states: hold, sold, rest.'
+    elif problem == '714':
+        # LeetCode 714: Best Time to Buy and Sell Stock with Transaction Fee
+        if not prices:
+            result = 0
+        else:
+            n = len(prices)
+            cash, hold = 0, -prices[0]
+            for i in range(1, n):
+                cash = max(cash, hold + prices[i] - fee)
+                hold = max(hold, cash - prices[i])
+            result = cash
+        code = '''def maxProfit(prices, fee):
+    if not prices:
+        return 0
+    cash, hold = 0, -prices[0]
+    for price in prices[1:]:
+        cash = max(cash, hold + price - fee)
+        hold = max(hold, cash - price)
+    return cash'''
+        time_complexity = 'O(n)'
+        space_complexity = 'O(1)'
+        explanation = 'DP with cash and hold states, subtracting fee on sell.'
+    else:
+        return jsonify({'error': 'Unknown problem'}), 400
+    return jsonify({
+        'result': result,
+        'code': code,
+        'time_complexity': time_complexity,
+        'space_complexity': space_complexity,
+        'explanation': explanation
+    })
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=port) 

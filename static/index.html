@@ -29,39 +29,6 @@
     <h1 style="text-align:center;font-size:2.2rem;margin-bottom:30px;color:#ff69b4;letter-spacing:1px;">LET'S PLAY</h1>
     <div class="main-flex" id="main-sections">
     <div class="container">
-        <img src="/static/img/cute.png" alt="Cute Japanese Cartoon" style="display:block;margin:0 auto 20px auto;width:120px;height:120px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        <h2>Tokimeki Matchmaking</h2>
-        <input type="text" id="name1" placeholder="Enter first name">
-        <input type="date" id="dob1" placeholder="Date of Birth (Person 1)">
-        <input type="text" id="name2" placeholder="Enter second name">
-        <input type="date" id="dob2" placeholder="Date of Birth (Person 2)">
-        <select id="algorithm" style="width:100%;padding:10px;margin:10px 0;border-radius:4px;border:1px solid #ccc;">
-            <option value="sum">Sum Similarity</option>
-            <option value="longest">Longest Consecutive</option>
-            <option value="lcs">Longest Common Subsequence (LCS)</option>
-        </select>
-        <button onclick="checkMatch()">Check Match</button>
-        <button onclick="refreshMatch()" style="margin-top:5px;background:#eee;color:#333;">Refresh</button>
-        <div class="result" id="result"></div>
-    </div>
-    <div class="container">
-        <img src="/static/img/handsome.png" alt="Handsome Cartoon" style="display:block;margin:0 auto 20px auto;width:120px;height:120px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        <h2>Sentiment Prediction</h2>
-        <div style="text-align:center;margin-bottom:8px;color:#888;font-size:0.98rem;">Enter a plan or thought and see if it's positive, negative, or neutral!</div>
-        <textarea id="sentence" placeholder="Type your plan or sentence here..." style="width:100%;height:60px;padding:10px;border-radius:4px;border:1px solid #ccc;">I plan to buy an apple</textarea>
-        <button onclick="predictSentiment()" style="margin-top:10px;">Predict Sentiment</button>
-        <button onclick="refreshSentiment()" style="margin-top:5px;background:#eee;color:#333;">Refresh</button>
-        <div class="result" id="sentiment-result"></div>
-    </div>
-    <div class="container">
-        <h2>LIS Game</h2>
-        <div id="lis-seq" style="text-align:center;margin-bottom:10px;"></div>
-        <div id="lis-selected" style="text-align:center;margin-bottom:10px;"></div>
-        <button onclick="submitLIS()">Submit Sequence</button>
-        <button onclick="refreshLIS()" style="margin-top:5px;background:#eee;color:#333;">Refresh</button>
-        <div class="result" id="lis-result"></div>
-    </div>
-    <div class="container">
         <h2>Stock Price Trends</h2>
         <div style="margin-bottom:10px;font-size:0.95rem;">
             <label for="stock-select" style="font-size:0.95rem;">Select companies:</label>
@@ -129,108 +96,38 @@
         <button onclick="fetchMaxChange()" style="font-size:0.98rem;padding:7px 0;">Show Largest Change Ranking</button>
         <div id="maxchange-result" style="margin-top:16px;font-size:0.97rem;"></div>
     </div>
+    <div class="container">
+        <h2>Stock Problems Playground</h2>
+        <div style="margin-bottom:10px;font-size:0.95rem;">
+            <label for="lc-problem" style="font-size:0.95rem;">Select Problem:</label>
+            <select id="lc-problem" style="width:100%;margin-top:5px;font-size:0.95rem;padding:6px;" onchange="updateLcInputs()">
+                <option value="121">121. Best Time to Buy and Sell Stock (One transaction)</option>
+                <option value="122">122. Best Time to Buy and Sell Stock II (Unlimited transactions)</option>
+                <option value="123">123. Best Time to Buy and Sell Stock III (At most two transactions)</option>
+                <option value="188">188. Best Time to Buy and Sell Stock IV (At most k transactions)</option>
+                <option value="309">309. Best Time to Buy and Sell Stock with Cooldown</option>
+                <option value="714">714. Best Time to Buy and Sell Stock with Transaction Fee</option>
+            </select>
+        </div>
+        <div style="margin-bottom:10px;font-size:0.95rem;">
+            <label for="lc-prices" style="font-size:0.95rem;">Prices (comma-separated):</label>
+            <input id="lc-prices" type="text" style="width:100%;font-size:0.95rem;padding:6px;" placeholder="e.g. 7,1,5,3,6,4">
+        </div>
+        <div id="lc-k-div" style="margin-bottom:10px;display:none;font-size:0.95rem;">
+            <label for="lc-k" style="font-size:0.95rem;">k (number of transactions):</label>
+            <input id="lc-k" type="number" min="1" max="10" value="2" style="width:100px;font-size:0.95rem;padding:6px;">
+        </div>
+        <div id="lc-fee-div" style="margin-bottom:10px;display:none;font-size:0.95rem;">
+            <label for="lc-fee" style="font-size:0.95rem;">Transaction Fee:</label>
+            <input id="lc-fee" type="number" min="0" value="0" style="width:100px;font-size:0.95rem;padding:6px;">
+        </div>
+        <button onclick="solveLcStock()" style="font-size:0.98rem;padding:7px 0;">Calculate</button>
+        <div id="lc-result" style="margin-top:16px;font-size:0.97rem;"></div>
+    </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
     <script>
-        async function checkMatch() {
-            const name1 = document.getElementById('name1').value;
-            const dob1 = document.getElementById('dob1').value;
-            const name2 = document.getElementById('name2').value;
-            const dob2 = document.getElementById('dob2').value;
-            const algorithm = document.getElementById('algorithm').value;
-            const res = await fetch('/match', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name1, name2, dob1, dob2, algorithm })
-            });
-            const data = await res.json();
-            document.getElementById('result').innerHTML = getMatchBar(data.percentage);
-        }
-        async function predictSentiment() {
-            const sentence = document.getElementById('sentence').value;
-            const res = await fetch('/predict', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sentence })
-            });
-            const data = await res.json();
-            let description = '';
-            if (data.sentiment === 'positive') {
-                description = 'This plan sounds positive and encouraging! You are likely to have a good outcome or positive experience.';
-            } else if (data.sentiment === 'negative') {
-                description = 'This plan seems negative or risky. You may want to reconsider or prepare for possible challenges.';
-            } else {
-                description = 'This plan is neutral. It could go either way, or more information is needed to judge.';
-            }
-            let barColor = '#aaa';
-            if (data.sentiment === 'positive') barColor = '#4caf50';
-            else if (data.sentiment === 'negative') barColor = '#f44336';
-            const percent = Math.round((data.score + 1) * 50); // -1 to 1 mapped to 0-100
-            const percentText = (percent).toFixed(1) + '%';
-            const bar = `<div style='background:#eee;width:100%;height:18px;border-radius:9px;overflow:hidden;margin:10px 0;'>` +
-                `<div style='height:18px;width:${percent}%;background:${barColor};transition:width 0.5s;'></div></div>`;
-            document.getElementById('sentiment-result').innerHTML = `<b>Sentiment:</b> ${data.sentiment} <br><b>Score:</b> ${percentText} ${bar}<br>${description}`;
-        }
-        function refreshMatch() {
-            document.getElementById('name1').value = '';
-            document.getElementById('dob1').value = '';
-            document.getElementById('name2').value = '';
-            document.getElementById('dob2').value = '';
-            document.getElementById('algorithm').selectedIndex = 0;
-            document.getElementById('result').innerText = '';
-        }
-        function refreshSentiment() {
-            document.getElementById('sentence').value = '';
-            document.getElementById('sentiment-result').innerText = '';
-        }
-        function getMatchBar(percentage) {
-            const bar = `<div style='background:#eee;width:100%;height:18px;border-radius:9px;overflow:hidden;margin:10px 0;'>` +
-                `<div style='height:18px;width:${percentage}%;background:#2196f3;transition:width 0.5s;'></div></div>`;
-            return `<b>How matchable between these two:</b> ${percentage}% ${bar}`;
-        }
-        // LIS Game logic
-        let lisNumbers = [];
-        let lisSelected = [];
-        function randomLISNumbers() {
-            lisNumbers = Array.from({length: 10}, () => Math.floor(Math.random() * 40));
-            lisSelected = [];
-            renderLIS();
-        }
-        function renderLIS() {
-            const seqDiv = document.getElementById('lis-seq');
-            seqDiv.innerHTML = lisNumbers.map((num, idx) =>
-                `<button onclick='selectLIS(${idx})' style='width:36px;margin:2px;${lisSelected.includes(idx) ? "background:#2196f3;color:#fff;" : ""}'>${num}</button>`
-            ).join(' ');
-            document.getElementById('lis-selected').innerHTML =
-                'Your sequence: ' + lisSelected.map(i => lisNumbers[i]).join(', ');
-            document.getElementById('lis-result').innerHTML = '';
-        }
-        function selectLIS(idx) {
-            if (lisSelected.length === 0 || (idx > lisSelected[lisSelected.length-1] && lisNumbers[idx] > lisNumbers[lisSelected[lisSelected.length-1]])) {
-                lisSelected.push(idx);
-                renderLIS();
-            }
-        }
-        async function submitLIS() {
-            const userSeq = lisSelected.map(i => lisNumbers[i]);
-            const res = await fetch('/lis', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nums: lisNumbers })
-            });
-            const data = await res.json();
-            const optimal = data.lis;
-            let msg = `<b>Your LIS length:</b> ${userSeq.length}<br><b>Optimal LIS length:</b> ${optimal.length}<br>`;
-            msg += `<b>Your sequence:</b> [${userSeq.join(', ')}]<br>`;
-            msg += `<b>Optimal LIS:</b> [${optimal.join(', ')}]`;
-            document.getElementById('lis-result').innerHTML = msg;
-        }
-        function refreshLIS() {
-            randomLISNumbers();
-        }
-        // Initialize LIS game on load
-        randomLISNumbers();
         async function fetchStockTrends() {
             document.getElementById('stock-trends-result').innerText = 'Loading...';
             document.getElementById('stockChartMulti').style.display = 'none';
@@ -455,6 +352,43 @@
                 document.getElementById('maxchange-result').innerText = 'Failed to fetch ranking.';
             }
         }
+        function updateLcInputs() {
+            const problem = document.getElementById('lc-problem').value;
+            document.getElementById('lc-k-div').style.display = (problem === '188') ? '' : 'none';
+            document.getElementById('lc-fee-div').style.display = (problem === '714') ? '' : 'none';
+        }
+        async function solveLcStock() {
+            const problem = document.getElementById('lc-problem').value;
+            const prices = document.getElementById('lc-prices').value.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x));
+            const k = parseInt(document.getElementById('lc-k').value);
+            const fee = parseFloat(document.getElementById('lc-fee').value);
+            let body = { problem, prices };
+            if (problem === '188') body.k = k;
+            if (problem === '714') body.fee = fee;
+            document.getElementById('lc-result').innerText = 'Calculating...';
+            try {
+                const res = await fetch('/leetcode/stock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.error) {
+                    document.getElementById('lc-result').innerText = data.error;
+                } else {
+                    document.getElementById('lc-result').innerHTML =
+                        `<b>Result:</b> ${data.result}<br><br>` +
+                        `<b>Python Code:</b><br><pre style='background:#f7f7f7;padding:10px;border-radius:6px;overflow-x:auto;'>${data.code}</pre>` +
+                        `<b>Time Complexity:</b> ${data.time_complexity}<br>` +
+                        `<b>Space Complexity:</b> ${data.space_complexity}<br>` +
+                        `<b>Explanation:</b> ${data.explanation}`;
+                }
+            } catch (e) {
+                document.getElementById('lc-result').innerText = 'Failed to calculate.';
+            }
+        }
+        // Initialize input visibility
+        updateLcInputs();
     </script>
 </body>
 </html> 
