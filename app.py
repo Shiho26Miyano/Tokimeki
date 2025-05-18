@@ -4,6 +4,13 @@ from typing import List
 from math import comb
 import os
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+import requests
+import logging
+
+try:
+    import yfinance as yf
+except ImportError:
+    yf = None
 
 app = Flask(__name__)
 CORS(app)
@@ -119,6 +126,30 @@ def lis_api():
     nums = data.get('nums', [])
     lis = longest_increasing_subsequence(nums)
     return jsonify({'lis': lis, 'length': len(lis)})
+
+@app.route('/stock/googl', methods=['GET'])
+def get_googl_stock():
+    url = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=GOOGL'
+    try:
+        resp = requests.get(url, timeout=5)
+        data = resp.json()
+        price = data['quoteResponse']['result'][0]['regularMarketPrice']
+        time = data['quoteResponse']['result'][0]['regularMarketTime']
+        return jsonify({'price': price, 'time': time})
+    except Exception as e:
+        logging.error(f"Yahoo direct fetch failed: {e}")
+        # Try yfinance as a fallback
+        if yf is not None:
+            try:
+                ticker = yf.Ticker('GOOGL')
+                hist = ticker.history(period='1d')
+                if not hist.empty:
+                    price = hist['Close'].iloc[-1]
+                    time = int(hist.index[-1].timestamp())
+                    return jsonify({'price': float(price), 'time': time})
+            except Exception as e2:
+                logging.error(f"yfinance fetch failed: {e2}")
+        return jsonify({'error': f'Failed to fetch stock price. {str(e)}'}), 500
 
 @app.route('/')
 def index():
