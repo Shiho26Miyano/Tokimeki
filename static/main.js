@@ -228,6 +228,26 @@ function updateLcInputs() {
     document.getElementById('lc-k-div').style.display = (problem === '188') ? '' : 'none';
     document.getElementById('lc-fee-div').style.display = (problem === '714') ? '' : 'none';
 }
+let lcCodeLang = 'py';
+let lcLastResult = { code: '', cpp_code: '', time_complexity: '', space_complexity: '', explanation: '', result: '' };
+function setLcCodeLang(lang) {
+    lcCodeLang = lang;
+    // Update button styles
+    document.getElementById('btn-py').style.background = lang === 'py' ? '#ff69b4' : '#eee';
+    document.getElementById('btn-py').style.color = lang === 'py' ? '#fff' : '#333';
+    document.getElementById('btn-cpp').style.background = lang === 'cpp' ? '#ff69b4' : '#eee';
+    document.getElementById('btn-cpp').style.color = lang === 'cpp' ? '#fff' : '#333';
+    // Update code display
+    if (lcLastResult.code || lcLastResult.cpp_code) {
+        let code = lcCodeLang === 'py' ? lcLastResult.code : lcLastResult.cpp_code;
+        document.getElementById('lc-result').innerHTML =
+            `<b>Result:</b> ${lcLastResult.result}<br><br>` +
+            `<b>${lcCodeLang === 'py' ? 'Python' : 'C++'} Code:</b><br><pre style='background:#f7f7f7;padding:10px;border-radius:6px;overflow-x:auto;'>${code}</pre>` +
+            `<b>Time Complexity:</b> ${lcLastResult.time_complexity}<br>` +
+            `<b>Space Complexity:</b> ${lcLastResult.space_complexity}<br>` +
+            `<b>Explanation:</b> ${lcLastResult.explanation}`;
+    }
+}
 async function solveLcStock() {
     const problem = document.getElementById('lc-problem').value;
     const prices = document.getElementById('lc-prices').value.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x));
@@ -247,16 +267,260 @@ async function solveLcStock() {
         if (data.error) {
             document.getElementById('lc-result').innerText = data.error;
         } else {
-            document.getElementById('lc-result').innerHTML =
-                `<b>Result:</b> ${data.result}<br><br>` +
-                `<b>Python Code:</b><br><pre style='background:#f7f7f7;padding:10px;border-radius:6px;overflow-x:auto;'>${data.code}</pre>` +
-                `<b>Time Complexity:</b> ${data.time_complexity}<br>` +
-                `<b>Space Complexity:</b> ${data.space_complexity}<br>` +
-                `<b>Explanation:</b> ${data.explanation}`;
+            lcLastResult = data;
+            setLcCodeLang(lcCodeLang); // Show selected code
         }
     } catch (e) {
         document.getElementById('lc-result').innerText = 'Failed to calculate.';
     }
 }
+async function fetchStableChange() {
+    document.getElementById('stable-cards').innerText = 'Loading...';
+    const metric = document.getElementById('stable-metric').value;
+    let url = `/stocks/stable?metric=${metric}`;
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        let cardsHtml = '';
+        data.forEach((item, idx) => {
+            if (item.stability_score !== undefined) {
+                const chartId = `stableChart${idx}`;
+                const sliderId = `stableSlider${idx}`;
+                const infoId = `stableInfo${idx}`;
+                const windowLen = item.window_len;
+                const allCloses = item.all_closes;
+                const allDates = item.all_dates;
+                const sliderMax = allCloses.length - windowLen;
+                // Initial window index is best window
+                const sliderVal = item.window_start_idx;
+                cardsHtml += `
+                <div style='display:flex;flex-wrap:nowrap;align-items:stretch;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
+                    <div style='flex:1 1 220px;min-width:180px;max-width:260px;display:flex;flex-direction:column;justify-content:center;padding:0 24px 0 24px;'>
+                        <div id='${infoId}'>
+                            <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
+                            <div style='margin-bottom:4px;'><b>Start:</b> ${item.start_date} <b>End:</b> ${item.end_date}</div>
+                            <div style='margin-bottom:4px;'><b>Stability Score:</b> ${item.stability_score.toFixed(4)}</div>
+                            <div style='margin-bottom:4px;'><b>Metric:</b> ${item.metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
+                            <div style='margin-bottom:4px;font-size:0.97em;color:#888;'>Window Prices: [${item.window_prices.map(x=>x.toFixed(2)).join(', ')}]</div>
+                        </div>
+                    </div>
+                    <div style='width:1px;background:#e0e0e0;margin:0 0;'></div>
+                    <div style='flex:2 1 320px;min-width:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px 0 32px;'>
+                        <canvas id='${chartId}' width='260' height='110' style='background:#fff;border-radius:8px;'></canvas>
+                        <input type='range' id='${sliderId}' min='0' max='${sliderMax}' value='${sliderVal}' style='width:100%;margin-top:10px;background:#eee;'>
+                        <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
+                    </div>
+                </div>
+                `;
+            } else {
+                cardsHtml += `<div style='margin-bottom:18px;color:#c00;'>${item.name} (${item.symbol}): ${item.error}</div>`;
+            }
+        });
+        document.getElementById('stable-cards').innerHTML = cardsHtml;
+        // Render charts and slider logic
+        data.forEach((item, idx) => {
+            if (item.stability_score !== undefined) {
+                const chartId = `stableChart${idx}`;
+                const sliderId = `stableSlider${idx}`;
+                const infoId = `stableInfo${idx}`;
+                const windowLen = item.window_len;
+                const allCloses = item.all_closes;
+                const allDates = item.all_dates;
+                const metric = item.metric;
+                // Helper to update chart and info
+                function updateWindow(startIdx) {
+                    const windowPrices = allCloses.slice(startIdx, startIdx+windowLen);
+                    const windowDates = allDates.slice(startIdx, startIdx+windowLen);
+                    // Compute stability
+                    let score = 0;
+                    if (metric === 'meanabs') {
+                        score = windowPrices.length > 1 ? windowPrices.slice(1).reduce((acc, v, i) => acc + Math.abs(v - windowPrices[i]), 0) / (windowPrices.length-1) : 0;
+                    } else {
+                        const changes = windowPrices.slice(1).map((v,i)=>v-windowPrices[i]);
+                        score = changes.length > 0 ? Math.sqrt(changes.reduce((acc, v) => acc + v*v, 0) / changes.length) : 0;
+                    }
+                    // Update info
+                    document.getElementById(infoId).innerHTML = `
+                        <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
+                        <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
+                        <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
+                        <div style='margin-bottom:4px;'><b>Metric:</b> ${metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
+                        <div style='margin-bottom:4px;font-size:0.97em;color:#888;'>Window Prices: [${windowPrices.map(x=>x.toFixed(2)).join(', ')}]</div>
+                    `;
+                    document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
+                    // Update chart
+                    if (windowPrices.length > 0 && window.myStableCharts && window.myStableCharts[chartId]) {
+                        window.myStableCharts[chartId].data.labels = windowPrices.map((v,i)=>i+1);
+                        window.myStableCharts[chartId].data.datasets[0].data = windowPrices;
+                        window.myStableCharts[chartId].update();
+                    }
+                }
+                // Initial chart
+                const ctx = document.getElementById(chartId).getContext('2d');
+                if (!window.myStableCharts) window.myStableCharts = {};
+                window.myStableCharts[chartId] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: allCloses.slice(item.window_start_idx, item.window_start_idx+windowLen).map((v,i)=>i+1),
+                        datasets: [{
+                            label: 'Price',
+                            data: allCloses.slice(item.window_start_idx, item.window_start_idx+windowLen),
+                            borderColor: '#2196f3',
+                            backgroundColor: 'rgba(33,150,243,0.08)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 2,
+                            pointBackgroundColor: '#2196f3',
+                        }]
+                    },
+                    options: {
+                        responsive: false,
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: false },
+                            tooltip: { enabled: true }
+                        },
+                        scales: {
+                            x: { display: false },
+                            y: { display: true, title: { display: false }, grid: { display: false } }
+                        }
+                    }
+                });
+                // Slider event
+                document.getElementById(sliderId).addEventListener('input', function(e) {
+                    updateWindow(Number(e.target.value));
+                });
+            }
+        });
+    } catch (e) {
+        document.getElementById('stable-cards').innerText = 'Failed to fetch stable stocks.';
+    }
+}
 // Initialize input visibility
-updateLcInputs(); 
+updateLcInputs();
+// Helper to render a single stable card (for explore)
+function renderStableCard(item, idx, targetId) {
+    if (item.stability_score === undefined) {
+        document.getElementById(targetId).innerHTML = `<div style='margin-bottom:18px;color:#c00;'>${item.name} (${item.symbol}): ${item.error}</div>`;
+        return;
+    }
+    const chartId = `exploreStableChart${idx}`;
+    const sliderId = `exploreStableSlider${idx}`;
+    const infoId = `exploreStableInfo${idx}`;
+    const windowLen = item.window_len;
+    const allCloses = item.all_closes;
+    const allDates = item.all_dates;
+    const sliderMax = allCloses.length - windowLen;
+    const sliderVal = item.window_start_idx;
+    let cardHtml = `
+        <div style='display:flex;flex-wrap:nowrap;align-items:stretch;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
+            <div style='flex:1 1 220px;min-width:180px;max-width:260px;display:flex;flex-direction:column;justify-content:center;padding:0 24px 0 24px;'>
+                <div id='${infoId}'>
+                    <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
+                    <div style='margin-bottom:4px;'><b>Start:</b> ${item.start_date} <b>End:</b> ${item.end_date}</div>
+                    <div style='margin-bottom:4px;'><b>Stability Score:</b> ${item.stability_score.toFixed(4)}</div>
+                    <div style='margin-bottom:4px;'><b>Metric:</b> ${item.metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
+                    <div style='margin-bottom:4px;font-size:0.97em;color:#888;'>Window Prices: [${item.window_prices.map(x=>x.toFixed(2)).join(', ')}]</div>
+                </div>
+            </div>
+            <div style='width:1px;background:#e0e0e0;margin:0 0;'></div>
+            <div style='flex:2 1 320px;min-width:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px 0 32px;'>
+                <canvas id='${chartId}' width='260' height='110' style='background:#fff;border-radius:8px;'></canvas>
+                <input type='range' id='${sliderId}' min='0' max='${sliderMax}' value='${sliderVal}' style='width:100%;margin-top:10px;background:#eee;'>
+                <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
+            </div>
+        </div>
+    `;
+    document.getElementById(targetId).innerHTML = cardHtml;
+    // Chart and slider logic
+    const metric = item.metric;
+    function updateWindow(startIdx) {
+        const windowPrices = allCloses.slice(startIdx, startIdx+windowLen);
+        const windowDates = allDates.slice(startIdx, startIdx+windowLen);
+        let score = 0;
+        if (metric === 'meanabs') {
+            score = windowPrices.length > 1 ? windowPrices.slice(1).reduce((acc, v, i) => acc + Math.abs(v - windowPrices[i]), 0) / (windowPrices.length-1) : 0;
+        } else {
+            const changes = windowPrices.slice(1).map((v,i)=>v-windowPrices[i]);
+            score = changes.length > 0 ? Math.sqrt(changes.reduce((acc, v) => acc + v*v, 0) / changes.length) : 0;
+        }
+        document.getElementById(infoId).innerHTML = `
+            <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
+            <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
+            <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
+            <div style='margin-bottom:4px;'><b>Metric:</b> ${metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
+            <div style='margin-bottom:4px;font-size:0.97em;color:#888;'>Window Prices: [${windowPrices.map(x=>x.toFixed(2)).join(', ')}]</div>
+        `;
+        document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
+        if (windowPrices.length > 0 && window.myStableCharts && window.myStableCharts[chartId]) {
+            window.myStableCharts[chartId].data.labels = windowPrices.map((v,i)=>i+1);
+            window.myStableCharts[chartId].data.datasets[0].data = windowPrices;
+            window.myStableCharts[chartId].update();
+        }
+    }
+    const ctx = document.getElementById(chartId).getContext('2d');
+    if (!window.myStableCharts) window.myStableCharts = {};
+    window.myStableCharts[chartId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: allCloses.slice(item.window_start_idx, item.window_start_idx+windowLen).map((v,i)=>i+1),
+            datasets: [{
+                label: 'Price',
+                data: allCloses.slice(item.window_start_idx, item.window_start_idx+windowLen),
+                borderColor: '#2196f3',
+                backgroundColor: 'rgba(33,150,243,0.08)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 2,
+                pointBackgroundColor: '#2196f3',
+            }]
+        },
+        options: {
+            responsive: false,
+            plugins: {
+                legend: { display: false },
+                title: { display: false },
+                tooltip: { enabled: true }
+            },
+            scales: {
+                x: { display: false },
+                y: { display: true, title: { display: false }, grid: { display: false } }
+            }
+        }
+    });
+    document.getElementById(sliderId).addEventListener('input', function(e) {
+        updateWindow(Number(e.target.value));
+    });
+}
+// Add event listener for explore-stock
+window.addEventListener('DOMContentLoaded', function() {
+    const exploreSelect = document.getElementById('explore-stock');
+    const metricSelect = document.getElementById('stable-metric');
+    const exploreMetricSelect = document.getElementById('explore-metric');
+    function fetchAndShowExploreCard() {
+        const symbol = exploreSelect.value;
+        const metric = exploreMetricSelect.value;
+        if (!symbol) {
+            document.getElementById('explore-card').innerHTML = '';
+            return;
+        }
+        document.getElementById('explore-card').innerHTML = 'Loading...';
+        fetch(`/stocks/stable?metric=${metric}&symbol=${symbol}`)
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data) && data.length > 0) {
+                    renderStableCard(data[0], 0, 'explore-card');
+                } else {
+                    document.getElementById('explore-card').innerHTML = 'No data.';
+                }
+            })
+            .catch(() => {
+                document.getElementById('explore-card').innerHTML = 'Failed to fetch.';
+            });
+    }
+    exploreSelect.addEventListener('change', fetchAndShowExploreCard);
+    exploreMetricSelect.addEventListener('change', fetchAndShowExploreCard);
+    metricSelect.addEventListener('change', function() {
+        if (exploreSelect.value) fetchAndShowExploreCard();
+    });
+}); 

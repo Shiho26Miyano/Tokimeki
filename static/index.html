@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tokimeki Matchmaking</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
     <style>
         body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 40px; }
         .main-flex { display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; }
@@ -140,11 +141,65 @@
             <input id="lc-fee" type="number" min="0" value="0" style="width:100px;font-size:0.95rem;padding:6px;">
         </div>
         <button onclick="solveLcStock()" style="font-size:0.98rem;padding:7px 0;">Calculate</button>
-        <div id="lc-result" style="margin-top:16px;font-size:0.97rem;"></div>
+        <div style="margin-top:10px;text-align:center;">
+            <div id="lc-code-toggle" style="display:inline-block;background:#f7f7f7;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-bottom:8px;">
+                <button id="btn-py" onclick="setLcCodeLang('py')" style="border:none;background:#ff69b4;color:#fff;padding:6px 18px;font-size:1rem;cursor:pointer;outline:none;">Python</button>
+                <button id="btn-cpp" onclick="setLcCodeLang('cpp')" style="border:none;background:#eee;color:#333;padding:6px 18px;font-size:1rem;cursor:pointer;outline:none;">C++</button>
+            </div>
+        </div>
+        <div id="lc-result" style="margin-top:8px;font-size:0.97rem;"></div>
+    </div>
+    <div class="container">
+        <h2>Find the Most Stable Stock</h2>
+        <div style="margin-bottom:10px;font-size:0.95rem;">
+            <label style="font-size:0.95rem;">Stability Metric:</label>
+            <select id="stable-metric" style="margin-left:8px;font-size:0.95rem;padding:4px;">
+                <option value="std">Lowest Standard Deviation (Most Stable)</option>
+                <option value="meanabs">Lowest Mean Absolute Change (Most Stable)</option>
+                <option value="maxstd">Highest Standard Deviation (Most Unstable)</option>
+                <option value="maxmeanabs">Highest Mean Absolute Change (Most Unstable)</option>
+            </select>
+        </div>
+        <button onclick="fetchStableChange()" style="font-size:0.98rem;padding:7px 0;">Find Most Stable Stocks</button>
+        <div id="stable-cards" style="margin-top:16px;"></div>
+    </div>
+    <div class="container">
+        <h2>Stock Stability Explorer</h2>
+        <div style="margin-bottom:10px;font-size:0.95rem;">
+            <label for="explore-stock" style="font-size:0.95rem;">Select a Stock:</label>
+            <select id="explore-stock" style="margin-left:8px;font-size:0.95rem;padding:4px;min-width:160px;">
+                <option value="">-- Select --</option>
+                <option value="GOOGL">Google (GOOGL)</option>
+                <option value="NVDA">Nvidia (NVDA)</option>
+                <option value="AAPL">Apple (AAPL)</option>
+                <option value="MSFT">Microsoft (MSFT)</option>
+                <option value="AMZN">Amazon (AMZN)</option>
+                <option value="META">Meta (META)</option>
+                <option value="TSLA">Tesla (TSLA)</option>
+                <option value="NFLX">Netflix (NFLX)</option>
+                <option value="AMD">AMD (AMD)</option>
+                <option value="INTC">Intel (INTC)</option>
+                <option value="BABA">Alibaba (BABA)</option>
+                <option value="SPY">S&P 500 ETF (SPY)</option>
+                <option value="QQQ">Nasdaq 100 ETF (QQQ)</option>
+                <option value="VOO">S&P 500 ETF (VOO)</option>
+                <option value="GTIM">Good Times Restaurants (GTIM)</option>
+                <option value="ARKK">ARK Innovation ETF (ARKK)</option>
+                <option value="EEM">Emerging Markets ETF (EEM)</option>
+                <option value="XLF">Financial Select Sector SPDR (XLF)</option>
+            </select>
+            <label style="margin-left:18px;font-size:0.95rem;">Stability Metric:</label>
+            <select id="explore-metric" style="margin-left:8px;font-size:0.95rem;padding:4px;">
+                <option value="std">Lowest Standard Deviation</option>
+                <option value="meanabs">Lowest Mean Absolute Change</option>
+            </select>
+        </div>
+        <div id="explore-card" style="margin-top:16px;"></div>
     </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
     <script src="static/main.js"></script>
 </body>
 </html> 
