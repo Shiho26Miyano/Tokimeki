@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tokimeki Matchmaking</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 40px; }
+        .container { background: #fff; padding: 30px; border-radius: 8px; max-width: 400px; margin: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #ccc; }
+        button { width: 100%; padding: 10px; background: #ff69b4; color: #fff; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #ff1493; }
+        .result { margin-top: 20px; text-align: center; font-size: 20px; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="/static/img/cute.png" alt="Cute Japanese Cartoon" style="display:block;margin:0 auto 20px auto;width:120px;height:120px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <h2>Tokimeki Matchmaking</h2>
+        <input type="text" id="name1" placeholder="Enter first name">
+        <input type="date" id="dob1" placeholder="Date of Birth (Person 1)">
+        <input type="text" id="name2" placeholder="Enter second name">
+        <input type="date" id="dob2" placeholder="Date of Birth (Person 2)">
+        <select id="algorithm" style="width:100%;padding:10px;margin:10px 0;border-radius:4px;border:1px solid #ccc;">
+            <option value="sum">Sum Similarity</option>
+            <option value="longest">Longest Consecutive</option>
+            <option value="lcs">Longest Common Subsequence (LCS)</option>
+        </select>
+        <button onclick="checkMatch()">Check Match</button>
+        <div class="result" id="result"></div>
+    </div>
+    <script>
+        async function checkMatch() {
+            const name1 = document.getElementById('name1').value;
+            const dob1 = document.getElementById('dob1').value;
+            const name2 = document.getElementById('name2').value;
+            const dob2 = document.getElementById('dob2').value;
+            const algorithm = document.getElementById('algorithm').value;
+            const res = await fetch('/match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name1, name2, dob1, dob2, algorithm })
+            });
+            const data = await res.json();
+            document.getElementById('result').innerText = `How matchable between these two: ${data.percentage}%`;
+        }
+    </script>
+</body>
+</html> 
