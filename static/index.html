@@ -2,16 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tokimeki Matchmaking</title>
     <style>
         body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 40px; }
         .main-flex { display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; }
-        .container { background: #fff; padding: 30px; border-radius: 8px; max-width: 400px; min-width: 300px; flex: 1 1 340px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .container { background: #fff; padding: 30px; border-radius: 8px; max-width: 400px; min-width: 280px; flex: 1 1 340px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         h2 { text-align: center; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #ccc; }
-        button { width: 100%; padding: 10px; background: #ff69b4; color: #fff; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        input, textarea { width: 100%; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #ccc; font-size: 1rem; }
+        button { width: 100%; padding: 12px; background: #ff69b4; color: #fff; border: none; border-radius: 4px; font-size: 1.1rem; cursor: pointer; }
         button:hover { background: #ff1493; }
-        .result { margin-top: 20px; text-align: center; font-size: 20px; color: #333; }
+        .result { margin-top: 20px; text-align: center; font-size: 1.15rem; color: #333; }
+        @media (max-width: 900px) {
+            body { padding: 10px; }
+            .main-flex { flex-direction: column; gap: 20px; }
+            .container { max-width: 100%; min-width: 0; padding: 18px; }
+        }
+        @media (max-width: 430px) {
+            h2 { font-size: 1.2rem; }
+            .result { font-size: 1rem; }
+            button, input, textarea { font-size: 0.95rem; }
+        }
     </style>
 </head>
 <body>
