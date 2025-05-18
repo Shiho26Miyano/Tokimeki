@@ -1,13 +1,10 @@
 # Elaine's Playground
 
-Elaine's Playground is a web app hosting a collection of fun and interactive play tools! This project is designed as a playground for experimenting with algorithms, data, and user interaction—all in one place.
+Elaine's Playground is a web app hosting interactive stock analysis tools! This project is a playground for experimenting with stock data, price trends, and volatility analysis.
 
 ## Features
-- **Tokimeki Matchmaking**: Test the "matchability" between two names using different algorithms.
-- **Sentiment Prediction**: Enter a sentence and get a positive/negative/neutral prediction using machine learning.
-- **LIS Game**: Play a game to find the Longest Increasing Subsequence in a random sequence.
-- **Stock Price Trends**: Explore and compare the price trends of popular stocks over the past month.
-- **Largest Stock Price Change**: See which stock had the biggest price swings in a given period.
+- **Stock Price Trends**: Explore and compare the price trends of popular stocks and ETFs over the past month.
+- **Largest Stock Price Change**: See which stock or ETF had the biggest price swings in a given period, with a ranking and details.
 
 ## Setup
 1. **Clone the repository:**
@@ -33,7 +30,7 @@ Elaine's Playground is a web app hosting a collection of fun and interactive pla
    or [http://192.168.1.25:8080](http://192.168.1.25:8080) (for LAN access)
 
 ## Tech Stack
-- **Backend:** Python, Flask, yfinance, vaderSentiment
+- **Backend:** Python, Flask, yfinance
 - **Frontend:** HTML, CSS, JavaScript, Chart.js
 
 ## License
