@@ -3,6 +3,7 @@ from flask_cors import CORS
 from typing import List
 from math import comb
 import os
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 app = Flask(__name__)
 CORS(app)
@@ -36,6 +37,8 @@ def lcs(nums1: List[int], nums2: List[int]) -> int:
             else:
                 dp[i + 1][j + 1] = max(dp[i][j + 1], dp[i + 1][j])
     return dp[m][n]
+
+analyzer = SentimentIntensityAnalyzer()
 
 @app.route('/match', methods=['POST'])
 def match():
@@ -71,6 +74,20 @@ def match():
         else:
             percentage = round(min(sum1, sum2) / max(sum1, sum2) * 100, 2)
     return jsonify({'percentage': percentage})
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    data = request.json
+    sentence = data.get('sentence', '')
+    scores = analyzer.polarity_scores(sentence)
+    compound = scores['compound']
+    if compound >= 0.05:
+        sentiment = 'positive'
+    elif compound <= -0.05:
+        sentiment = 'negative'
+    else:
+        sentiment = 'neutral'
+    return jsonify({'sentiment': sentiment, 'score': compound})
 
 @app.route('/')
 def index():

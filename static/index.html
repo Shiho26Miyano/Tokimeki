@@ -5,7 +5,8 @@
     <title>Tokimeki Matchmaking</title>
     <style>
         body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 40px; }
-        .container { background: #fff; padding: 30px; border-radius: 8px; max-width: 400px; margin: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .main-flex { display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; }
+        .container { background: #fff; padding: 30px; border-radius: 8px; max-width: 400px; min-width: 300px; flex: 1 1 340px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         h2 { text-align: center; }
         input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #ccc; }
         button { width: 100%; padding: 10px; background: #ff69b4; color: #fff; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
@@ -14,6 +15,7 @@
     </style>
 </head>
 <body>
+    <div class="main-flex">
     <div class="container">
         <img src="/static/img/cute.png" alt="Cute Japanese Cartoon" style="display:block;margin:0 auto 20px auto;width:120px;height:120px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
         <h2>Tokimeki Matchmaking</h2>
@@ -27,7 +29,17 @@
             <option value="lcs">Longest Common Subsequence (LCS)</option>
         </select>
         <button onclick="checkMatch()">Check Match</button>
+        <button onclick="refreshMatch()" style="margin-top:5px;background:#eee;color:#333;">Refresh</button>
         <div class="result" id="result"></div>
+    </div>
+    <div class="container">
+        <img src="/static/img/handsome.png" alt="Handsome Cartoon" style="display:block;margin:0 auto 20px auto;width:120px;height:120px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <h2>Sentiment Prediction</h2>
+        <textarea id="sentence" placeholder="Type your plan or sentence here..." style="width:100%;height:60px;padding:10px;border-radius:4px;border:1px solid #ccc;"></textarea>
+        <button onclick="predictSentiment()" style="margin-top:10px;">Predict Sentiment</button>
+        <button onclick="refreshSentiment()" style="margin-top:5px;background:#eee;color:#333;">Refresh</button>
+        <div class="result" id="sentiment-result"></div>
+    </div>
     </div>
     <script>
         async function checkMatch() {
@@ -42,7 +54,49 @@
                 body: JSON.stringify({ name1, name2, dob1, dob2, algorithm })
             });
             const data = await res.json();
-            document.getElementById('result').innerText = `How matchable between these two: ${data.percentage}%`;
+            document.getElementById('result').innerHTML = getMatchBar(data.percentage);
+        }
+        async function predictSentiment() {
+            const sentence = document.getElementById('sentence').value;
+            const res = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sentence })
+            });
+            const data = await res.json();
+            let description = '';
+            if (data.sentiment === 'positive') {
+                description = 'This plan sounds positive and encouraging!';
+            } else if (data.sentiment === 'negative') {
+                description = 'This plan seems negative or risky. Consider your options carefully.';
+            } else {
+                description = 'This plan is neutral. More context may be needed.';
+            }
+            let barColor = '#aaa';
+            if (data.sentiment === 'positive') barColor = '#4caf50';
+            else if (data.sentiment === 'negative') barColor = '#f44336';
+            const percent = Math.round((data.score + 1) * 50); // -1 to 1 mapped to 0-100
+            const percentText = (percent).toFixed(1) + '%';
+            const bar = `<div style='background:#eee;width:100%;height:18px;border-radius:9px;overflow:hidden;margin:10px 0;'>` +
+                `<div style='height:18px;width:${percent}%;background:${barColor};transition:width 0.5s;'></div></div>`;
+            document.getElementById('sentiment-result').innerHTML = `<b>Sentiment:</b> ${data.sentiment} <br><b>Score:</b> ${percentText} ${bar}<br>${description}`;
+        }
+        function refreshMatch() {
+            document.getElementById('name1').value = '';
+            document.getElementById('dob1').value = '';
+            document.getElementById('name2').value = '';
+            document.getElementById('dob2').value = '';
+            document.getElementById('algorithm').selectedIndex = 0;
+            document.getElementById('result').innerText = '';
+        }
+        function refreshSentiment() {
+            document.getElementById('sentence').value = '';
+            document.getElementById('sentiment-result').innerText = '';
+        }
+        function getMatchBar(percentage) {
+            const bar = `<div style='background:#eee;width:100%;height:18px;border-radius:9px;overflow:hidden;margin:10px 0;'>` +
+                `<div style='height:18px;width:${percentage}%;background:#2196f3;transition:width 0.5s;'></div></div>`;
+            return `<b>How matchable between these two:</b> ${percentage}% ${bar}`;
         }
     </script>
 </body>
