@@ -71,3 +71,9 @@ Tokimeki is an interactive web application that lets users test the "matchabilit
 
 ## License
 MIT 
+
+import os
+# ...
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port) 
