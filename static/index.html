@@ -14,6 +14,47 @@
         button { width: 100%; padding: 12px; background: #ff69b4; color: #fff; border: none; border-radius: 4px; font-size: 1.1rem; cursor: pointer; }
         button:hover { background: #ff1493; }
         .result { margin-top: 20px; text-align: center; font-size: 1.15rem; color: #333; }
+        /* --- Modern noUiSlider Custom Style --- */
+        .noUi-target {
+            background: #e0e0e0;
+            border-radius: 8px;
+            box-shadow: none;
+            border: none;
+            height: 8px;
+            margin-top: 18px;
+        }
+        .noUi-connect {
+            background: #2196f3;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(33,150,243,0.08);
+        }
+        .noUi-horizontal .noUi-handle {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #2196f3;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 8px rgba(33,150,243,0.13);
+            top: -5px;
+            cursor: pointer;
+            transition: box-shadow 0.2s;
+        }
+        .noUi-horizontal .noUi-handle:hover {
+            box-shadow: 0 4px 16px rgba(33,150,243,0.18);
+        }
+        .noUi-handle:after, .noUi-handle:before {
+            display: none;
+        }
+        .noUi-tooltip {
+            background: #fff;
+            color: #2196f3;
+            border-radius: 6px;
+            border: 1px solid #2196f3;
+            font-size: 0.95em;
+            box-shadow: 0 1px 4px rgba(33,150,243,0.08);
+            padding: 2px 8px;
+        }
+        /* --- End noUiSlider Custom Style --- */
         @media (max-width: 900px) {
             body { padding: 10px; }
             .main-flex { flex-direction: column; gap: 20px; }
@@ -31,6 +72,13 @@
             .letsplay-row { flex-direction: column !important; gap: 2px !important; }
             .letsplay-row img { width: 32px !important; height: 32px !important; }
             .letsplay-row h1 { font-size: 0.95rem !important; }
+        }
+        /* Disabled select style */
+        select:disabled {
+            background: #f3f3f3;
+            color: #aaa;
+            border-color: #ddd;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -52,25 +100,50 @@
         <div style="margin-bottom:10px;font-size:0.95rem;">
             <label for="stock-select" style="font-size:0.95rem;">Select companies:</label>
             <select id="stock-select" multiple size="5" style="width:100%;margin-top:5px;font-size:0.95rem;padding:6px;">
-                <option value="GOOGL">Google (GOOGL)</option>
-                <option value="NVDA">Nvidia (NVDA)</option>
                 <option value="AAPL">Apple (AAPL)</option>
                 <option value="MSFT">Microsoft (MSFT)</option>
+                <option value="GOOGL">Google (GOOGL)</option>
                 <option value="AMZN">Amazon (AMZN)</option>
                 <option value="META">Meta (META)</option>
+                <option value="NVDA">Nvidia (NVDA)</option>
                 <option value="TSLA">Tesla (TSLA)</option>
                 <option value="NFLX">Netflix (NFLX)</option>
                 <option value="AMD">AMD (AMD)</option>
                 <option value="INTC">Intel (INTC)</option>
-                <option value="BABA">Alibaba (BABA)</option>
+                <option value="BRK-B">Berkshire Hathaway (BRK-B)</option>
+                <option value="JNJ">Johnson & Johnson (JNJ)</option>
+                <option value="V">Visa (V)</option>
+                <option value="JPM">JPMorgan Chase (JPM)</option>
+                <option value="WMT">Walmart (WMT)</option>
+                <option value="PG">Procter & Gamble (PG)</option>
+                <option value="KO">Coca-Cola (KO)</option>
+                <option value="XOM">Exxon Mobil (XOM)</option>
                 <option value="SPY">S&P 500 ETF (SPY)</option>
                 <option value="QQQ">Nasdaq 100 ETF (QQQ)</option>
                 <option value="VOO">S&P 500 ETF (VOO)</option>
-                <option value="GTIM">Good Times Restaurants (GTIM)</option>
                 <option value="ARKK">ARK Innovation ETF (ARKK)</option>
                 <option value="EEM">Emerging Markets ETF (EEM)</option>
                 <option value="XLF">Financial Select Sector SPDR (XLF)</option>
-                <option value="MNQ=F">Micro E-mini Nasdaq-100 (MNQ=F)</option>
+                <option value="ES=F">S&P 500 E-mini (ES=F)</option>
+                <option value="NQ=F">Nasdaq 100 E-mini (NQ=F)</option>
+                <option value="YM=F">Dow Jones E-mini (YM=F)</option>
+                <option value="RTY=F">Russell 2000 E-mini (RTY=F)</option>
+                <option value="MES=F">Micro E-mini S&P 500 (MES=F)</option>
+                <option value="MNQ=F">Micro E-mini Nasdaq 100 (MNQ=F)</option>
+                <option value="MYM=F">Micro E-mini Dow (MYM=F)</option>
+                <option value="M2K=F">Micro E-mini Russell 2000 (M2K=F)</option>
+                <option value="GC=F">Gold (GC=F)</option>
+                <option value="SI=F">Silver (SI=F)</option>
+                <option value="CL=F">Crude Oil WTI (CL=F)</option>
+                <option value="BZ=F">Brent Oil (BZ=F)</option>
+                <option value="NG=F">Natural Gas (NG=F)</option>
+                <option value="HG=F">Copper (HG=F)</option>
+                <option value="ZC=F">Corn (ZC=F)</option>
+                <option value="ZS=F">Soybeans (ZS=F)</option>
+                <option value="ZW=F">Wheat (ZW=F)</option>
+                <option value="VX=F">VIX (VX=F)</option>
+                <option value="BTC=F">Bitcoin Futures (BTC=F)</option>
+                <option value="ETH=F">Ethereum Futures (ETH=F)</option>
             </select>
             <div style="margin-top:8px;">
                 <label for="scale-select" style="font-size:0.95rem;">Y-Axis Scale:</label>
@@ -91,25 +164,50 @@
         <div style="margin-bottom:10px;font-size:0.95rem;">
             <label for="maxchange-stock-select" style="font-size:0.95rem;">Select companies:</label>
             <select id="maxchange-stock-select" multiple size="5" style="width:100%;margin-top:5px;font-size:0.95rem;padding:6px;">
-                <option value="GOOGL">Google (GOOGL)</option>
-                <option value="NVDA">Nvidia (NVDA)</option>
                 <option value="AAPL">Apple (AAPL)</option>
                 <option value="MSFT">Microsoft (MSFT)</option>
+                <option value="GOOGL">Google (GOOGL)</option>
                 <option value="AMZN">Amazon (AMZN)</option>
                 <option value="META">Meta (META)</option>
+                <option value="NVDA">Nvidia (NVDA)</option>
                 <option value="TSLA">Tesla (TSLA)</option>
                 <option value="NFLX">Netflix (NFLX)</option>
                 <option value="AMD">AMD (AMD)</option>
                 <option value="INTC">Intel (INTC)</option>
-                <option value="BABA">Alibaba (BABA)</option>
+                <option value="BRK-B">Berkshire Hathaway (BRK-B)</option>
+                <option value="JNJ">Johnson & Johnson (JNJ)</option>
+                <option value="V">Visa (V)</option>
+                <option value="JPM">JPMorgan Chase (JPM)</option>
+                <option value="WMT">Walmart (WMT)</option>
+                <option value="PG">Procter & Gamble (PG)</option>
+                <option value="KO">Coca-Cola (KO)</option>
+                <option value="XOM">Exxon Mobil (XOM)</option>
                 <option value="SPY">S&P 500 ETF (SPY)</option>
                 <option value="QQQ">Nasdaq 100 ETF (QQQ)</option>
                 <option value="VOO">S&P 500 ETF (VOO)</option>
-                <option value="GTIM">Good Times Restaurants (GTIM)</option>
                 <option value="ARKK">ARK Innovation ETF (ARKK)</option>
                 <option value="EEM">Emerging Markets ETF (EEM)</option>
                 <option value="XLF">Financial Select Sector SPDR (XLF)</option>
-                <option value="MNQ=F">Micro E-mini Nasdaq-100 (MNQ=F)</option>
+                <option value="ES=F">S&P 500 E-mini (ES=F)</option>
+                <option value="NQ=F">Nasdaq 100 E-mini (NQ=F)</option>
+                <option value="YM=F">Dow Jones E-mini (YM=F)</option>
+                <option value="RTY=F">Russell 2000 E-mini (RTY=F)</option>
+                <option value="MES=F">Micro E-mini S&P 500 (MES=F)</option>
+                <option value="MNQ=F">Micro E-mini Nasdaq 100 (MNQ=F)</option>
+                <option value="MYM=F">Micro E-mini Dow (MYM=F)</option>
+                <option value="M2K=F">Micro E-mini Russell 2000 (M2K=F)</option>
+                <option value="GC=F">Gold (GC=F)</option>
+                <option value="SI=F">Silver (SI=F)</option>
+                <option value="CL=F">Crude Oil WTI (CL=F)</option>
+                <option value="BZ=F">Brent Oil (BZ=F)</option>
+                <option value="NG=F">Natural Gas (NG=F)</option>
+                <option value="HG=F">Copper (HG=F)</option>
+                <option value="ZC=F">Corn (ZC=F)</option>
+                <option value="ZS=F">Soybeans (ZS=F)</option>
+                <option value="ZW=F">Wheat (ZW=F)</option>
+                <option value="VX=F">VIX (VX=F)</option>
+                <option value="BTC=F">Bitcoin Futures (BTC=F)</option>
+                <option value="ETH=F">Ethereum Futures (ETH=F)</option>
             </select>
         </div>
         <button onclick="fetchMaxChange()" style="font-size:0.98rem;padding:7px 0;">Show Largest Change Ranking</button>
@@ -151,6 +249,13 @@
     </div>
     <div class="container">
         <h2>Find the Most Stable Stock</h2>
+        <div style="margin-bottom:10px;font-size:0.97rem;color:#444;background:#f7f7fa;padding:10px 14px 10px 14px;border-radius:7px;margin-bottom:18px;line-height:1.6;">
+            <b>How to use:</b> <br>
+            1. Choose a <b>Stability Metric</b>, <b>Time Range</b>, and <b>Window Size</b>.<br>
+            2. Click <b>Find Most Stable Stocks</b> to see the top results.<br>
+            3. Use the <b>slider</b> in each result card to analyze different windows and see their scores.<br>
+            <span style="color:#888;font-size:0.95em;">Tip: You can compare different metrics, time ranges, and window sizes for deeper insights.</span>
+        </div>
         <div style="margin-bottom:10px;font-size:0.95rem;">
             <label style="font-size:0.95rem;">Stability Metric:</label>
             <select id="stable-metric" style="margin-left:8px;font-size:0.95rem;padding:4px;">
@@ -176,40 +281,49 @@
                 <option value="60">60 days</option>
             </select>
         </div>
+        <button onclick="resetStableSection()" style="margin-bottom:10px;background:#eee;color:#333;border:1px solid #ccc;">Reset</button>
         <button onclick="fetchStableChange()" style="font-size:0.98rem;padding:7px 0;">Find Most Stable Stocks</button>
         <div id="stable-cards" style="margin-top:16px;"></div>
     </div>
     <div class="container">
         <h2>Stock Stability Explorer</h2>
+        <div style="margin-bottom:10px;font-size:0.97rem;color:#444;background:#f7f7fa;padding:10px 14px 10px 14px;border-radius:7px;margin-bottom:18px;line-height:1.6;">
+            <b>How to use:</b> <br>
+            1. Select <b>Stock</b>, <b>Time Range</b>, and <b>Window Size</b> first.<br>
+            2. Then choose a <b>Stability Metric</b> to see the most stable/unstable period.<br>
+            3. Use the <b>slider</b> below the chart to explore other windows and see their scores.<br>
+            <span style="color:#888;font-size:0.95em;">Tip: The metric dropdown will unlock after you make all three selections above.</span>
+        </div>
         <div style="margin-bottom:10px;font-size:0.95rem;">
             <label for="explore-stock" style="font-size:0.95rem;">Select a Stock:</label>
             <select id="explore-stock" style="margin-left:8px;font-size:0.95rem;padding:4px;min-width:160px;">
                 <option value="">-- Select --</option>
-                <option value="GOOGL">Google (GOOGL)</option>
-                <option value="NVDA">Nvidia (NVDA)</option>
-                <option value="AAPL">Apple (AAPL)</option>
-                <option value="MSFT">Microsoft (MSFT)</option>
-                <option value="AMZN">Amazon (AMZN)</option>
-                <option value="META">Meta (META)</option>
-                <option value="TSLA">Tesla (TSLA)</option>
-                <option value="NFLX">Netflix (NFLX)</option>
-                <option value="AMD">AMD (AMD)</option>
-                <option value="INTC">Intel (INTC)</option>
-                <option value="BABA">Alibaba (BABA)</option>
-                <option value="SPY">S&P 500 ETF (SPY)</option>
-                <option value="QQQ">Nasdaq 100 ETF (QQQ)</option>
-                <option value="VOO">S&P 500 ETF (VOO)</option>
-                <option value="GTIM">Good Times Restaurants (GTIM)</option>
-                <option value="ARKK">ARK Innovation ETF (ARKK)</option>
-                <option value="EEM">Emerging Markets ETF (EEM)</option>
-                <option value="XLF">Financial Select Sector SPDR (XLF)</option>
             </select>
             <label style="margin-left:18px;font-size:0.95rem;">Stability Metric:</label>
-            <select id="explore-metric" style="margin-left:8px;font-size:0.95rem;padding:4px;">
+            <select id="explore-metric" style="margin-left:8px;font-size:0.95rem;padding:4px;" disabled>
                 <option value="std">Lowest Standard Deviation</option>
                 <option value="meanabs">Lowest Mean Absolute Change</option>
+                <option value="maxstd">Highest Standard Deviation (Most Unstable)</option>
+                <option value="maxmeanabs">Highest Mean Absolute Change (Most Unstable)</option>
+            </select>
+            <label style="margin-left:18px;font-size:0.95rem;">Time Range:</label>
+            <select id="explore-range" style="margin-left:8px;font-size:0.95rem;padding:4px;">
+                <option value="90">3 months</option>
+                <option value="180">6 months</option>
+                <option value="365">1 year</option>
+                <option value="730">2 years</option>
+                <option value="1095" selected>3 years</option>
+            </select>
+            <label style="margin-left:18px;font-size:0.95rem;">Window Size:</label>
+            <select id="explore-window" style="margin-left:8px;font-size:0.95rem;padding:4px;">
+                <option value="5">5 days</option>
+                <option value="10">10 days</option>
+                <option value="20" selected>20 days</option>
+                <option value="30">30 days</option>
+                <option value="60">60 days</option>
             </select>
         </div>
+        <button onclick="resetExplorerSection()" style="margin-bottom:10px;background:#eee;color:#333;border:1px solid #ccc;">Reset</button>
         <div id="explore-card" style="margin-top:16px;"></div>
     </div>
     </div>

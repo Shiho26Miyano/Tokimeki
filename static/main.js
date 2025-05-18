@@ -281,7 +281,9 @@ async function fetchStableChange() {
     let order = 'asc';
     if (metricSel === 'maxstd') { metric = 'std'; order = 'desc'; }
     if (metricSel === 'maxmeanabs') { metric = 'meanabs'; order = 'desc'; }
-    let url = `/stocks/stable?metric=${metric}&order=${order}`;
+    const windowSize = document.getElementById('stable-window').value;
+    const days = document.getElementById('stable-range').value;
+    let url = `/stocks/stable?metric=${metric}&order=${order}&window=${windowSize}&days=${days}`;
     try {
         const res = await fetch(url);
         const data = await res.json();
@@ -294,9 +296,9 @@ async function fetchStableChange() {
                 const windowLen = item.window_len;
                 const allCloses = item.all_closes;
                 const allDates = item.all_dates;
-                const sliderMax = allCloses.length - windowLen;
-                // Initial window index is best window
-                const sliderVal = item.window_start_idx;
+                const sliderMax = allCloses.length - 1;
+                const sliderStart = item.window_start_idx;
+                const sliderEnd = item.window_end_idx;
                 cardsHtml += `
                 <div style='display:flex;flex-wrap:nowrap;align-items:stretch;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
                     <div style='flex:1 1 220px;min-width:180px;max-width:260px;display:flex;flex-direction:column;justify-content:center;padding:0 24px 0 24px;'>
@@ -311,7 +313,7 @@ async function fetchStableChange() {
                     <div style='width:1px;background:#e0e0e0;margin:0 0;'></div>
                     <div style='flex:2 1 320px;min-width:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px 0 32px;'>
                         <canvas id='${chartId}' width='260' height='110' style='background:#fff;border-radius:8px;'></canvas>
-                        <input type='range' id='${sliderId}' min='0' max='${sliderMax}' value='${sliderVal}' style='width:100%;margin-top:10px;background:#eee;'>
+                        <div id='${sliderId}' style='width:100%;margin-top:10px;'></div>
                         <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
                     </div>
                 </div>
@@ -349,7 +351,7 @@ async function fetchStableChange() {
                         <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
                         <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
                         <div style='margin-bottom:4px;'><b>Metric:</b> ${metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
-                        <div style='margin-bottom:4px;font-size:0.97em;color:#888;'>Window Prices: [${windowPrices.map(x=>x.toFixed(2)).join(', ')}]</div>
+                        <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${windowPrices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(windowPrices)}]</div>
                     `;
                     document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
                     // Update chart
@@ -390,9 +392,46 @@ async function fetchStableChange() {
                         }
                     }
                 });
-                // Slider event
-                document.getElementById(sliderId).addEventListener('input', function(e) {
-                    updateWindow(Number(e.target.value));
+                // Dual-handle slider using noUiSlider
+                const sliderElem = document.getElementById(sliderId);
+                noUiSlider.create(sliderElem, {
+                    start: [item.window_start_idx, item.window_end_idx],
+                    connect: true,
+                    range: { min: 0, max: item.window_end_idx },
+                    step: 1,
+                    tooltips: [true, true],
+                    format: {
+                        to: v => Math.round(v),
+                        from: v => Math.round(v)
+                    }
+                });
+                sliderElem.noUiSlider.on('update', function(values) {
+                    const startIdx = Number(values[0]);
+                    const endIdx = Number(values[1]);
+                    if (endIdx - startIdx < 1) return; // window must be at least 2
+                    const windowPrices = allCloses.slice(startIdx, endIdx+1);
+                    const windowDates = allDates.slice(startIdx, endIdx+1);
+                    let score = 0;
+                    if (item.metric === 'meanabs') {
+                        score = windowPrices.length > 1 ? windowPrices.slice(1).reduce((acc, v, i) => acc + Math.abs(v - windowPrices[i]), 0) / (windowPrices.length-1) : 0;
+                    } else {
+                        const changes = windowPrices.slice(1).map((v,i)=>v-windowPrices[i]);
+                        score = changes.length > 0 ? Math.sqrt(changes.reduce((acc, v) => acc + v*v, 0) / changes.length) : 0;
+                    }
+                    document.getElementById(infoId).innerHTML = `
+                        <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
+                        <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
+                        <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
+                        <div style='margin-bottom:4px;'><b>Metric:</b> ${item.metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
+                        <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${windowPrices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(windowPrices)}]</div>
+                    `;
+                    document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
+                    // Update chart
+                    if (windowPrices.length > 0 && window.myStableCharts && window.myStableCharts[chartId]) {
+                        window.myStableCharts[chartId].data.labels = windowPrices.map((v,i)=>i+1);
+                        window.myStableCharts[chartId].data.datasets[0].data = windowPrices;
+                        window.myStableCharts[chartId].update();
+                    }
                 });
             }
         });
@@ -403,19 +442,20 @@ async function fetchStableChange() {
 // Initialize input visibility
 updateLcInputs();
 // Helper to render a single stable card (for explore)
-function renderStableCard(item, idx, targetId) {
+function renderStableCard(item, idx, targetId, isExplorer = false) {
     if (item.stability_score === undefined) {
         document.getElementById(targetId).innerHTML = `<div style='margin-bottom:18px;color:#c00;'>${item.name} (${item.symbol}): ${item.error}</div>`;
         return;
     }
-    const chartId = `exploreStableChart${idx}`;
-    const sliderId = `exploreStableSlider${idx}`;
-    const infoId = `exploreStableInfo${idx}`;
+    const chartId = `${isExplorer ? 'explore' : ''}StableChart${idx}`;
+    const sliderId = `${isExplorer ? 'explore' : ''}StableSlider${idx}`;
+    const infoId = `${isExplorer ? 'explore' : ''}StableInfo${idx}`;
     const windowLen = item.window_len;
     const allCloses = item.all_closes;
     const allDates = item.all_dates;
-    const sliderMax = allCloses.length - windowLen;
-    const sliderVal = item.window_start_idx;
+    const sliderMax = allCloses.length - 1;
+    const sliderStart = item.window_start_idx;
+    const sliderEnd = item.window_end_idx;
     let cardHtml = `
         <div style='display:flex;flex-wrap:nowrap;align-items:stretch;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
             <div style='flex:1 1 220px;min-width:180px;max-width:260px;display:flex;flex-direction:column;justify-content:center;padding:0 24px 0 24px;'>
@@ -424,53 +464,28 @@ function renderStableCard(item, idx, targetId) {
                     <div style='margin-bottom:4px;'><b>Start:</b> ${item.start_date} <b>End:</b> ${item.end_date}</div>
                     <div style='margin-bottom:4px;'><b>Stability Score:</b> ${item.stability_score.toFixed(4)}</div>
                     <div style='margin-bottom:4px;'><b>Metric:</b> ${item.metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
-                    <div style='margin-bottom:4px;font-size:0.97em;color:#888;'>Window Prices: [${item.window_prices.map(x=>x.toFixed(2)).join(', ')}]</div>
+                    <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${item.window_prices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(item.window_prices)}]</div>
                 </div>
             </div>
             <div style='width:1px;background:#e0e0e0;margin:0 0;'></div>
             <div style='flex:2 1 320px;min-width:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px 0 32px;'>
                 <canvas id='${chartId}' width='260' height='110' style='background:#fff;border-radius:8px;'></canvas>
-                <input type='range' id='${sliderId}' min='0' max='${sliderMax}' value='${sliderVal}' style='width:100%;margin-top:10px;background:#eee;'>
+                <div id='${sliderId}' style='width:100%;margin-top:10px;'></div>
                 <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
             </div>
         </div>
     `;
     document.getElementById(targetId).innerHTML = cardHtml;
-    // Chart and slider logic
-    const metric = item.metric;
-    function updateWindow(startIdx) {
-        const windowPrices = allCloses.slice(startIdx, startIdx+windowLen);
-        const windowDates = allDates.slice(startIdx, startIdx+windowLen);
-        let score = 0;
-        if (metric === 'meanabs') {
-            score = windowPrices.length > 1 ? windowPrices.slice(1).reduce((acc, v, i) => acc + Math.abs(v - windowPrices[i]), 0) / (windowPrices.length-1) : 0;
-        } else {
-            const changes = windowPrices.slice(1).map((v,i)=>v-windowPrices[i]);
-            score = changes.length > 0 ? Math.sqrt(changes.reduce((acc, v) => acc + v*v, 0) / changes.length) : 0;
-        }
-        document.getElementById(infoId).innerHTML = `
-            <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
-            <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
-            <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
-            <div style='margin-bottom:4px;'><b>Metric:</b> ${metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
-            <div style='margin-bottom:4px;font-size:0.97em;color:#888;'>Window Prices: [${windowPrices.map(x=>x.toFixed(2)).join(', ')}]</div>
-        `;
-        document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
-        if (windowPrices.length > 0 && window.myStableCharts && window.myStableCharts[chartId]) {
-            window.myStableCharts[chartId].data.labels = windowPrices.map((v,i)=>i+1);
-            window.myStableCharts[chartId].data.datasets[0].data = windowPrices;
-            window.myStableCharts[chartId].update();
-        }
-    }
+    // Chart logic
     const ctx = document.getElementById(chartId).getContext('2d');
     if (!window.myStableCharts) window.myStableCharts = {};
     window.myStableCharts[chartId] = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: allCloses.slice(item.window_start_idx, item.window_start_idx+windowLen).map((v,i)=>i+1),
+            labels: allCloses.slice(sliderStart, sliderEnd+1).map((v,i)=>i+1),
             datasets: [{
                 label: 'Price',
-                data: allCloses.slice(item.window_start_idx, item.window_start_idx+windowLen),
+                data: allCloses.slice(sliderStart, sliderEnd+1),
                 borderColor: '#2196f3',
                 backgroundColor: 'rgba(33,150,243,0.08)',
                 fill: true,
@@ -492,8 +507,46 @@ function renderStableCard(item, idx, targetId) {
             }
         }
     });
-    document.getElementById(sliderId).addEventListener('input', function(e) {
-        updateWindow(Number(e.target.value));
+    // Dual-handle slider using noUiSlider
+    const sliderElem = document.getElementById(sliderId);
+    noUiSlider.create(sliderElem, {
+        start: [sliderStart, sliderEnd],
+        connect: true,
+        range: { min: 0, max: sliderMax },
+        step: 1,
+        tooltips: [true, true],
+        format: {
+            to: v => Math.round(v),
+            from: v => Math.round(v)
+        }
+    });
+    sliderElem.noUiSlider.on('update', function(values) {
+        const startIdx = Number(values[0]);
+        const endIdx = Number(values[1]);
+        if (endIdx - startIdx < 1) return; // window must be at least 2
+        const windowPrices = allCloses.slice(startIdx, endIdx+1);
+        const windowDates = allDates.slice(startIdx, endIdx+1);
+        let score = 0;
+        if (item.metric === 'meanabs') {
+            score = windowPrices.length > 1 ? windowPrices.slice(1).reduce((acc, v, i) => acc + Math.abs(v - windowPrices[i]), 0) / (windowPrices.length-1) : 0;
+        } else {
+            const changes = windowPrices.slice(1).map((v,i)=>v-windowPrices[i]);
+            score = changes.length > 0 ? Math.sqrt(changes.reduce((acc, v) => acc + v*v, 0) / changes.length) : 0;
+        }
+        document.getElementById(infoId).innerHTML = `
+            <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
+            <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
+            <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
+            <div style='margin-bottom:4px;'><b>Metric:</b> ${item.metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
+            <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${windowPrices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(windowPrices)}]</div>
+        `;
+        document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
+        // Update chart
+        if (windowPrices.length > 0 && window.myStableCharts && window.myStableCharts[chartId]) {
+            window.myStableCharts[chartId].data.labels = windowPrices.map((v,i)=>i+1);
+            window.myStableCharts[chartId].data.datasets[0].data = windowPrices;
+            window.myStableCharts[chartId].update();
+        }
     });
 }
 // Add event listener for explore-stock
@@ -501,19 +554,23 @@ window.addEventListener('DOMContentLoaded', function() {
     const exploreSelect = document.getElementById('explore-stock');
     const metricSelect = document.getElementById('stable-metric');
     const exploreMetricSelect = document.getElementById('explore-metric');
+    const exploreRangeSelect = document.getElementById('explore-range');
+    const exploreWindowSelect = document.getElementById('explore-window');
     function fetchAndShowExploreCard() {
         const symbol = exploreSelect.value;
         const metric = exploreMetricSelect.value;
+        const days = exploreRangeSelect.value;
+        const windowSize = exploreWindowSelect.value;
         if (!symbol) {
             document.getElementById('explore-card').innerHTML = '';
             return;
         }
         document.getElementById('explore-card').innerHTML = 'Loading...';
-        fetch(`/stocks/stable?metric=${metric}&symbol=${symbol}`)
+        fetch(`/stocks/stable?metric=${metric}&symbol=${symbol}&window=${windowSize}&days=${days}`)
             .then(res => res.json())
             .then(data => {
                 if (Array.isArray(data) && data.length > 0) {
-                    renderStableCard(data[0], 0, 'explore-card');
+                    renderStableCard(data[0], 0, 'explore-card', true);
                 } else {
                     document.getElementById('explore-card').innerHTML = 'No data.';
                 }
@@ -522,9 +579,94 @@ window.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('explore-card').innerHTML = 'Failed to fetch.';
             });
     }
-    exploreSelect.addEventListener('change', fetchAndShowExploreCard);
-    exploreMetricSelect.addEventListener('change', fetchAndShowExploreCard);
+    function fetchAndShowExploreCardWrapper() {
+        // Only fetch if metric is enabled and selected
+        if (!exploreMetricSelect.disabled && exploreMetricSelect.value) {
+            fetchAndShowExploreCard();
+        } else {
+            document.getElementById('explore-card').innerHTML = '';
+        }
+    }
+    exploreSelect.addEventListener('change', function() {
+        updateExploreMetricState();
+        fetchAndShowExploreCardWrapper();
+    });
+    exploreRangeSelect.addEventListener('change', function() {
+        updateExploreMetricState();
+        fetchAndShowExploreCardWrapper();
+    });
+    exploreWindowSelect.addEventListener('change', function() {
+        updateExploreMetricState();
+        fetchAndShowExploreCardWrapper();
+    });
+    exploreMetricSelect.addEventListener('change', fetchAndShowExploreCardWrapper);
+    // Initial state
+    updateExploreMetricState();
     metricSelect.addEventListener('change', function() {
         if (exploreSelect.value) fetchAndShowExploreCard();
     });
-}); 
+    fetch('/available_tickers').then(res => res.json()).then(tickers => {
+        populateDropdown('stock-select', tickers);
+        populateDropdown('maxchange-stock-select', tickers);
+        populateDropdown('explore-stock', tickers, true);
+    });
+});
+function formatWindowPrices(windowPrices) {
+    if (windowPrices.length <= 5) {
+        return windowPrices.map(x => x.toFixed(2)).join(', ');
+    } else {
+        return `${windowPrices[0].toFixed(2)}, ${windowPrices[1].toFixed(2)}, ..., ${windowPrices[windowPrices.length-2].toFixed(2)}, ${windowPrices[windowPrices.length-1].toFixed(2)}`;
+    }
+}
+// Add logic to enable/disable metric dropdown in Stock Stability Explorer
+function updateExploreMetricState() {
+    const stock = document.getElementById('explore-stock').value;
+    const range = document.getElementById('explore-range').value;
+    const windowSize = document.getElementById('explore-window').value;
+    const metricSelect = document.getElementById('explore-metric');
+    if (stock && range && windowSize) {
+        metricSelect.disabled = false;
+    } else {
+        metricSelect.disabled = true;
+    }
+}
+const tickerDisplayNames = {
+    'AAPL': 'Apple (AAPL)', 'MSFT': 'Microsoft (MSFT)', 'GOOGL': 'Google (GOOGL)', 'AMZN': 'Amazon (AMZN)', 'META': 'Meta (META)', 'NVDA': 'Nvidia (NVDA)', 'TSLA': 'Tesla (TSLA)', 'NFLX': 'Netflix (NFLX)', 'AMD': 'AMD (AMD)', 'INTC': 'Intel (INTC)',
+    'BRK-B': 'Berkshire Hathaway (BRK-B)', 'JNJ': 'Johnson & Johnson (JNJ)', 'V': 'Visa (V)', 'JPM': 'JPMorgan Chase (JPM)', 'WMT': 'Walmart (WMT)', 'PG': 'Procter & Gamble (PG)', 'KO': 'Coca-Cola (KO)', 'XOM': 'Exxon Mobil (XOM)',
+    'SPY': 'S&P 500 ETF (SPY)', 'QQQ': 'Nasdaq 100 ETF (QQQ)', 'VOO': 'S&P 500 ETF (VOO)', 'ARKK': 'ARK Innovation ETF (ARKK)', 'EEM': 'Emerging Markets ETF (EEM)', 'XLF': 'Financial Select Sector SPDR (XLF)',
+    'ES=F': 'S&P 500 E-mini (ES=F)', 'NQ=F': 'Nasdaq 100 E-mini (NQ=F)', 'YM=F': 'Dow Jones E-mini (YM=F)', 'RTY=F': 'Russell 2000 E-mini (RTY=F)', 'MES=F': 'Micro E-mini S&P 500 (MES=F)', 'MNQ=F': 'Micro E-mini Nasdaq 100 (MNQ=F)', 'MYM=F': 'Micro E-mini Dow (MYM=F)', 'M2K=F': 'Micro E-mini Russell 2000 (M2K=F)',
+    'GC=F': 'Gold (GC=F)', 'SI=F': 'Silver (SI=F)', 'CL=F': 'Crude Oil WTI (CL=F)', 'BZ=F': 'Brent Oil (BZ=F)', 'NG=F': 'Natural Gas (NG=F)', 'HG=F': 'Copper (HG=F)', 'ZC=F': 'Corn (ZC=F)', 'ZS=F': 'Soybeans (ZS=F)', 'ZW=F': 'Wheat (ZW=F)',
+    'VX=F': 'VIX (VX=F)', 'BTC=F': 'Bitcoin Futures (BTC=F)', 'ETH=F': 'Ethereum Futures (ETH=F)'
+};
+
+function populateDropdown(selectId, tickers, allowEmpty=false) {
+    const sel = document.getElementById(selectId);
+    sel.innerHTML = '';
+    if (allowEmpty) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- Select --';
+        sel.appendChild(opt);
+    }
+    tickers.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = tickerDisplayNames[t] || t;
+        sel.appendChild(opt);
+    });
+}
+function resetStableSection() {
+    document.getElementById('stable-metric').selectedIndex = 0;
+    document.getElementById('stable-range').selectedIndex = 4; // 3 years
+    document.getElementById('stable-window').selectedIndex = 2; // 20 days
+    document.getElementById('stable-cards').innerHTML = '';
+}
+function resetExplorerSection() {
+    const exploreStock = document.getElementById('explore-stock');
+    if (exploreStock.options.length > 0) exploreStock.selectedIndex = 0;
+    document.getElementById('explore-metric').selectedIndex = 0;
+    document.getElementById('explore-metric').disabled = true;
+    document.getElementById('explore-range').selectedIndex = 4; // 3 years
+    document.getElementById('explore-window').selectedIndex = 2; // 20 days
+    document.getElementById('explore-card').innerHTML = '';
+} 
