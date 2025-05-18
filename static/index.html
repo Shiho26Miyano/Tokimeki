@@ -26,6 +26,7 @@
     </style>
 </head>
 <body>
+    <h1 style="text-align:center;font-size:2.2rem;margin-bottom:30px;color:#ff69b4;letter-spacing:1px;">LET'S PLAY</h1>
     <div class="main-flex">
     <div class="container">
         <img src="/static/img/cute.png" alt="Cute Japanese Cartoon" style="display:block;margin:0 auto 20px auto;width:120px;height:120px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
@@ -46,10 +47,19 @@
     <div class="container">
         <img src="/static/img/handsome.png" alt="Handsome Cartoon" style="display:block;margin:0 auto 20px auto;width:120px;height:120px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
         <h2>Sentiment Prediction</h2>
-        <textarea id="sentence" placeholder="Type your plan or sentence here..." style="width:100%;height:60px;padding:10px;border-radius:4px;border:1px solid #ccc;"></textarea>
+        <div style="text-align:center;margin-bottom:8px;color:#888;font-size:0.98rem;">Enter a plan or thought and see if it's positive, negative, or neutral!</div>
+        <textarea id="sentence" placeholder="Type your plan or sentence here..." style="width:100%;height:60px;padding:10px;border-radius:4px;border:1px solid #ccc;">I plan to buy an apple</textarea>
         <button onclick="predictSentiment()" style="margin-top:10px;">Predict Sentiment</button>
         <button onclick="refreshSentiment()" style="margin-top:5px;background:#eee;color:#333;">Refresh</button>
         <div class="result" id="sentiment-result"></div>
+    </div>
+    <div class="container">
+        <h2>LIS Game</h2>
+        <div id="lis-seq" style="text-align:center;margin-bottom:10px;"></div>
+        <div id="lis-selected" style="text-align:center;margin-bottom:10px;"></div>
+        <button onclick="submitLIS()">Submit Sequence</button>
+        <button onclick="refreshLIS()" style="margin-top:5px;background:#eee;color:#333;">Refresh</button>
+        <div class="result" id="lis-result"></div>
     </div>
     </div>
     <script>
@@ -77,11 +87,11 @@
             const data = await res.json();
             let description = '';
             if (data.sentiment === 'positive') {
-                description = 'This plan sounds positive and encouraging!';
+                description = 'This plan sounds positive and encouraging! You are likely to have a good outcome or positive experience.';
             } else if (data.sentiment === 'negative') {
-                description = 'This plan seems negative or risky. Consider your options carefully.';
+                description = 'This plan seems negative or risky. You may want to reconsider or prepare for possible challenges.';
             } else {
-                description = 'This plan is neutral. More context may be needed.';
+                description = 'This plan is neutral. It could go either way, or more information is needed to judge.';
             }
             let barColor = '#aaa';
             if (data.sentiment === 'positive') barColor = '#4caf50';
@@ -109,6 +119,48 @@
                 `<div style='height:18px;width:${percentage}%;background:#2196f3;transition:width 0.5s;'></div></div>`;
             return `<b>How matchable between these two:</b> ${percentage}% ${bar}`;
         }
+        // LIS Game logic
+        let lisNumbers = [];
+        let lisSelected = [];
+        function randomLISNumbers() {
+            lisNumbers = Array.from({length: 10}, () => Math.floor(Math.random() * 40));
+            lisSelected = [];
+            renderLIS();
+        }
+        function renderLIS() {
+            const seqDiv = document.getElementById('lis-seq');
+            seqDiv.innerHTML = lisNumbers.map((num, idx) =>
+                `<button onclick='selectLIS(${idx})' style='width:36px;margin:2px;${lisSelected.includes(idx) ? "background:#2196f3;color:#fff;" : ""}'>${num}</button>`
+            ).join(' ');
+            document.getElementById('lis-selected').innerHTML =
+                'Your sequence: ' + lisSelected.map(i => lisNumbers[i]).join(', ');
+            document.getElementById('lis-result').innerHTML = '';
+        }
+        function selectLIS(idx) {
+            if (lisSelected.length === 0 || (idx > lisSelected[lisSelected.length-1] && lisNumbers[idx] > lisNumbers[lisSelected[lisSelected.length-1]])) {
+                lisSelected.push(idx);
+                renderLIS();
+            }
+        }
+        async function submitLIS() {
+            const userSeq = lisSelected.map(i => lisNumbers[i]);
+            const res = await fetch('/lis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nums: lisNumbers })
+            });
+            const data = await res.json();
+            const optimal = data.lis;
+            let msg = `<b>Your LIS length:</b> ${userSeq.length}<br><b>Optimal LIS length:</b> ${optimal.length}<br>`;
+            msg += `<b>Your sequence:</b> [${userSeq.join(', ')}]<br>`;
+            msg += `<b>Optimal LIS:</b> [${optimal.join(', ')}]`;
+            document.getElementById('lis-result').innerHTML = msg;
+        }
+        function refreshLIS() {
+            randomLISNumbers();
+        }
+        // Initialize LIS game on load
+        randomLISNumbers();
     </script>
 </body>
 </html> 
