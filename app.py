@@ -6,6 +6,7 @@ import os
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import requests
 import logging
+from datetime import datetime, timedelta
 
 try:
     import yfinance as yf
@@ -151,9 +152,121 @@ def get_googl_stock():
                 logging.error(f"yfinance fetch failed: {e2}")
         return jsonify({'error': f'Failed to fetch stock price. {str(e)}'}), 500
 
+@app.route('/stocks/history', methods=['GET'])
+def stocks_history():
+    # Default tickers
+    default_tickers = {
+        'Google': 'GOOGL',
+        'Nvidia': 'NVDA',
+        'Apple': 'AAPL',
+        'Microsoft': 'MSFT',
+        'Amazon': 'AMZN',
+        'Meta': 'META',
+        'Tesla': 'TSLA',
+        'Netflix': 'NFLX',
+        'AMD': 'AMD',
+        'Intel': 'INTC',
+        'Alibaba': 'BABA'
+    }
+    # Parse symbols from query param
+    symbols_param = request.args.get('symbols')
+    if symbols_param:
+        symbols = [s.strip().upper() for s in symbols_param.split(',') if s.strip()]
+        tickers = {k: v for k, v in default_tickers.items() if v in symbols}
+        # Add any custom tickers not in default list
+        for s in symbols:
+            if s not in tickers.values():
+                tickers[s] = s
+    else:
+        tickers = default_tickers
+    results = {}
+    end = datetime.now()
+    start = end - timedelta(days=31)
+    for name, symbol in tickers.items():
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'))
+            if not hist.empty:
+                results[name] = {
+                    'symbol': symbol,
+                    'dates': [d.strftime('%Y-%m-%d') for d in hist.index],
+                    'closes': [float(c) for c in hist['Close']]
+                }
+            else:
+                results[name] = {'symbol': symbol, 'error': 'No data'}
+        except Exception as e:
+            results[name] = {'symbol': symbol, 'error': str(e)}
+    return jsonify(results)
+
+@app.route('/stocks/maxchange', methods=['GET'])
+def stocks_maxchange():
+    # Default tickers
+    default_tickers = {
+        'Google': 'GOOGL',
+        'Nvidia': 'NVDA',
+        'Apple': 'AAPL',
+        'Microsoft': 'MSFT',
+        'Amazon': 'AMZN',
+        'Meta': 'META',
+        'Tesla': 'TSLA',
+        'Netflix': 'NFLX',
+        'AMD': 'AMD',
+        'Intel': 'INTC',
+        'Alibaba': 'BABA'
+    }
+    symbols_param = request.args.get('symbols')
+    if symbols_param:
+        symbols = [s.strip().upper() for s in symbols_param.split(',') if s.strip()]
+        tickers = {k: v for k, v in default_tickers.items() if v in symbols}
+        for s in symbols:
+            if s not in tickers.values():
+                tickers[s] = s
+    else:
+        tickers = default_tickers
+    results = []
+    end = datetime.now()
+    start = end - timedelta(days=31)
+    for name, symbol in tickers.items():
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'))
+            closes = [float(c) for c in hist['Close']]
+            dates = [d.strftime('%Y-%m-%d') for d in hist.index]
+            if len(closes) > 1:
+                max_sum, (i, j) = max_abs_sum_change(closes)
+                results.append({
+                    'name': name,
+                    'symbol': symbol,
+                    'max_abs_sum': max_sum,
+                    'start_date': dates[i],
+                    'end_date': dates[j],
+                    'start_price': closes[i],
+                    'end_price': closes[j],
+                    'dates': dates,
+                    'closes': closes
+                })
+        except Exception as e:
+            results.append({'name': name, 'symbol': symbol, 'error': str(e)})
+    # Sort by max_abs_sum descending
+    results = sorted(results, key=lambda x: x.get('max_abs_sum', 0), reverse=True)
+    return jsonify(results)
+
 @app.route('/')
 def index():
     return send_from_directory('static', 'index.html')
+
+def max_abs_sum_change(prices):
+    # Find the time range with the largest absolute sum of price changes
+    n = len(prices)
+    max_sum = 0
+    best_range = (0, 0)
+    for i in range(n):
+        for j in range(i+1, n):
+            abs_sum = sum(abs(prices[k+1] - prices[k]) for k in range(i, j))
+            if abs_sum > max_sum:
+                max_sum = abs_sum
+                best_range = (i, j)
+    return max_sum, best_range
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
