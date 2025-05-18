@@ -7,6 +7,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import requests
 import logging
 from datetime import datetime, timedelta
+import numpy as np
 
 try:
     import yfinance as yf
@@ -291,6 +292,7 @@ def leetcode_stock():
     fee = data.get('fee', 0)
     result = None
     code = ''
+    cpp_code = ''
     time_complexity = ''
     space_complexity = ''
     explanation = ''
@@ -313,6 +315,14 @@ def leetcode_stock():
         elif price - min_price > max_profit:
             max_profit = price - min_price
     return max_profit'''
+        cpp_code = '''int maxProfit(vector<int>& prices) {
+    int min_price = INT_MAX, max_profit = 0;
+    for (int price : prices) {
+        min_price = min(min_price, price);
+        max_profit = max(max_profit, price - min_price);
+    }
+    return max_profit;
+}'''
         time_complexity = 'O(n)'
         space_complexity = 'O(1)'
         explanation = 'Track the minimum price and the maximum profit as you iterate.'
@@ -329,6 +339,14 @@ def leetcode_stock():
         if prices[i] > prices[i-1]:
             profit += prices[i] - prices[i-1]
     return profit'''
+        cpp_code = '''int maxProfit(vector<int>& prices) {
+    int profit = 0;
+    for (int i = 1; i < prices.size(); ++i) {
+        if (prices[i] > prices[i-1])
+            profit += prices[i] - prices[i-1];
+    }
+    return profit;
+}'''
         time_complexity = 'O(n)'
         space_complexity = 'O(1)'
         explanation = 'Sum all positive price differences.'
@@ -351,6 +369,17 @@ def leetcode_stock():
         buy2 = min(buy2, price - profit1)
         profit2 = max(profit2, price - buy2)
     return profit2'''
+        cpp_code = '''int maxProfit(vector<int>& prices) {
+    int buy1 = INT_MAX, buy2 = INT_MAX;
+    int profit1 = 0, profit2 = 0;
+    for (int price : prices) {
+        buy1 = min(buy1, price);
+        profit1 = max(profit1, price - buy1);
+        buy2 = min(buy2, price - profit1);
+        profit2 = max(profit2, price - buy2);
+    }
+    return profit2;
+}'''
         time_complexity = 'O(n)'
         space_complexity = 'O(1)'
         explanation = 'Track two buys and two profits for two transactions.'
@@ -388,6 +417,26 @@ def leetcode_stock():
             dp[t][d] = max(dp[t][d-1], prices[d] + max_diff)
             max_diff = max(max_diff, dp[t-1][d] - prices[d])
     return dp[k][-1]'''
+        cpp_code = '''int maxProfit(int k, vector<int>& prices) {
+    int n = prices.size();
+    if (n == 0 || k == 0) return 0;
+    if (k >= n / 2) {
+        int profit = 0;
+        for (int i = 1; i < n; ++i)
+            if (prices[i] > prices[i-1])
+                profit += prices[i] - prices[i-1];
+        return profit;
+    }
+    vector<vector<int>> dp(k+1, vector<int>(n, 0));
+    for (int t = 1; t <= k; ++t) {
+        int maxDiff = -prices[0];
+        for (int d = 1; d < n; ++d) {
+            dp[t][d] = max(dp[t][d-1], prices[d] + maxDiff);
+            maxDiff = max(maxDiff, dp[t-1][d] - prices[d]);
+        }
+    }
+    return dp[k][n-1];
+}'''
         time_complexity = 'O(kn)'
         space_complexity = 'O(kn)'
         explanation = 'DP for at most k transactions.'
@@ -419,6 +468,18 @@ def leetcode_stock():
         sold[i] = hold[i-1] + prices[i]
         rest[i] = max(rest[i-1], sold[i-1])
     return max(sold[-1], rest[-1])'''
+        cpp_code = '''int maxProfit(vector<int>& prices) {
+    int n = prices.size();
+    if (n == 0) return 0;
+    vector<int> hold(n), sold(n), rest(n);
+    hold[0] = -prices[0];
+    for (int i = 1; i < n; ++i) {
+        hold[i] = max(hold[i-1], rest[i-1] - prices[i]);
+        sold[i] = hold[i-1] + prices[i];
+        rest[i] = max(rest[i-1], sold[i-1]);
+    }
+    return max(sold[n-1], rest[n-1]);
+}'''
         time_complexity = 'O(n)'
         space_complexity = 'O(n)'
         explanation = 'DP with three states: hold, sold, rest.'
@@ -441,6 +502,16 @@ def leetcode_stock():
         cash = max(cash, hold + price - fee)
         hold = max(hold, cash - price)
     return cash'''
+        cpp_code = '''int maxProfit(vector<int>& prices, int fee) {
+    int n = prices.size();
+    if (n == 0) return 0;
+    int cash = 0, hold = -prices[0];
+    for (int i = 1; i < n; ++i) {
+        cash = max(cash, hold + prices[i] - fee);
+        hold = max(hold, cash - prices[i]);
+    }
+    return cash;
+}'''
         time_complexity = 'O(n)'
         space_complexity = 'O(1)'
         explanation = 'DP with cash and hold states, subtracting fee on sell.'
@@ -449,10 +520,86 @@ def leetcode_stock():
     return jsonify({
         'result': result,
         'code': code,
+        'cpp_code': cpp_code,
         'time_complexity': time_complexity,
         'space_complexity': space_complexity,
         'explanation': explanation
     })
+
+@app.route('/stocks/stable', methods=['GET'])
+def stocks_stable():
+    # Default tickers
+    default_tickers = {
+        'Google': 'GOOGL',
+        'Nvidia': 'NVDA',
+        'Apple': 'AAPL',
+        'Microsoft': 'MSFT',
+        'Amazon': 'AMZN',
+        'Meta': 'META',
+        'Tesla': 'TSLA',
+        'Netflix': 'NFLX',
+        'AMD': 'AMD',
+        'Intel': 'INTC',
+        'Alibaba': 'BABA',
+        'S&P 500 ETF': 'SPY',
+        'Nasdaq 100 ETF': 'QQQ',
+        'S&P 500 ETF (VOO)': 'VOO',
+        'Good Times Restaurants': 'GTIM',
+        'ARK Innovation ETF': 'ARKK',
+        'Emerging Markets ETF': 'EEM',
+        'Financial Select Sector SPDR': 'XLF'
+    }
+    metric = request.args.get('metric', 'std')
+    order = request.args.get('order', 'asc')
+    symbol_filter = request.args.get('symbol')
+    min_window = 5
+    results = []
+    end = datetime.now()
+    start = end - timedelta(days=1095)
+    for name, symbol in default_tickers.items():
+        if symbol_filter and symbol != symbol_filter:
+            continue
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'))
+            closes = [float(c) for c in hist['Close']]
+            dates = [d.strftime('%Y-%m-%d') for d in hist.index]
+            n = len(closes)
+            best_score = float('inf') if order == 'asc' else float('-inf')
+            best_i, best_j = 0, 0
+            for window in range(min_window, n+1):
+                for i in range(n-window+1):
+                    window_closes = closes[i:i+window]
+                    changes = np.diff(window_closes)
+                    if metric == 'meanabs' or metric == 'maxmeanabs':
+                        score = np.mean(np.abs(changes))
+                    else:
+                        score = np.std(changes)
+                    if (order == 'asc' and score < best_score) or (order == 'desc' and score > best_score):
+                        best_score = score
+                        best_i, best_j = i, i+window-1
+            if n >= min_window:
+                results.append({
+                    'name': name,
+                    'symbol': symbol,
+                    'start_date': dates[best_i],
+                    'end_date': dates[best_j],
+                    'stability_score': best_score,
+                    'window_prices': closes[best_i:best_j+1],
+                    'metric': metric,
+                    'window_len': best_j - best_i + 1,
+                    'window_start_idx': best_i,
+                    'window_end_idx': best_j,
+                    'all_closes': closes,
+                    'all_dates': dates
+                })
+        except Exception as e:
+            results.append({'name': name, 'symbol': symbol, 'error': str(e)})
+    # Sort by stability_score ascending or descending
+    results = sorted(results, key=lambda x: x.get('stability_score', float('inf')), reverse=(order=='desc'))
+    if symbol_filter:
+        return jsonify(results[:1])
+    return jsonify(results[:5])
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
