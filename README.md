@@ -33,7 +33,8 @@ Tokimeki is an interactive web application that lets users test the "matchabilit
    python app.py
    ```
 5. **Open your browser:**
-   Visit [http://127.0.0.1:5000/](http://127.0.0.1:5000/)
+   Visit [http://127.0.0.1:8080](http://127.0.0.1:8080) (for local access)
+   or [http://192.168.1.25:8080](http://192.168.1.25:8080) (for LAN access)
 
 ## Usage
 - Enter two English names (and optionally, dates of birth)

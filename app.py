@@ -38,6 +38,30 @@ def lcs(nums1: List[int], nums2: List[int]) -> int:
                 dp[i + 1][j + 1] = max(dp[i][j + 1], dp[i + 1][j])
     return dp[m][n]
 
+def longest_increasing_subsequence(nums):
+    if not nums:
+        return []
+    n = len(nums)
+    dp = [1] * n
+    prev = [-1] * n
+    max_len = 1
+    max_idx = 0
+    for i in range(n):
+        for j in range(i):
+            if nums[j] < nums[i] and dp[j] + 1 > dp[i]:
+                dp[i] = dp[j] + 1
+                prev[i] = j
+        if dp[i] > max_len:
+            max_len = dp[i]
+            max_idx = i
+    # reconstruct LIS
+    lis = []
+    idx = max_idx
+    while idx != -1:
+        lis.append(nums[idx])
+        idx = prev[idx]
+    return lis[::-1]
+
 analyzer = SentimentIntensityAnalyzer()
 
 @app.route('/match', methods=['POST'])
@@ -88,6 +112,13 @@ def predict():
     else:
         sentiment = 'neutral'
     return jsonify({'sentiment': sentiment, 'score': compound})
+
+@app.route('/lis', methods=['POST'])
+def lis_api():
+    data = request.json
+    nums = data.get('nums', [])
+    lis = longest_increasing_subsequence(nums)
+    return jsonify({'lis': lis, 'length': len(lis)})
 
 @app.route('/')
 def index():
