@@ -554,9 +554,11 @@ def stocks_stable():
     order = request.args.get('order', 'asc')
     symbol_filter = request.args.get('symbol')
     window_size = int(request.args.get('window', 20))  # Default 20 days
+    days_param = request.args.get('days')
+    days = int(days_param) if days_param and days_param.isdigit() else 1095
     results = []
     end = datetime.now()
-    start = end - timedelta(days=1095)
+    start = end - timedelta(days=days)
     for name, symbol in default_tickers.items():
         if symbol_filter and symbol != symbol_filter:
             continue
@@ -604,6 +606,26 @@ def stocks_stable():
     if symbol_filter:
         return jsonify(results[:1])
     return jsonify(results[:5])
+
+@app.route('/available_tickers')
+def available_tickers():
+    tickers = [
+        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'NFLX', 'AMD', 'INTC',
+        'BRK-B', 'JNJ', 'V', 'JPM', 'WMT', 'PG', 'KO', 'XOM',
+        'SPY', 'QQQ', 'VOO', 'ARKK', 'EEM', 'XLF',
+        'ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'MES=F', 'MNQ=F', 'MYM=F', 'M2K=F',
+        'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZS=F', 'ZW=F',
+        'VX=F', 'BTC=F', 'ETH=F'
+    ]
+    available = []
+    for t in tickers:
+        try:
+            hist = yf.Ticker(t).history(period='1095d')  # 3 years
+            if not hist.empty and len(hist) > 200:
+                available.append(t)
+        except Exception:
+            continue
+    return jsonify(available)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
