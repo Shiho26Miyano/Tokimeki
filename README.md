@@ -1,6 +1,6 @@
 # Elaine's Playground
 
-![Demo Screenshot](static/img/demo.png)
+![Demo Screenshot](demo.png)
 
 Elaine's Playground is a web app hosting interactive stock analysis tools! This project is a playground for experimenting with stock data, price trends, and volatility analysis.
 
@@ -47,3 +47,5 @@ if __name__ == '__main__':
 # Tokimeki
 
 Demo Screenshot 
+
+git status 
