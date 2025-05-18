@@ -61,6 +61,11 @@
         <button onclick="refreshLIS()" style="margin-top:5px;background:#eee;color:#333;">Refresh</button>
         <div class="result" id="lis-result"></div>
     </div>
+    <div class="container">
+        <h2>Google Stock Price</h2>
+        <button onclick="getGoogleStockPrice()">Get Today's Price</button>
+        <div class="result" id="stock-result"></div>
+    </div>
     </div>
     <script>
         async function checkMatch() {
@@ -161,6 +166,21 @@
         }
         // Initialize LIS game on load
         randomLISNumbers();
+        async function getGoogleStockPrice() {
+            document.getElementById('stock-result').innerText = 'Loading...';
+            try {
+                const res = await fetch('/stock/googl');
+                const data = await res.json();
+                if (data.price) {
+                    const time = new Date(data.time * 1000).toLocaleString();
+                    document.getElementById('stock-result').innerText = `GOOGL Stock Price: $${data.price} (as of ${time})`;
+                } else {
+                    document.getElementById('stock-result').innerText = 'Failed to fetch stock price.';
+                }
+            } catch (e) {
+                document.getElementById('stock-result').innerText = 'Failed to fetch stock price.';
+            }
+        }
     </script>
 </body>
 </html> 
