@@ -281,6 +281,7 @@
                 <option value="60">60 days</option>
             </select>
         </div>
+        <button onclick="resetStableSection()" style="margin-bottom:10px;background:#eee;color:#333;border:1px solid #ccc;">Reset</button>
         <button onclick="fetchStableChange()" style="font-size:0.98rem;padding:7px 0;">Find Most Stable Stocks</button>
         <div id="stable-cards" style="margin-top:16px;"></div>
     </div>
@@ -295,7 +296,9 @@
         </div>
         <div style="margin-bottom:10px;font-size:0.95rem;">
             <label for="explore-stock" style="font-size:0.95rem;">Select a Stock:</label>
-            <select id="explore-stock" style="margin-left:8px;font-size:0.95rem;padding:4px;min-width:160px;"></select>
+            <select id="explore-stock" style="margin-left:8px;font-size:0.95rem;padding:4px;min-width:160px;">
+                <option value="">-- Select --</option>
+            </select>
             <label style="margin-left:18px;font-size:0.95rem;">Stability Metric:</label>
             <select id="explore-metric" style="margin-left:8px;font-size:0.95rem;padding:4px;" disabled>
                 <option value="std">Lowest Standard Deviation</option>
@@ -320,6 +323,7 @@
                 <option value="60">60 days</option>
             </select>
         </div>
+        <button onclick="resetExplorerSection()" style="margin-bottom:10px;background:#eee;color:#333;border:1px solid #ccc;">Reset</button>
         <div id="explore-card" style="margin-top:16px;"></div>
     </div>
     </div>

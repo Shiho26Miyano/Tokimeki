@@ -654,4 +654,19 @@ function populateDropdown(selectId, tickers, allowEmpty=false) {
         opt.textContent = tickerDisplayNames[t] || t;
         sel.appendChild(opt);
     });
+}
+function resetStableSection() {
+    document.getElementById('stable-metric').selectedIndex = 0;
+    document.getElementById('stable-range').selectedIndex = 4; // 3 years
+    document.getElementById('stable-window').selectedIndex = 2; // 20 days
+    document.getElementById('stable-cards').innerHTML = '';
+}
+function resetExplorerSection() {
+    const exploreStock = document.getElementById('explore-stock');
+    if (exploreStock.options.length > 0) exploreStock.selectedIndex = 0;
+    document.getElementById('explore-metric').selectedIndex = 0;
+    document.getElementById('explore-metric').disabled = true;
+    document.getElementById('explore-range').selectedIndex = 4; // 3 years
+    document.getElementById('explore-window').selectedIndex = 2; // 20 days
+    document.getElementById('explore-card').innerHTML = '';
 } 
