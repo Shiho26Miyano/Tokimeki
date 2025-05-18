@@ -8,6 +8,7 @@ import requests
 import logging
 from datetime import datetime, timedelta
 import numpy as np
+import pandas as pd
 
 try:
     import yfinance as yf
@@ -552,7 +553,7 @@ def stocks_stable():
     metric = request.args.get('metric', 'std')
     order = request.args.get('order', 'asc')
     symbol_filter = request.args.get('symbol')
-    min_window = 5
+    window_size = int(request.args.get('window', 20))  # Default 20 days
     results = []
     end = datetime.now()
     start = end - timedelta(days=1095)
@@ -565,26 +566,29 @@ def stocks_stable():
             closes = [float(c) for c in hist['Close']]
             dates = [d.strftime('%Y-%m-%d') for d in hist.index]
             n = len(closes)
-            best_score = float('inf') if order == 'asc' else float('-inf')
-            best_i, best_j = 0, 0
-            for window in range(min_window, n+1):
-                for i in range(n-window+1):
-                    window_closes = closes[i:i+window]
-                    changes = np.diff(window_closes)
-                    if metric == 'meanabs' or metric == 'maxmeanabs':
-                        score = np.mean(np.abs(changes))
-                    else:
-                        score = np.std(changes)
-                    if (order == 'asc' and score < best_score) or (order == 'desc' and score > best_score):
-                        best_score = score
-                        best_i, best_j = i, i+window-1
-            if n >= min_window:
+            if n < window_size:
+                continue
+            s = pd.Series(closes)
+            if metric == 'meanabs' or metric == 'maxmeanabs':
+                changes = s.diff().abs()
+                rolling_score = changes.rolling(window=window_size).mean()
+            else:
+                changes = s.diff()
+                rolling_score = changes.rolling(window=window_size).std()
+            if order == 'asc':
+                best_idx = rolling_score.idxmin()
+            else:
+                best_idx = rolling_score.idxmax()
+            best_score = rolling_score.iloc[best_idx]
+            best_i = max(0, best_idx - window_size + 1)
+            best_j = best_i + window_size - 1
+            if n >= window_size:
                 results.append({
                     'name': name,
                     'symbol': symbol,
                     'start_date': dates[best_i],
                     'end_date': dates[best_j],
-                    'stability_score': best_score,
+                    'stability_score': float(best_score) if pd.notnull(best_score) else None,
                     'window_prices': closes[best_i:best_j+1],
                     'metric': metric,
                     'window_len': best_j - best_i + 1,
