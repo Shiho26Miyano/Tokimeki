@@ -1,5 +1,7 @@
 # Elaine's Playground
 
+![Demo Screenshot](static/img/demo.png)
+
 Elaine's Playground is a web app hosting interactive stock analysis tools! This project is a playground for experimenting with stock data, price trends, and volatility analysis.
 
 ## Features
@@ -40,4 +42,8 @@ import os
 # ...
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port) 
+    app.run(debug=True, host='0.0.0.0', port=port)
+
+# Tokimeki
+
+Demo Screenshot 
