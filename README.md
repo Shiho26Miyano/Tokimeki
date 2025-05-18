@@ -1,73 +1,73 @@
-# Tokimeki 测姻缘网站
-
-本项目是一个基于自定义算法的测姻缘网站。
-
-## 项目简介
-
-Tokimeki 是一个帮助用户测试姻缘的网站，算法由作者自主设计，结合了趣味性和个性化。
-
-## 功能特色
-- 输入个人信息，测试姻缘匹配度
-- 结果基于自定义算法生成
-- 界面简洁，操作方便
-
-## 使用方法
-1. 克隆本仓库：
-   ```bash
-   git clone <仓库地址>
-   ```
-2. 安装依赖：
-   ```bash
-   # 依赖安装命令（请根据实际项目补充）
-   ```
-3. 启动项目：
-   ```bash
-   # 启动命令（请根据实际项目补充）
-   ```
-
-## 算法说明
-本项目的姻缘算法由作者自定义，具体细节可在源码中查看。
-
-## 贡献
-欢迎提交 issue 和 PR 共同完善本项目。
-
-## License
-MIT 
-
----
-
 # Tokimeki: Matchmaking Fate Website
 
-This project is a matchmaking fate website based on a custom algorithm.
-
-## Project Overview
-
-Tokimeki is a website that helps users test their romantic compatibility. The algorithm is uniquely designed by the author, combining fun and personalization.
+Tokimeki is an interactive web application that lets users test the "matchability" between two people based on their names (and optionally, dates of birth). The backend is powered by Flask (Python), and the frontend is a modern, responsive JavaScript app.
 
 ## Features
-- Enter personal information to test romantic compatibility
-- Results are generated based on a custom algorithm
-- Simple interface and easy to use
+- Enter two names and (optionally) dates of birth
+- Choose from multiple matching algorithms:
+  - **Sum Similarity**: Compares the sum of name character values
+  - **Longest Consecutive**: Finds the longest consecutive sequence in the combined name values
+  - **Longest Common Subsequence (LCS)**: Measures the longest sequence present in both names
+- Instant, interactive results with a cute anime-style UI
 
-## Usage
-1. Clone this repository:
+## Demo
+![screenshot](static/img/cute.png)
+
+## Setup
+1. **Clone the repository:**
    ```bash
    git clone <repository-url>
+   cd Tokimeki
    ```
-2. Install dependencies:
+2. **Create and activate a virtual environment:**
    ```bash
-   # Dependency installation command (please fill in according to your project)
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
-3. Start the project:
+3. **Install dependencies:**
    ```bash
-   # Start command (please fill in according to your project)
+   pip install -r requirements.txt
    ```
+4. **Run the app:**
+   ```bash
+   python app.py
+   ```
+5. **Open your browser:**
+   Visit [http://127.0.0.1:5000/](http://127.0.0.1:5000/)
 
-## Algorithm
-The matchmaking algorithm is custom-designed by the author. For details, please refer to the source code.
+## Usage
+- Enter two English names (and optionally, dates of birth)
+- Select a matching algorithm from the dropdown
+- Click "Check Match" to see the matchability percentage
 
-## Contributing
-Feel free to submit issues and pull requests to help improve this project.
+## API
+- **POST** `/match`
+  - **Request JSON:**
+    ```json
+    {
+      "name1": "string",
+      "name2": "string",
+      "dob1": "YYYY-MM-DD",  // optional
+      "dob2": "YYYY-MM-DD",  // optional
+      "algorithm": "sum" | "longest" | "lcs"
+    }
+    ```
+  - **Response JSON:**
+    ```json
+    {
+      "percentage": 87.5
+    }
+    ```
+
+## Algorithms
+- **Sum Similarity**: Converts each name to a list of numbers (a=0, b=1, ...), sums each, and compares the ratio.
+- **Longest Consecutive**: Finds the longest consecutive sequence in the combined number lists, and compares to the number of unique values.
+- **LCS**: Uses the Longest Common Subsequence algorithm to measure similarity between the two name lists.
+
+## Customization
+- To change the matching logic, edit `app.py`.
+- To update the UI or add new features, edit `static/index.html`.
+- To use your own image, replace `static/img/cute.png`.
 
 ## License
 MIT 
