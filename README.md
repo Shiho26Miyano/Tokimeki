@@ -11,7 +11,7 @@ Tokimeki is an interactive web application that lets users test the "matchabilit
 - Instant, interactive results with a cute anime-style UI
 
 ## Demo
-![screenshot](static/img/cute.png)
+![screenshot](static/img/demo.png)
 
 ## Setup
 1. **Clone the repository:**
