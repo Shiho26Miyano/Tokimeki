@@ -276,8 +276,12 @@ async function solveLcStock() {
 }
 async function fetchStableChange() {
     document.getElementById('stable-cards').innerText = 'Loading...';
-    const metric = document.getElementById('stable-metric').value;
-    let url = `/stocks/stable?metric=${metric}`;
+    const metricSel = document.getElementById('stable-metric').value;
+    let metric = metricSel;
+    let order = 'asc';
+    if (metricSel === 'maxstd') { metric = 'std'; order = 'desc'; }
+    if (metricSel === 'maxmeanabs') { metric = 'meanabs'; order = 'desc'; }
+    let url = `/stocks/stable?metric=${metric}&order=${order}`;
     try {
         const res = await fetch(url);
         const data = await res.json();

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tokimeki Matchmaking</title>
+    <title>Tokimeki</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
     <style>
         body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 40px; }
@@ -158,6 +158,22 @@
                 <option value="meanabs">Lowest Mean Absolute Change (Most Stable)</option>
                 <option value="maxstd">Highest Standard Deviation (Most Unstable)</option>
                 <option value="maxmeanabs">Highest Mean Absolute Change (Most Unstable)</option>
+            </select>
+            <label style="margin-left:18px;font-size:0.95rem;">Time Range:</label>
+            <select id="stable-range" style="margin-left:8px;font-size:0.95rem;padding:4px;">
+                <option value="90">3 months</option>
+                <option value="180">6 months</option>
+                <option value="365">1 year</option>
+                <option value="730">2 years</option>
+                <option value="1095" selected>3 years</option>
+            </select>
+            <label style="margin-left:18px;font-size:0.95rem;">Window Size:</label>
+            <select id="stable-window" style="margin-left:8px;font-size:0.95rem;padding:4px;">
+                <option value="5">5 days</option>
+                <option value="10">10 days</option>
+                <option value="20" selected>20 days</option>
+                <option value="30">30 days</option>
+                <option value="60">60 days</option>
             </select>
         </div>
         <button onclick="fetchStableChange()" style="font-size:0.98rem;padding:7px 0;">Find Most Stable Stocks</button>
