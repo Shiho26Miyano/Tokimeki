@@ -2,6 +2,10 @@
 
 Tokimeki is a web app hosting interactive stock analysis tools! This project is a playground for experimenting with stock data, price trends, and volatility analysis.
 
+## Live Demo
+
+[https://tokimeki-pro.up.railway.app/](https://tokimeki-pro.up.railway.app/)
+
 ## Demo
 
 ![Demo Screenshot](static/img/demo.png)
