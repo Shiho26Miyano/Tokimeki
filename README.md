@@ -1,8 +1,12 @@
-# Elaine's Playground
+# Tokimeki
 
-![Demo Screenshot](demo.png)
+Tokimeki is a web app hosting interactive stock analysis tools! This project is a playground for experimenting with stock data, price trends, and volatility analysis.
 
-Elaine's Playground is a web app hosting interactive stock analysis tools! This project is a playground for experimenting with stock data, price trends, and volatility analysis.
+## Demo
+
+![Demo Screenshot](static/img/demo.png)
+
+Demo Screenshot
 
 ## Features
 - **Stock Price Trends**: Explore and compare the price trends of popular stocks and ETFs over the past month.
@@ -34,18 +38,3 @@ Elaine's Playground is a web app hosting interactive stock analysis tools! This 
 ## Tech Stack
 - **Backend:** Python, Flask, yfinance
 - **Frontend:** HTML, CSS, JavaScript, Chart.js
-
-## License
-MIT 
-
-import os
-# ...
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port)
-
-# Tokimeki
-
-Demo Screenshot 
-
-git status 
