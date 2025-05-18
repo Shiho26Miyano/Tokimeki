@@ -166,7 +166,14 @@ def stocks_history():
         'Netflix': 'NFLX',
         'AMD': 'AMD',
         'Intel': 'INTC',
-        'Alibaba': 'BABA'
+        'Alibaba': 'BABA',
+        'S&P 500 ETF': 'SPY',
+        'Nasdaq 100 ETF': 'QQQ',
+        'S&P 500 ETF (VOO)': 'VOO',
+        'Good Times Restaurants': 'GTIM',
+        'ARK Innovation ETF': 'ARKK',
+        'Emerging Markets ETF': 'EEM',
+        'Financial Select Sector SPDR': 'XLF'
     }
     # Parse symbols from query param
     symbols_param = request.args.get('symbols')
@@ -212,7 +219,14 @@ def stocks_maxchange():
         'Netflix': 'NFLX',
         'AMD': 'AMD',
         'Intel': 'INTC',
-        'Alibaba': 'BABA'
+        'Alibaba': 'BABA',
+        'S&P 500 ETF': 'SPY',
+        'Nasdaq 100 ETF': 'QQQ',
+        'S&P 500 ETF (VOO)': 'VOO',
+        'Good Times Restaurants': 'GTIM',
+        'ARK Innovation ETF': 'ARKK',
+        'Emerging Markets ETF': 'EEM',
+        'Financial Select Sector SPDR': 'XLF'
     }
     symbols_param = request.args.get('symbols')
     if symbols_param:
