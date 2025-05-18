@@ -1,17 +1,13 @@
-# Tokimeki: Matchmaking Fate Website
+# Elaine's Playground
 
-Tokimeki is an interactive web application that lets users test the "matchability" between two people based on their names (and optionally, dates of birth). The backend is powered by Flask (Python), and the frontend is a modern, responsive JavaScript app.
+Elaine's Playground is a web app hosting a collection of fun and interactive play tools! This project is designed as a playground for experimenting with algorithms, data, and user interaction—all in one place.
 
 ## Features
-- Enter two names and (optionally) dates of birth
-- Choose from multiple matching algorithms:
-  - **Sum Similarity**: Compares the sum of name character values
-  - **Longest Consecutive**: Finds the longest consecutive sequence in the combined name values
-  - **Longest Common Subsequence (LCS)**: Measures the longest sequence present in both names
-- Instant, interactive results with a cute anime-style UI
-
-## Demo
-![screenshot](static/img/demo.png)
+- **Tokimeki Matchmaking**: Test the "matchability" between two names using different algorithms.
+- **Sentiment Prediction**: Enter a sentence and get a positive/negative/neutral prediction using machine learning.
+- **LIS Game**: Play a game to find the Longest Increasing Subsequence in a random sequence.
+- **Stock Price Trends**: Explore and compare the price trends of popular stocks over the past month.
+- **Largest Stock Price Change**: See which stock had the biggest price swings in a given period.
 
 ## Setup
 1. **Clone the repository:**
@@ -36,39 +32,9 @@ Tokimeki is an interactive web application that lets users test the "matchabilit
    Visit [http://127.0.0.1:8080](http://127.0.0.1:8080) (for local access)
    or [http://192.168.1.25:8080](http://192.168.1.25:8080) (for LAN access)
 
-## Usage
-- Enter two English names (and optionally, dates of birth)
-- Select a matching algorithm from the dropdown
-- Click "Check Match" to see the matchability percentage
-
-## API
-- **POST** `/match`
-  - **Request JSON:**
-    ```json
-    {
-      "name1": "string",
-      "name2": "string",
-      "dob1": "YYYY-MM-DD",  // optional
-      "dob2": "YYYY-MM-DD",  // optional
-      "algorithm": "sum" | "longest" | "lcs"
-    }
-    ```
-  - **Response JSON:**
-    ```json
-    {
-      "percentage": 87.5
-    }
-    ```
-
-## Algorithms
-- **Sum Similarity**: Converts each name to a list of numbers (a=0, b=1, ...), sums each, and compares the ratio.
-- **Longest Consecutive**: Finds the longest consecutive sequence in the combined number lists, and compares to the number of unique values.
-- **LCS**: Uses the Longest Common Subsequence algorithm to measure similarity between the two name lists.
-
-## Customization
-- To change the matching logic, edit `app.py`.
-- To update the UI or add new features, edit `static/index.html`.
-- To use your own image, replace `static/img/cute.png`.
+## Tech Stack
+- **Backend:** Python, Flask, yfinance, vaderSentiment
+- **Frontend:** HTML, CSS, JavaScript, Chart.js
 
 ## License
 MIT 
