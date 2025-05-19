@@ -1040,14 +1040,49 @@ def available_tickers():
         # Return default tickers as fallback
         return jsonify(default_tickers)
 
-@app.route('/explain_stability', methods=['POST'])
+@app.route('/explain_stability')
 def explain_stability():
-    data = request.json
-    stock = data.get('stock')
-    start_date = data.get('start_date')
-    end_date = data.get('end_date')
-    explanation = f"A major event or news between {start_date} and {end_date} may have impacted the stability of {stock}."
-    return jsonify({'explanation': explanation})
+    print("!!!!!!!!!!!! DEBUG: /explain_stability endpoint accessed")
+    try:
+        print("DEBUG: /explain_stability endpoint accessed")
+        if request.method == 'POST':
+            data = request.json
+            stock = data.get('stock')
+        else:  # GET
+            stock = request.args.get('stock', 'NVDA')
+        if not stock:
+            return jsonify({'explanation': 'Missing required parameter: stock.'})
+        from datetime import datetime
+        year = datetime.now().year
+        year_start = f"{year}-01-01"
+        year_end = f"{year}-12-31"
+        ticker = yf.Ticker(stock)
+        hist = ticker.history(start=year_start, end=year_end)
+        if hist.empty:
+            return jsonify({'explanation': f"No data available for {stock} in {year}."})
+        closes = hist['Close'].tolist()
+        dates = [d.strftime('%Y-%m-%d') for d in hist.index]
+        daily_changes = []
+        for i in range(1, len(closes)):
+            pct_change = ((closes[i] - closes[i-1]) / closes[i-1]) * 100
+            daily_changes.append({
+                'date': dates[i],
+                'change': pct_change
+            })
+        top_events = sorted(daily_changes, key=lambda x: abs(x['change']), reverse=True)[:3]
+        explanation = f"Biggest price movement events for {stock} in {year}:\n\n"
+        if not top_events:
+            explanation += "No significant price movements detected this year."
+        else:
+            for event in top_events:
+                direction = 'up' if event['change'] > 0 else 'down'
+                explanation += f"• {event['date']}: {direction} {abs(event['change']):.2f}%\n"
+        return jsonify({'explanation': explanation})
+    except Exception as e:
+        import traceback
+        print(f"Error in explain_stability: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'explanation': f"Error analyzing {stock}: {str(e)}"})
 
 @app.route('/stocks/available_for_prediction', methods=['GET'])
 def available_for_prediction():
@@ -1096,5 +1131,5 @@ def test_post():
         })
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5001))
     app.run(debug=True, host='0.0.0.0', port=port) 
