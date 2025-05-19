@@ -1,3 +1,5 @@
+console.log('main.js loaded');
+
 // Custom JavaScript moved from index.html
 async function fetchStockTrends() {
     document.getElementById('stock-trends-result').innerText = 'Loading...';
@@ -814,36 +816,60 @@ window.addEventListener('DOMContentLoaded', function() {
     predictionRangeSelect.addEventListener('change', function() {
         filterAndPopulatePredictionDropdown();
     });
-    // Add event listener for Explain Stability button
-    document.getElementById('explain-stability-btn').addEventListener('click', async function() {
-        const stock = document.getElementById('explore-stock').value;
-        const days = document.getElementById('explore-range').value;
-        const allDates = window.myStableCharts && window.myStableCharts['exploreStableChart0'] && window.myStableCharts['exploreStableChart0'].data.labels;
-        // For simplicity, use the selected time range
-        // If you want to use the actual window, you can extract start/end from the chart or slider
-        let start_date = '';
-        let end_date = '';
-        // Try to get the dates from the current explore card if available
-        const exploreCard = document.getElementById('explore-card');
-        const dateMatch = exploreCard.innerHTML.match(/Window: (\d{4}-\d{2}-\d{2}) ~ (\d{4}-\d{2}-\d{2})/);
-        if (dateMatch) {
-            start_date = dateMatch[1];
-            end_date = dateMatch[2];
-        }
-        if (!stock || !start_date || !end_date) {
-            document.getElementById('stability-explanation').innerText = 'Please select a stock and apply a window first.';
-            return;
-        }
-        document.getElementById('stability-explanation').innerText = 'Generating explanation...';
-        const res = await fetch('/explain_stability', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ stock, start_date, end_date })
+    // Force-populate the explain-stock dropdown with tickers (independent from explorer)
+    const explainSelect = document.getElementById('explain-stock');
+    if (explainSelect) {
+        explainSelect.innerHTML = '<option value="">-- Select --</option>';
+        [
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'NFLX', 'AMD', 'INTC',
+            'BRK-B', 'JNJ', 'V', 'JPM', 'WMT', 'PG', 'KO', 'XOM',
+            'SPY', 'QQQ', 'VOO', 'ARKK', 'EEM', 'XLF',
+            'ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'MES=F', 'MNQ=F', 'MYM=F', 'M2K=F',
+            'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZS=F', 'ZW=F',
+            'VX=F', 'BTC=F', 'ETH=F'
+        ].forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            explainSelect.appendChild(opt);
         });
-        const data = await res.json();
-        document.getElementById('stability-explanation').innerText = data.explanation;
-    });
+    }
+    // Remove old cat-house-btn logic if present
+    const catHeartBtn = document.getElementById('cat-heart-btn');
+    if (catHeartBtn) {
+        catHeartBtn.addEventListener('click', function() {
+            const catHouseContent = document.getElementById('cat-house-content');
+            if (catHouseContent) {
+                catHouseContent.innerHTML = 'happy lover';
+            }
+        });
+    }
+    // Lab section logic
+    const labSelect = document.getElementById('lab-ticker-select');
+    const labExplanation = document.getElementById('lab-explanation');
+    const labApplyBtn = document.getElementById('lab-apply-btn');
+    if (labSelect && labExplanation && labApplyBtn) {
+        labApplyBtn.addEventListener('click', async function() {
+            const stock = labSelect.value;
+            if (!stock) {
+                labExplanation.innerHTML = '<span style="color:red">Please select a stock first.</span>';
+                return;
+            }
+            labExplanation.innerHTML = 'Loading...';
+            try {
+                const res = await fetch('http://127.0.0.1:5001/explain_stability?stock=' + stock);
+                const data = await res.json();
+                labExplanation.innerHTML = data.explanation.replace(/\n/g, '<br>');
+            } catch (e) {
+                labExplanation.innerHTML = 'Error: ' + e.message;
+            }
+        });
+    }
 });
+// Add spinner animation CSS
+const style = document.createElement('style');
+style.innerHTML = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+document.head.appendChild(style);
 function getMetricLabel(metric, order) {
     if (metric === 'std' && order === 'asc') {
         return 'Lowest Standard Deviation (Most Stable)';
