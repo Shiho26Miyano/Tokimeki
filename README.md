@@ -38,7 +38,7 @@ Demo Screenshot
 5. **Open your browser:**
    Visit [http://127.0.0.1:8080](http://127.0.0.1:8080) (for local access)
    or [http://192.168.1.25:8080](http://192.168.1.25:8080) (for LAN access)
-
+g
 ## Tech Stack
 - **Backend:** Python, Flask, yfinance
 - **Frontend:** HTML, CSS, JavaScript, Chart.js

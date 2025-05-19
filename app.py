@@ -992,23 +992,53 @@ def generate_mock_data(default_tickers, metric, order, symbol_filter, window_siz
 
 @app.route('/available_tickers')
 def available_tickers():
-    tickers = [
-        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'NFLX', 'AMD', 'INTC',
-        'BRK-B', 'JNJ', 'V', 'JPM', 'WMT', 'PG', 'KO', 'XOM',
-        'SPY', 'QQQ', 'VOO', 'ARKK', 'EEM', 'XLF',
-        'ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'MES=F', 'MNQ=F', 'MYM=F', 'M2K=F',
-        'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZS=F', 'ZW=F',
-        'VX=F', 'BTC=F', 'ETH=F'
-    ]
-    available = []
-    for t in tickers:
-        try:
-            hist = yf.Ticker(t).history(period='1095d')  # 3 years
-            if not hist.empty and len(hist) > 200:
-                available.append(t)
-        except Exception:
-            continue
-    return jsonify(available)
+    """Get a list of available tickers that can be used for analysis"""
+    try:
+        print("DEBUG: /available_tickers endpoint accessed")
+        default_tickers = [
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'NFLX', 'AMD', 'INTC',
+            'BRK-B', 'JNJ', 'V', 'JPM', 'WMT', 'PG', 'KO', 'XOM',
+            'SPY', 'QQQ', 'VOO', 'ARKK', 'EEM', 'XLF',
+            'ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'MES=F', 'MNQ=F', 'MYM=F', 'M2K=F',
+            'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZS=F', 'ZW=F',
+            'VX=F', 'BTC=F', 'ETH=F'
+        ]
+        
+        # If yfinance is not available, return the default tickers without validation
+        if yf is None:
+            print("DEBUG: yfinance module is not available, returning default tickers")
+            return jsonify(default_tickers)
+        
+        # Use a shorter validation period to speed up the check
+        validation_period = '5d'  # Just check if we can get 5 days of data
+        print(f"DEBUG: Validating tickers with period={validation_period}")
+        
+        available = []
+        for t in default_tickers:
+            try:
+                hist = yf.Ticker(t).history(period=validation_period)
+                if not hist.empty:
+                    available.append(t)
+                    print(f"DEBUG: Ticker {t} is available")
+                else:
+                    print(f"DEBUG: Ticker {t} returned empty data")
+            except Exception as e:
+                print(f"DEBUG: Error checking ticker {t}: {str(e)}")
+                continue
+        
+        # If no tickers are available, return the default list
+        if not available:
+            print("DEBUG: No tickers validated, returning default list")
+            return jsonify(default_tickers)
+            
+        print(f"DEBUG: Returning {len(available)} validated tickers")
+        return jsonify(available)
+    except Exception as e:
+        print(f"DEBUG: Global error in /available_tickers: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Return default tickers as fallback
+        return jsonify(default_tickers)
 
 @app.route('/explain_stability', methods=['POST'])
 def explain_stability():
