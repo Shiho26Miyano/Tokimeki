@@ -9,6 +9,9 @@ import logging
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
+from transformers import pipeline
+from threading import Thread
+import time
 
 try:
     import yfinance as yf
@@ -17,6 +20,21 @@ except ImportError:
 
 app = Flask(__name__)
 CORS(app)
+
+# Use a smaller, faster model for explanation
+explanation_pipe = pipeline('text-generation', model='sshleifer/tiny-gpt2')
+
+# In-memory cache for explanations
+explanation_cache = {}
+
+def generate_explanation_async(key, prompt):
+    # Generate and cache the explanation in the background
+    result = explanation_pipe(prompt, max_length=20, num_return_sequences=1)
+    explanation = result[0]['generated_text'].split('Explanation:')[-1].strip()
+    if '.' in explanation:
+        explanation = explanation.split('.', 1)[0].strip() + '.'
+    explanation = explanation[:200]
+    explanation_cache[key] = explanation
 
 def name_to_numbers(name):
     name = name.lower()
@@ -108,20 +126,6 @@ def match():
         else:
             percentage = round(min(sum1, sum2) / max(sum1, sum2) * 100, 2)
     return jsonify({'percentage': percentage})
-
-@app.route('/predict', methods=['POST'])
-def predict():
-    data = request.json
-    sentence = data.get('sentence', '')
-    scores = analyzer.polarity_scores(sentence)
-    compound = scores['compound']
-    if compound >= 0.05:
-        sentiment = 'positive'
-    elif compound <= -0.05:
-        sentiment = 'negative'
-    else:
-        sentiment = 'neutral'
-    return jsonify({'sentiment': sentiment, 'score': compound})
 
 @app.route('/lis', methods=['POST'])
 def lis_api():
@@ -527,33 +531,94 @@ def leetcode_stock():
         'explanation': explanation
     })
 
+# --- Stability window helper functions ---
+def lowest_std_window(prices, window_size):
+    min_std = float('inf')
+    best_i = None
+    for i in range(len(prices) - window_size + 1):
+        window = prices[i:i+window_size]
+        std = np.std(window)
+        if std < min_std:
+            min_std = std
+            best_i = i
+    if best_i is None:
+        return None, None
+    return best_i, min_std
+
+def highest_std_window(prices, window_size):
+    max_std = float('-inf')
+    best_i = None
+    for i in range(len(prices) - window_size + 1):
+        window = prices[i:i+window_size]
+        std = np.std(window)
+        if std > max_std:
+            max_std = std
+            best_i = i
+    if best_i is None:
+        return None, None
+    return best_i, max_std
+
+def lowest_meanabs_window(prices, window_size):
+    min_meanabs = float('inf')
+    best_i = None
+    for i in range(len(prices) - window_size + 1):
+        window = prices[i:i+window_size]
+        changes = [abs(window[j+1] - window[j]) for j in range(len(window)-1)]
+        meanabs = np.mean(changes)
+        if meanabs < min_meanabs:
+            min_meanabs = meanabs
+            best_i = i
+    if best_i is None:
+        return None, None
+    return best_i, min_meanabs
+
+def highest_meanabs_window(prices, window_size):
+    max_meanabs = float('-inf')
+    best_i = None
+    for i in range(len(prices) - window_size + 1):
+        window = prices[i:i+window_size]
+        changes = [abs(window[j+1] - window[j]) for j in range(len(window)-1)]
+        meanabs = np.mean(changes)
+        if meanabs > max_meanabs:
+            max_meanabs = meanabs
+            best_i = i
+    if best_i is None:
+        return None, None
+    return best_i, max_meanabs
+
 @app.route('/stocks/stable', methods=['GET'])
 def stocks_stable():
     # Default tickers
     default_tickers = {
-        'Google': 'GOOGL',
-        'Nvidia': 'NVDA',
         'Apple': 'AAPL',
         'Microsoft': 'MSFT',
+        'Google': 'GOOGL',
         'Amazon': 'AMZN',
         'Meta': 'META',
+        'Nvidia': 'NVDA',
         'Tesla': 'TSLA',
         'Netflix': 'NFLX',
         'AMD': 'AMD',
         'Intel': 'INTC',
-        'Alibaba': 'BABA',
-        'S&P 500 ETF': 'SPY',
-        'Nasdaq 100 ETF': 'QQQ',
-        'S&P 500 ETF (VOO)': 'VOO',
-        'Good Times Restaurants': 'GTIM',
-        'ARK Innovation ETF': 'ARKK',
-        'Emerging Markets ETF': 'EEM',
-        'Financial Select Sector SPDR': 'XLF'
+        'Berkshire Hathaway': 'BRK-B',
+        'Johnson & Johnson': 'JNJ',
+        'Visa': 'V',
+        'JPMorgan Chase': 'JPM',
+        'Walmart': 'WMT',
+        'Procter & Gamble': 'PG',
+        'Coca-Cola': 'KO',
+        'Exxon Mobil': 'XOM',
+        'SPY': 'SPY',
+        'QQQ': 'QQQ',
+        'VOO': 'VOO',
+        'ARKK': 'ARKK',
+        'EEM': 'EEM',
+        'XLF': 'XLF'
     }
     metric = request.args.get('metric', 'std')
     order = request.args.get('order', 'asc')
     symbol_filter = request.args.get('symbol')
-    window_size = int(request.args.get('window', 20))  # Default 20 days
+    window_size = int(request.args.get('window', 20))
     days_param = request.args.get('days')
     days = int(days_param) if days_param and days_param.isdigit() else 1095
     results = []
@@ -569,39 +634,41 @@ def stocks_stable():
             dates = [d.strftime('%Y-%m-%d') for d in hist.index]
             n = len(closes)
             if n < window_size:
+                results.append({'name': name, 'symbol': symbol, 'error': 'Not enough data for this window size.'})
                 continue
-            s = pd.Series(closes)
-            if metric == 'meanabs' or metric == 'maxmeanabs':
-                changes = s.diff().abs()
-                rolling_score = changes.rolling(window=window_size).mean()
+            # Use the appropriate function for metric/order
+            if metric == 'std' and order == 'asc':
+                best_i, best_score = lowest_std_window(closes, window_size)
+            elif metric == 'std' and order == 'desc':
+                best_i, best_score = highest_std_window(closes, window_size)
+            elif metric == 'meanabs' and order == 'asc':
+                best_i, best_score = lowest_meanabs_window(closes, window_size)
+            elif metric == 'meanabs' and order == 'desc':
+                best_i, best_score = highest_meanabs_window(closes, window_size)
             else:
-                changes = s.diff()
-                rolling_score = changes.rolling(window=window_size).std()
-            if order == 'asc':
-                best_idx = rolling_score.idxmin()
-            else:
-                best_idx = rolling_score.idxmax()
-            best_score = rolling_score.iloc[best_idx]
-            best_i = max(0, best_idx - window_size + 1)
+                results.append({'name': name, 'symbol': symbol, 'error': 'Invalid metric or order.'})
+                continue
+            if best_i is None:
+                results.append({'name': name, 'symbol': symbol, 'error': 'No valid window found for this metric/order.'})
+                continue
             best_j = best_i + window_size - 1
-            if n >= window_size:
-                results.append({
-                    'name': name,
-                    'symbol': symbol,
-                    'start_date': dates[best_i],
-                    'end_date': dates[best_j],
-                    'stability_score': float(best_score) if pd.notnull(best_score) else None,
-                    'window_prices': closes[best_i:best_j+1],
-                    'metric': metric,
-                    'window_len': best_j - best_i + 1,
-                    'window_start_idx': best_i,
-                    'window_end_idx': best_j,
-                    'all_closes': closes,
-                    'all_dates': dates
-                })
+            results.append({
+                'name': name,
+                'symbol': symbol,
+                'start_date': dates[best_i],
+                'end_date': dates[best_j],
+                'stability_score': float(best_score),
+                'window_prices': closes[best_i:best_j+1],
+                'metric': metric,
+                'order': order,
+                'window_len': window_size,
+                'window_start_idx': best_i,
+                'window_end_idx': best_j,
+                'all_closes': closes,
+                'all_dates': dates
+            })
         except Exception as e:
             results.append({'name': name, 'symbol': symbol, 'error': str(e)})
-    # Sort by stability_score ascending or descending
     results = sorted(results, key=lambda x: x.get('stability_score', float('inf')), reverse=(order=='desc'))
     if symbol_filter:
         return jsonify(results[:1])
@@ -622,6 +689,39 @@ def available_tickers():
         try:
             hist = yf.Ticker(t).history(period='1095d')  # 3 years
             if not hist.empty and len(hist) > 200:
+                available.append(t)
+        except Exception:
+            continue
+    return jsonify(available)
+
+@app.route('/explain_stability', methods=['POST'])
+def explain_stability():
+    data = request.json
+    stock = data.get('stock')
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
+    explanation = f"A major event or news between {start_date} and {end_date} may have impacted the stability of {stock}."
+    return jsonify({'explanation': explanation})
+
+@app.route('/stocks/available_for_prediction', methods=['GET'])
+def available_for_prediction():
+    default_tickers = [
+        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'NFLX', 'AMD', 'INTC',
+        'BRK-B', 'JNJ', 'V', 'JPM', 'WMT', 'PG', 'KO', 'XOM',
+        'SPY', 'QQQ', 'VOO', 'ARKK', 'EEM', 'XLF',
+        'ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'MES=F', 'MNQ=F', 'MYM=F', 'M2K=F',
+        'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZS=F', 'ZW=F',
+        'VX=F', 'BTC=F', 'ETH=F'
+    ]
+    days_param = request.args.get('days')
+    days = int(days_param) if days_param and days_param.isdigit() else 1095
+    end = datetime.now()
+    start = end - timedelta(days=days)
+    available = []
+    for t in default_tickers:
+        try:
+            hist = yf.Ticker(t).history(start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'))
+            if not hist.empty and len(hist) > 0:
                 available.append(t)
         except Exception:
             continue

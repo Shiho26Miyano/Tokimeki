@@ -288,7 +288,7 @@ async function fetchStableChange() {
         const res = await fetch(url);
         const data = await res.json();
         let cardsHtml = '';
-        data.forEach((item, idx) => {
+        data.slice(0, 1).forEach((item, idx) => { // Only show top 1
             if (item.stability_score !== undefined) {
                 const chartId = `stableChart${idx}`;
                 const sliderId = `stableSlider${idx}`;
@@ -300,21 +300,18 @@ async function fetchStableChange() {
                 const sliderStart = item.window_start_idx;
                 const sliderEnd = item.window_end_idx;
                 cardsHtml += `
-                <div style='display:flex;flex-wrap:nowrap;align-items:stretch;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
-                    <div style='flex:1 1 220px;min-width:180px;max-width:260px;display:flex;flex-direction:column;justify-content:center;padding:0 24px 0 24px;'>
-                        <div id='${infoId}'>
-                            <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
-                            <div style='margin-bottom:4px;'><b>Start:</b> ${item.start_date} <b>End:</b> ${item.end_date}</div>
-                            <div style='margin-bottom:4px;'><b>Stability Score:</b> ${item.stability_score.toFixed(4)}</div>
-                            <div style='margin-bottom:4px;'><b>Metric:</b> ${item.metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
-                            <div style='margin-bottom:4px;font-size:0.97em;color:#888;'>Window Prices: [${item.window_prices.map(x=>x.toFixed(2)).join(', ')}]</div>
-                        </div>
-                    </div>
-                    <div style='width:1px;background:#e0e0e0;margin:0 0;'></div>
-                    <div style='flex:2 1 320px;min-width:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px 0 32px;'>
-                        <canvas id='${chartId}' width='260' height='110' style='background:#fff;border-radius:8px;'></canvas>
+                <div style='display:flex;flex-direction:column;align-items:center;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
+                    <div style='width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 0 0 0;'>
+                        <canvas id='${chartId}' width='350' height='350' style='background:#fff;border-radius:8px;'></canvas>
                         <div id='${sliderId}' style='width:100%;margin-top:10px;'></div>
                         <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
+                    </div>
+                    <div id='${infoId}' style='width:100%;max-width:600px;margin-top:18px;'>
+                        <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
+                        <div style='margin-bottom:4px;'><b>Start:</b> ${item.start_date} <b>End:</b> ${item.end_date}</div>
+                        <div style='margin-bottom:4px;'><b>Stability Score:</b> ${item.stability_score.toFixed(4)}</div>
+                        <div style='margin-bottom:4px;'><b>Metric:</b> ${getMetricLabel(item.metric, item.order)}</div>
+                        <div style='margin-bottom:4px;font-size:0.97em;color:#888;'>Window Prices: [${item.window_prices.map(x=>x.toFixed(2)).join(', ')}]</div>
                     </div>
                 </div>
                 `;
@@ -324,7 +321,7 @@ async function fetchStableChange() {
         });
         document.getElementById('stable-cards').innerHTML = cardsHtml;
         // Render charts and slider logic
-        data.forEach((item, idx) => {
+        data.slice(0, 1).forEach((item, idx) => {
             if (item.stability_score !== undefined) {
                 const chartId = `stableChart${idx}`;
                 const sliderId = `stableSlider${idx}`;
@@ -350,7 +347,7 @@ async function fetchStableChange() {
                         <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
                         <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
                         <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
-                        <div style='margin-bottom:4px;'><b>Metric:</b> ${metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
+                        <div style='margin-bottom:4px;'><b>Metric:</b> ${getMetricLabel(item.metric, item.order)}</div>
                         <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${windowPrices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(windowPrices)}]</div>
                     `;
                     document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
@@ -422,7 +419,7 @@ async function fetchStableChange() {
                         <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
                         <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
                         <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
-                        <div style='margin-bottom:4px;'><b>Metric:</b> ${item.metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
+                        <div style='margin-bottom:4px;'><b>Metric:</b> ${getMetricLabel(item.metric, item.order)}</div>
                         <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${windowPrices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(windowPrices)}]</div>
                     `;
                     document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
@@ -456,15 +453,23 @@ function renderStableCard(item, idx, targetId, isExplorer = false) {
     const sliderMax = allCloses.length - 1;
     const sliderStart = item.window_start_idx;
     const sliderEnd = item.window_end_idx;
-    let cardHtml = `
+    let cardHtml = '';
+    if (isExplorer) {
+        cardHtml = `
+        <div style='display:flex;flex-direction:column;align-items:center;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
+            <div style='width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 0 0 0;'>
+                <canvas id='${chartId}' width='350' height='350' style='background:#fff;border-radius:8px;'></canvas>
+                <div id='${sliderId}' style='width:100%;margin-top:10px;'></div>
+                <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
+            </div>
+            <div id='${infoId}' style='width:100%;max-width:600px;margin-top:18px;'></div>
+        </div>
+        `;
+    } else {
+        cardHtml = `
         <div style='display:flex;flex-wrap:nowrap;align-items:stretch;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
             <div style='flex:1 1 220px;min-width:180px;max-width:260px;display:flex;flex-direction:column;justify-content:center;padding:0 24px 0 24px;'>
                 <div id='${infoId}'>
-                    <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
-                    <div style='margin-bottom:4px;'><b>Start:</b> ${item.start_date} <b>End:</b> ${item.end_date}</div>
-                    <div style='margin-bottom:4px;'><b>Stability Score:</b> ${item.stability_score.toFixed(4)}</div>
-                    <div style='margin-bottom:4px;'><b>Metric:</b> ${item.metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
-                    <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${item.window_prices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(item.window_prices)}]</div>
                 </div>
             </div>
             <div style='width:1px;background:#e0e0e0;margin:0 0;'></div>
@@ -474,7 +479,8 @@ function renderStableCard(item, idx, targetId, isExplorer = false) {
                 <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
             </div>
         </div>
-    `;
+        `;
+    }
     document.getElementById(targetId).innerHTML = cardHtml;
     // Chart logic
     const ctx = document.getElementById(chartId).getContext('2d');
@@ -537,7 +543,7 @@ function renderStableCard(item, idx, targetId, isExplorer = false) {
             <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
             <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
             <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
-            <div style='margin-bottom:4px;'><b>Metric:</b> ${item.metric === 'meanabs' ? 'Lowest Mean Absolute Change' : 'Lowest Standard Deviation'}</div>
+            <div style='margin-bottom:4px;'><b>Metric:</b> ${getMetricLabel(item.metric, item.order)}</div>
             <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${windowPrices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(windowPrices)}]</div>
         `;
         document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
@@ -556,59 +562,102 @@ window.addEventListener('DOMContentLoaded', function() {
     const exploreMetricSelect = document.getElementById('explore-metric');
     const exploreRangeSelect = document.getElementById('explore-range');
     const exploreWindowSelect = document.getElementById('explore-window');
-    function fetchAndShowExploreCard() {
-        const symbol = exploreSelect.value;
-        const metric = exploreMetricSelect.value;
-        const days = exploreRangeSelect.value;
+    // Remove all auto-fetch event listeners for explorer section
+    // Only enable metric dropdown when all required fields are selected
+    function updateExploreMetricState() {
+        const stock = exploreSelect.value;
+        const range = exploreRangeSelect.value;
         const windowSize = exploreWindowSelect.value;
-        if (!symbol) {
-            document.getElementById('explore-card').innerHTML = '';
-            return;
-        }
-        document.getElementById('explore-card').innerHTML = 'Loading...';
-        fetch(`/stocks/stable?metric=${metric}&symbol=${symbol}&window=${windowSize}&days=${days}`)
-            .then(res => res.json())
-            .then(data => {
-                if (Array.isArray(data) && data.length > 0) {
-                    renderStableCard(data[0], 0, 'explore-card', true);
-                } else {
-                    document.getElementById('explore-card').innerHTML = 'No data.';
-                }
-            })
-            .catch(() => {
-                document.getElementById('explore-card').innerHTML = 'Failed to fetch.';
-            });
-    }
-    function fetchAndShowExploreCardWrapper() {
-        // Only fetch if metric is enabled and selected
-        if (!exploreMetricSelect.disabled && exploreMetricSelect.value) {
-            fetchAndShowExploreCard();
+        if (stock && range && windowSize) {
+            exploreMetricSelect.disabled = false;
         } else {
-            document.getElementById('explore-card').innerHTML = '';
+            exploreMetricSelect.disabled = true;
         }
     }
     exploreSelect.addEventListener('change', function() {
         updateExploreMetricState();
-        fetchAndShowExploreCardWrapper();
     });
     exploreRangeSelect.addEventListener('change', function() {
         updateExploreMetricState();
-        fetchAndShowExploreCardWrapper();
     });
     exploreWindowSelect.addEventListener('change', function() {
         updateExploreMetricState();
-        fetchAndShowExploreCardWrapper();
     });
-    exploreMetricSelect.addEventListener('change', fetchAndShowExploreCardWrapper);
+    exploreMetricSelect.addEventListener('change', function() {
+        // Do not auto-fetch
+    });
     // Initial state
     updateExploreMetricState();
-    metricSelect.addEventListener('change', function() {
-        if (exploreSelect.value) fetchAndShowExploreCard();
+    // Only fetch when Apply is clicked
+    window.fetchAndShowExploreCard = function() {
+        if (!exploreMetricSelect.disabled && exploreMetricSelect.value) {
+            const symbol = exploreSelect.value;
+            let metricSel = exploreMetricSelect.value;
+            let metric = metricSel;
+            let order = 'asc';
+            if (metricSel === 'maxstd') { metric = 'std'; order = 'desc'; }
+            if (metricSel === 'maxmeanabs') { metric = 'meanabs'; order = 'desc'; }
+            const days = exploreRangeSelect.value;
+            const windowSize = exploreWindowSelect.value;
+            document.getElementById('explore-card').innerHTML = 'Loading...';
+            fetch(`/stocks/stable?metric=${metric}&order=${order}&symbol=${symbol}&window=${windowSize}&days=${days}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data) && data.length > 0) {
+                        renderStableCard(data[0], 0, 'explore-card', true);
+                    } else {
+                        document.getElementById('explore-card').innerHTML = 'No data.';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('explore-card').innerHTML = 'Failed to fetch.';
+                });
+        }
+    };
+    // Reset button resets all controls to default
+    window.resetExplorerSection = function() {
+        if (exploreSelect.options.length > 0) exploreSelect.selectedIndex = 0;
+        exploreMetricSelect.selectedIndex = 0;
+        exploreMetricSelect.disabled = true;
+        exploreRangeSelect.selectedIndex = 4; // 3 years
+        exploreWindowSelect.selectedIndex = 2; // 20 days
+        document.getElementById('explore-card').innerHTML = '';
+        updateExploreMetricState();
+    };
+    // Populate explorer-stock dropdown
+    filterAndPopulateExplorerDropdown();
+    const predictionRangeSelect = document.getElementById('prediction-range');
+    predictionRangeSelect.addEventListener('change', function() {
+        filterAndPopulatePredictionDropdown();
     });
-    fetch('/available_tickers').then(res => res.json()).then(tickers => {
-        populateDropdown('stock-select', tickers);
-        populateDropdown('maxchange-stock-select', tickers);
-        populateDropdown('explore-stock', tickers, true);
+    // Add event listener for Explain Stability button
+    document.getElementById('explain-stability-btn').addEventListener('click', async function() {
+        const stock = document.getElementById('explore-stock').value;
+        const days = document.getElementById('explore-range').value;
+        const allDates = window.myStableCharts && window.myStableCharts['exploreStableChart0'] && window.myStableCharts['exploreStableChart0'].data.labels;
+        // For simplicity, use the selected time range
+        // If you want to use the actual window, you can extract start/end from the chart or slider
+        let start_date = '';
+        let end_date = '';
+        // Try to get the dates from the current explore card if available
+        const exploreCard = document.getElementById('explore-card');
+        const dateMatch = exploreCard.innerHTML.match(/Window: (\d{4}-\d{2}-\d{2}) ~ (\d{4}-\d{2}-\d{2})/);
+        if (dateMatch) {
+            start_date = dateMatch[1];
+            end_date = dateMatch[2];
+        }
+        if (!stock || !start_date || !end_date) {
+            document.getElementById('stability-explanation').innerText = 'Please select a stock and apply a window first.';
+            return;
+        }
+        document.getElementById('stability-explanation').innerText = 'Generating explanation...';
+        const res = await fetch('/explain_stability', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stock, start_date, end_date })
+        });
+        const data = await res.json();
+        document.getElementById('stability-explanation').innerText = data.explanation;
     });
 });
 function formatWindowPrices(windowPrices) {
@@ -616,18 +665,6 @@ function formatWindowPrices(windowPrices) {
         return windowPrices.map(x => x.toFixed(2)).join(', ');
     } else {
         return `${windowPrices[0].toFixed(2)}, ${windowPrices[1].toFixed(2)}, ..., ${windowPrices[windowPrices.length-2].toFixed(2)}, ${windowPrices[windowPrices.length-1].toFixed(2)}`;
-    }
-}
-// Add logic to enable/disable metric dropdown in Stock Stability Explorer
-function updateExploreMetricState() {
-    const stock = document.getElementById('explore-stock').value;
-    const range = document.getElementById('explore-range').value;
-    const windowSize = document.getElementById('explore-window').value;
-    const metricSelect = document.getElementById('explore-metric');
-    if (stock && range && windowSize) {
-        metricSelect.disabled = false;
-    } else {
-        metricSelect.disabled = true;
     }
 }
 const tickerDisplayNames = {
@@ -648,7 +685,9 @@ function populateDropdown(selectId, tickers, allowEmpty=false) {
         opt.textContent = '-- Select --';
         sel.appendChild(opt);
     }
+    // Only add tickers that are not empty strings and are in the tickers list
     tickers.forEach(t => {
+        if (!t) return; // skip empty
         const opt = document.createElement('option');
         opt.value = t;
         opt.textContent = tickerDisplayNames[t] || t;
@@ -669,4 +708,54 @@ function resetExplorerSection() {
     document.getElementById('explore-range').selectedIndex = 4; // 3 years
     document.getElementById('explore-window').selectedIndex = 2; // 20 days
     document.getElementById('explore-card').innerHTML = '';
+}
+async function filterAndPopulateExplorerDropdown() {
+    const exploreSelect = document.getElementById('explore-stock');
+    const exploreRangeSelect = document.getElementById('explore-range');
+    const exploreWindowSelect = document.getElementById('explore-window');
+    exploreSelect.innerHTML = '<option value="">Loading...</option>';
+    const days = exploreRangeSelect.value;
+    const windowSize = exploreWindowSelect.value;
+    let tickers = [];
+    try {
+        tickers = await fetch('/available_tickers').then(res => res.json());
+    } catch {
+        exploreSelect.innerHTML = '<option value="">Failed to load</option>';
+        return;
+    }
+    // For each ticker, check if it has data for the current settings
+    const validTickers = [];
+    await Promise.all(tickers.map(async t => {
+        try {
+            const url = `/stocks/stable?symbol=${t}&window=${windowSize}&days=${days}&metric=std&order=asc`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0 && !data[0].error) {
+                validTickers.push(t);
+            }
+        } catch {}
+    }));
+    if (validTickers.length === 0) {
+        exploreSelect.innerHTML = '<option value="">No stocks available</option>';
+    } else {
+        populateDropdown('explore-stock', validTickers, true);
+    }
+}
+async function filterAndPopulatePredictionDropdown() {
+    const predictionSelect = document.getElementById('prediction-stock');
+    const predictionRangeSelect = document.getElementById('prediction-range');
+    predictionSelect.innerHTML = '<option value="">Loading...</option>';
+    const days = predictionRangeSelect.value;
+    let tickers = [];
+    try {
+        tickers = await fetch(`/stocks/available_for_prediction?days=${days}`).then(res => res.json());
+    } catch {
+        predictionSelect.innerHTML = '<option value="">Failed to load</option>';
+        return;
+    }
+    if (!tickers || tickers.length === 0) {
+        predictionSelect.innerHTML = '<option value="">No stocks available</option>';
+    } else {
+        populateDropdown('prediction-stock', tickers, true);
+    }
 } 
