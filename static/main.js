@@ -256,22 +256,73 @@ async function solveLcStock() {
     let body = { problem, prices };
     if (problem === '188') body.k = k;
     if (problem === '714') body.fee = fee;
-    document.getElementById('lc-result').innerText = 'Calculating...';
+    document.getElementById('lc-result').innerText = 'Testing endpoints...';
+    
+    // Add timestamp to prevent caching issues
+    const cacheBuster = new Date().getTime();
+    
+    // Try the basic test endpoint first
     try {
-        const res = await fetch('/leetcode/stock', {
+        console.log("Testing POST endpoint at /test-post");
+        const testRes = await fetch(`/test-post?_=${cacheBuster}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            body: JSON.stringify({test: true})
         });
-        const data = await res.json();
-        if (data.error) {
-            document.getElementById('lc-result').innerText = data.error;
+        
+        if (testRes.ok) {
+            const testData = await testRes.json();
+            console.log("Test endpoint works:", testData);
+            document.getElementById('lc-result').innerText = 'Test endpoint works, attempting actual calculation...';
+            
+            // Now try our actual endpoints
+            const endpoints = [
+                '/stock-problems',
+                '/leetcode/stock'
+            ];
+            
+            for (const endpoint of endpoints) {
+                try {
+                    console.log(`Trying endpoint: ${endpoint}`);
+                    const res = await fetch(`${endpoint}?_=${cacheBuster}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    
+                    console.log(`${endpoint} response status:`, res.status);
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        console.log(`${endpoint} response data:`, data);
+                        
+                        if (data.error) {
+                            document.getElementById('lc-result').innerText = data.error;
+                        } else {
+                            lcLastResult = data;
+                            setLcCodeLang(lcCodeLang); // Show selected code
+                            console.log("Calculation successful from", endpoint);
+                            return; // Success, exit function
+                        }
+                        return; // We got a response, exit function
+                    } else {
+                        console.error(`${endpoint} error:`, await res.text());
+                    }
+                } catch (e) {
+                    console.error(`Error with ${endpoint}:`, e);
+                }
+            }
+            
+            // If we get here, all endpoints failed
+            document.getElementById('lc-result').innerText = `All endpoints failed. Check server logs.`;
+            
         } else {
-            lcLastResult = data;
-            setLcCodeLang(lcCodeLang); // Show selected code
+            console.error("Test endpoint failed:", await testRes.text());
+            document.getElementById('lc-result').innerText = `Test endpoint failed with status ${testRes.status}. Basic POST requests not working.`;
         }
     } catch (e) {
-        document.getElementById('lc-result').innerText = 'Failed to calculate.';
+        console.error("Test fetch error:", e);
+        document.getElementById('lc-result').innerText = `Failed basic test. Error: ${e.message}`;
     }
 }
 async function fetchStableChange() {
@@ -284,9 +335,41 @@ async function fetchStableChange() {
     const windowSize = document.getElementById('stable-window').value;
     const days = document.getElementById('stable-range').value;
     let url = `/stocks/stable?metric=${metric}&order=${order}&window=${windowSize}&days=${days}`;
+    
+    console.log("Fetching stable stocks from:", url);
+    
     try {
         const res = await fetch(url);
+        
+        if (!res.ok) {
+            document.getElementById('stable-cards').innerHTML = 
+                `<div style="color:red;padding:10px;background:#ffeeee;border-radius:5px;">
+                    Error fetching stable stocks: HTTP ${res.status} ${res.statusText}
+                </div>`;
+            console.error("Error response:", await res.text());
+            return;
+        }
+        
         const data = await res.json();
+        console.log("Stable stocks response:", data);
+        
+        if (!Array.isArray(data) || data.length === 0) {
+            document.getElementById('stable-cards').innerHTML = 
+                `<div style="padding:10px;background:#ffeeee;border-radius:5px;">
+                    No stable stocks data found or empty response.
+                </div>`;
+            return;
+        }
+        
+        // Check if we have an error in the first result
+        if (data[0] && data[0].error && !data[0].symbol) {
+            document.getElementById('stable-cards').innerHTML = 
+                `<div style="color:red;padding:10px;background:#ffeeee;border-radius:5px;">
+                    Server error: ${data[0].error}
+                </div>`;
+            return;
+        }
+        
         let cardsHtml = '';
         data.slice(0, 1).forEach((item, idx) => { // Only show top 1
             if (item.stability_score !== undefined) {
@@ -319,7 +402,7 @@ async function fetchStableChange() {
                 cardsHtml += `<div style='margin-bottom:18px;color:#c00;'>${item.name} (${item.symbol}): ${item.error}</div>`;
             }
         });
-        document.getElementById('stable-cards').innerHTML = cardsHtml;
+        document.getElementById('stable-cards').innerHTML = cardsHtml || '<div>No results found.</div>';
         // Render charts and slider logic
         data.slice(0, 1).forEach((item, idx) => {
             if (item.stability_score !== undefined) {
@@ -440,120 +523,189 @@ async function fetchStableChange() {
 updateLcInputs();
 // Helper to render a single stable card (for explore)
 function renderStableCard(item, idx, targetId, isExplorer = false) {
-    if (item.stability_score === undefined) {
-        document.getElementById(targetId).innerHTML = `<div style='margin-bottom:18px;color:#c00;'>${item.name} (${item.symbol}): ${item.error}</div>`;
-        return;
-    }
-    const chartId = `${isExplorer ? 'explore' : ''}StableChart${idx}`;
-    const sliderId = `${isExplorer ? 'explore' : ''}StableSlider${idx}`;
-    const infoId = `${isExplorer ? 'explore' : ''}StableInfo${idx}`;
-    const windowLen = item.window_len;
-    const allCloses = item.all_closes;
-    const allDates = item.all_dates;
-    const sliderMax = allCloses.length - 1;
-    const sliderStart = item.window_start_idx;
-    const sliderEnd = item.window_end_idx;
-    let cardHtml = '';
-    if (isExplorer) {
-        cardHtml = `
-        <div style='display:flex;flex-direction:column;align-items:center;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
-            <div style='width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 0 0 0;'>
-                <canvas id='${chartId}' width='350' height='350' style='background:#fff;border-radius:8px;'></canvas>
-                <div id='${sliderId}' style='width:100%;margin-top:10px;'></div>
-                <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
+    try {
+        if (!item || item.stability_score === undefined) {
+            document.getElementById(targetId).innerHTML = `
+                <div style="padding:12px;background:#eee;border-radius:5px;text-align:center;">
+                    ${item && item.error ? 
+                        `<span style="color:red">Error: ${item.error}</span>` : 
+                        'No valid data available for this stock.'}
+                </div>`;
+            return;
+        }
+        
+        const chartId = `${isExplorer ? 'explore' : ''}StableChart${idx}`;
+        const sliderId = `${isExplorer ? 'explore' : ''}StableSlider${idx}`;
+        const infoId = `${isExplorer ? 'explore' : ''}StableInfo${idx}`;
+        const windowLen = item.window_len;
+        const allCloses = item.all_closes;
+        const allDates = item.all_dates;
+        const sliderMax = allCloses.length - 1;
+        const sliderStart = item.window_start_idx;
+        const sliderEnd = item.window_end_idx;
+        let cardHtml = '';
+        
+        // Check if we have all required data for rendering
+        if (!allCloses || !Array.isArray(allCloses) || allCloses.length < windowLen ||
+            !allDates || !Array.isArray(allDates) || allDates.length < windowLen) {
+            document.getElementById(targetId).innerHTML = `
+                <div style="padding:12px;background:#eee;border-radius:5px;text-align:center;">
+                    <span style="color:red">Error: Incomplete data for chart rendering</span>
+                </div>`;
+            return;
+        }
+        
+        if (isExplorer) {
+            cardHtml = `
+            <div style='display:flex;flex-direction:column;align-items:center;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
+                <div style='width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 0 0 0;'>
+                    <canvas id='${chartId}' width='350' height='350' style='background:#fff;border-radius:8px;'></canvas>
+                    <div id='${sliderId}' style='width:100%;margin-top:10px;'></div>
+                    <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
+                </div>
+                <div id='${infoId}' style='width:100%;max-width:600px;margin-top:18px;'></div>
             </div>
-            <div id='${infoId}' style='width:100%;max-width:600px;margin-top:18px;'></div>
-        </div>
-        `;
-    } else {
-        cardHtml = `
-        <div style='display:flex;flex-wrap:nowrap;align-items:stretch;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
-            <div style='flex:1 1 220px;min-width:180px;max-width:260px;display:flex;flex-direction:column;justify-content:center;padding:0 24px 0 24px;'>
-                <div id='${infoId}'>
+            `;
+        } else {
+            cardHtml = `
+            <div style='display:flex;flex-wrap:nowrap;align-items:stretch;gap:0;margin-bottom:28px;background:#fafbfc;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:18px 0;max-width:700px;margin-left:auto;margin-right:auto;'>
+                <div style='flex:1 1 220px;min-width:180px;max-width:260px;display:flex;flex-direction:column;justify-content:center;padding:0 24px 0 24px;'>
+                    <div id='${infoId}'>
+                    </div>
+                </div>
+                <div style='width:1px;background:#e0e0e0;margin:0 0;'></div>
+                <div style='flex:2 1 320px;min-width:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px 0 32px;'>
+                    <canvas id='${chartId}' width='260' height='110' style='background:#fff;border-radius:8px;'></canvas>
+                    <div id='${sliderId}' style='width:100%;margin-top:10px;'></div>
+                    <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
                 </div>
             </div>
-            <div style='width:1px;background:#e0e0e0;margin:0 0;'></div>
-            <div style='flex:2 1 320px;min-width:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px 0 32px;'>
-                <canvas id='${chartId}' width='260' height='110' style='background:#fff;border-radius:8px;'></canvas>
-                <div id='${sliderId}' style='width:100%;margin-top:10px;'></div>
-                <div id='${chartId}-window' style='font-size:0.92em;color:#888;'>Window: ${item.start_date} ~ ${item.end_date}</div>
-            </div>
-        </div>
-        `;
-    }
-    document.getElementById(targetId).innerHTML = cardHtml;
-    // Chart logic
-    const ctx = document.getElementById(chartId).getContext('2d');
-    if (!window.myStableCharts) window.myStableCharts = {};
-    window.myStableCharts[chartId] = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: allCloses.slice(sliderStart, sliderEnd+1).map((v,i)=>i+1),
-            datasets: [{
-                label: 'Price',
-                data: allCloses.slice(sliderStart, sliderEnd+1),
-                borderColor: '#2196f3',
-                backgroundColor: 'rgba(33,150,243,0.08)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 2,
-                pointBackgroundColor: '#2196f3',
-            }]
-        },
-        options: {
-            responsive: false,
-            plugins: {
-                legend: { display: false },
-                title: { display: false },
-                tooltip: { enabled: true }
-            },
-            scales: {
-                x: { display: false },
-                y: { display: true, title: { display: false }, grid: { display: false } }
+            `;
+        }
+        document.getElementById(targetId).innerHTML = cardHtml;
+        
+        try {
+            // Chart logic
+            const ctx = document.getElementById(chartId).getContext('2d');
+            if (!window.myStableCharts) window.myStableCharts = {};
+            
+            // Safely extract the data slice
+            const startIdx = Math.min(sliderStart, allCloses.length - windowLen);
+            const endIdx = Math.min(sliderEnd, allCloses.length - 1);
+            
+            window.myStableCharts[chartId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: allCloses.slice(startIdx, endIdx+1).map((v,i)=>i+1),
+                    datasets: [{
+                        label: 'Price',
+                        data: allCloses.slice(startIdx, endIdx+1),
+                        borderColor: '#2196f3',
+                        backgroundColor: 'rgba(33,150,243,0.08)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2,
+                        pointBackgroundColor: '#2196f3',
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false },
+                        tooltip: { enabled: true }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { display: true, title: { display: false }, grid: { display: false } }
+                    }
+                }
+            });
+            
+            // Fill the info box initially
+            document.getElementById(infoId).innerHTML = `
+                <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
+                <div style='margin-bottom:4px;'><b>Start:</b> ${item.start_date} <b>End:</b> ${item.end_date}</div>
+                <div style='margin-bottom:4px;'><b>Stability Score:</b> ${item.stability_score.toFixed(4)}</div>
+                <div style='margin-bottom:4px;'><b>Metric:</b> ${getMetricLabel(item.metric, item.order)}</div>
+                <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${item.window_prices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(item.window_prices)}]</div>
+            `;
+            
+            try {
+                // Dual-handle slider using noUiSlider
+                const sliderElem = document.getElementById(sliderId);
+                if (typeof noUiSlider === 'undefined') {
+                    console.error("noUiSlider library not available");
+                    return;
+                }
+                
+                noUiSlider.create(sliderElem, {
+                    start: [sliderStart, sliderEnd],
+                    connect: true,
+                    range: { min: 0, max: sliderMax },
+                    step: 1,
+                    tooltips: [true, true],
+                    format: {
+                        to: v => Math.round(v),
+                        from: v => Math.round(v)
+                    }
+                });
+                
+                // Update when slider changes
+                sliderElem.noUiSlider.on('update', function(values) {
+                    const startIdx = Number(values[0]);
+                    const endIdx = Number(values[1]);
+                    if (endIdx - startIdx < 1) return; // window must be at least 2
+                    
+                    // Safety check for valid indices
+                    if (startIdx >= 0 && endIdx < allCloses.length && startIdx < endIdx) {
+                        const windowPrices = allCloses.slice(startIdx, endIdx+1);
+                        const windowDates = allDates.slice(startIdx, endIdx+1);
+                        let score = 0;
+                        if (item.metric === 'meanabs') {
+                            score = windowPrices.length > 1 ? windowPrices.slice(1).reduce((acc, v, i) => acc + Math.abs(v - windowPrices[i]), 0) / (windowPrices.length-1) : 0;
+                        } else {
+                            const changes = windowPrices.slice(1).map((v,i)=>v-windowPrices[i]);
+                            score = changes.length > 0 ? Math.sqrt(changes.reduce((acc, v) => acc + v*v, 0) / changes.length) : 0;
+                        }
+                        document.getElementById(infoId).innerHTML = `
+                            <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
+                            <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
+                            <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
+                            <div style='margin-bottom:4px;'><b>Metric:</b> ${getMetricLabel(item.metric, item.order)}</div>
+                            <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${windowPrices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(windowPrices)}]</div>
+                        `;
+                        document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
+                        
+                        // Update chart
+                        if (windowPrices.length > 0 && window.myStableCharts && window.myStableCharts[chartId]) {
+                            window.myStableCharts[chartId].data.labels = windowPrices.map((v,i)=>i+1);
+                            window.myStableCharts[chartId].data.datasets[0].data = windowPrices;
+                            window.myStableCharts[chartId].update();
+                        }
+                    }
+                });
+            } catch (sliderError) {
+                console.error("Error creating slider:", sliderError);
+                document.getElementById(targetId).innerHTML += `
+                    <div style="color:orange;margin-top:10px;text-align:center;">
+                        Note: Interactive slider could not be initialized. Chart is still viewable.
+                    </div>`;
             }
+        } catch (chartError) {
+            console.error("Error rendering chart:", chartError);
+            document.getElementById(targetId).innerHTML = `
+                <div style="padding:12px;background:#ffeeee;border-radius:5px;text-align:center;color:red;">
+                    Error rendering chart: ${chartError.message}
+                </div>`;
         }
-    });
-    // Dual-handle slider using noUiSlider
-    const sliderElem = document.getElementById(sliderId);
-    noUiSlider.create(sliderElem, {
-        start: [sliderStart, sliderEnd],
-        connect: true,
-        range: { min: 0, max: sliderMax },
-        step: 1,
-        tooltips: [true, true],
-        format: {
-            to: v => Math.round(v),
-            from: v => Math.round(v)
-        }
-    });
-    sliderElem.noUiSlider.on('update', function(values) {
-        const startIdx = Number(values[0]);
-        const endIdx = Number(values[1]);
-        if (endIdx - startIdx < 1) return; // window must be at least 2
-        const windowPrices = allCloses.slice(startIdx, endIdx+1);
-        const windowDates = allDates.slice(startIdx, endIdx+1);
-        let score = 0;
-        if (item.metric === 'meanabs') {
-            score = windowPrices.length > 1 ? windowPrices.slice(1).reduce((acc, v, i) => acc + Math.abs(v - windowPrices[i]), 0) / (windowPrices.length-1) : 0;
-        } else {
-            const changes = windowPrices.slice(1).map((v,i)=>v-windowPrices[i]);
-            score = changes.length > 0 ? Math.sqrt(changes.reduce((acc, v) => acc + v*v, 0) / changes.length) : 0;
-        }
-        document.getElementById(infoId).innerHTML = `
-            <div style='font-size:1.13rem;font-weight:bold;margin-bottom:6px;'>${item.name} <span style='font-size:0.98rem;color:#888;'>(${item.symbol})</span></div>
-            <div style='margin-bottom:4px;'><b>Start:</b> ${windowDates[0]} <b>End:</b> ${windowDates[windowDates.length-1]}</div>
-            <div style='margin-bottom:4px;'><b>Stability Score:</b> ${score.toFixed(4)}</div>
-            <div style='margin-bottom:4px;'><b>Metric:</b> ${getMetricLabel(item.metric, item.order)}</div>
-            <div style='margin-bottom:4px;font-size:0.97em;color:#888;' title='${windowPrices.map(x=>x.toFixed(2)).join(", ") }'>Window Prices: [${formatWindowPrices(windowPrices)}]</div>
-        `;
-        document.getElementById(`${chartId}-window`).innerText = `Window: ${windowDates[0]} ~ ${windowDates[windowDates.length-1]}`;
-        // Update chart
-        if (windowPrices.length > 0 && window.myStableCharts && window.myStableCharts[chartId]) {
-            window.myStableCharts[chartId].data.labels = windowPrices.map((v,i)=>i+1);
-            window.myStableCharts[chartId].data.datasets[0].data = windowPrices;
-            window.myStableCharts[chartId].update();
-        }
-    });
+    } catch (error) {
+        console.error("Error in renderStableCard:", error);
+        document.getElementById(targetId).innerHTML = `
+            <div style="padding:12px;background:#ffeeee;border-radius:5px;text-align:center;color:red;">
+                Failed to render card: ${error.message}
+            </div>`;
+    }
 }
 // Add event listener for explore-stock
 window.addEventListener('DOMContentLoaded', function() {
@@ -600,18 +752,50 @@ window.addEventListener('DOMContentLoaded', function() {
             const days = exploreRangeSelect.value;
             const windowSize = exploreWindowSelect.value;
             document.getElementById('explore-card').innerHTML = 'Loading...';
-            fetch(`/stocks/stable?metric=${metric}&order=${order}&symbol=${symbol}&window=${windowSize}&days=${days}`)
-                .then(res => res.json())
+            
+            const url = `/stocks/stable?metric=${metric}&order=${order}&symbol=${symbol}&window=${windowSize}&days=${days}`;
+            console.log("Fetching stock stability data from:", url);
+            
+            fetch(url)
+                .then(res => {
+                    if (!res.ok) {
+                        console.error("Error response:", res.status, res.statusText);
+                        throw new Error(`HTTP error ${res.status}: ${res.statusText}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
+                    console.log("Got data:", data);
                     if (Array.isArray(data) && data.length > 0) {
-                        renderStableCard(data[0], 0, 'explore-card', true);
+                        if (data[0].error) {
+                            document.getElementById('explore-card').innerHTML = 
+                                `<div style="color:red;padding:12px;background:#ffeeee;border-radius:5px;text-align:center;">
+                                    ${data[0].error}
+                                </div>`;
+                        } else {
+                            renderStableCard(data[0], 0, 'explore-card', true);
+                        }
                     } else {
-                        document.getElementById('explore-card').innerHTML = 'No data.';
+                        document.getElementById('explore-card').innerHTML = 
+                            `<div style="padding:12px;background:#eee;border-radius:5px;text-align:center;">
+                                No data found for ${symbol} with the current settings.
+                            </div>`;
                     }
                 })
-                .catch(() => {
-                    document.getElementById('explore-card').innerHTML = 'Failed to fetch.';
+                .catch(error => {
+                    console.error("Error fetching stock data:", error);
+                    document.getElementById('explore-card').innerHTML = 
+                        `<div style="color:red;padding:12px;background:#ffeeee;border-radius:5px;text-align:center;">
+                            Failed to fetch data: ${error.message}
+                            <br><br>
+                            <button onclick="fetchAndShowExploreCard()" style="background:#2196f3;color:#fff;border:none;padding:5px 16px;border-radius:5px;font-size:0.97rem;">Try Again</button>
+                        </div>`;
                 });
+        } else {
+            document.getElementById('explore-card').innerHTML = 
+                `<div style="padding:12px;background:#eee;border-radius:5px;text-align:center;">
+                    Please select a stock and stability metric first.
+                </div>`;
         }
     };
     // Reset button resets all controls to default
@@ -660,6 +844,19 @@ window.addEventListener('DOMContentLoaded', function() {
         document.getElementById('stability-explanation').innerText = data.explanation;
     });
 });
+function getMetricLabel(metric, order) {
+    if (metric === 'std' && order === 'asc') {
+        return 'Lowest Standard Deviation (Most Stable)';
+    } else if (metric === 'std' && order === 'desc') {
+        return 'Highest Standard Deviation (Most Unstable)';
+    } else if (metric === 'meanabs' && order === 'asc') {
+        return 'Lowest Mean Absolute Change (Most Stable)';
+    } else if (metric === 'meanabs' && order === 'desc') {
+        return 'Highest Mean Absolute Change (Most Unstable)';
+    } else {
+        return `${order === 'asc' ? 'Lowest' : 'Highest'} ${metric === 'std' ? 'Standard Deviation' : 'Mean Absolute Change'}`;
+    }
+}
 function formatWindowPrices(windowPrices) {
     if (windowPrices.length <= 5) {
         return windowPrices.map(x => x.toFixed(2)).join(', ');
@@ -716,29 +913,68 @@ async function filterAndPopulateExplorerDropdown() {
     exploreSelect.innerHTML = '<option value="">Loading...</option>';
     const days = exploreRangeSelect.value;
     const windowSize = exploreWindowSelect.value;
-    let tickers = [];
+    
+    console.log("Fetching available tickers for Explorer...");
+    
     try {
-        tickers = await fetch('/available_tickers').then(res => res.json());
-    } catch {
-        exploreSelect.innerHTML = '<option value="">Failed to load</option>';
-        return;
-    }
-    // For each ticker, check if it has data for the current settings
-    const validTickers = [];
-    await Promise.all(tickers.map(async t => {
-        try {
-            const url = `/stocks/stable?symbol=${t}&window=${windowSize}&days=${days}&metric=std&order=asc`;
-            const res = await fetch(url);
-            const data = await res.json();
-            if (Array.isArray(data) && data.length > 0 && !data[0].error) {
-                validTickers.push(t);
-            }
-        } catch {}
-    }));
-    if (validTickers.length === 0) {
-        exploreSelect.innerHTML = '<option value="">No stocks available</option>';
-    } else {
-        populateDropdown('explore-stock', validTickers, true);
+        // First try to fetch the list of available tickers
+        const tickerRes = await fetch('/available_tickers');
+        
+        if (!tickerRes.ok) {
+            console.error("Failed to fetch available tickers:", tickerRes.status, tickerRes.statusText);
+            exploreSelect.innerHTML = '<option value="">Failed to load tickers</option>';
+            return;
+        }
+        
+        const tickers = await tickerRes.json();
+        console.log(`Got ${tickers.length} available tickers`);
+        
+        if (!tickers || tickers.length === 0) {
+            exploreSelect.innerHTML = '<option value="">No tickers available</option>';
+            return;
+        }
+        
+        // Process tickers in smaller batches to avoid overwhelming the server
+        const BATCH_SIZE = 5;
+        const validTickers = [];
+        
+        // Instead of testing each ticker, just use the list directly to speed things up
+        populateDropdown('explore-stock', tickers, true);
+        
+        // If we want to validate each ticker (optional):
+        /*
+        exploreSelect.innerHTML = '<option value="">Validating tickers...</option>';
+        
+        for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
+            const batch = tickers.slice(i, i + BATCH_SIZE);
+            await Promise.all(batch.map(async t => {
+                try {
+                    const url = `/stocks/stable?symbol=${t}&window=${windowSize}&days=${days}&metric=std&order=asc`;
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data) && data.length > 0 && !data[0].error) {
+                            validTickers.push(t);
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Error validating ticker ${t}:`, e);
+                }
+            }));
+            
+            // Update status
+            exploreSelect.innerHTML = `<option value="">Validated ${Math.min(i + BATCH_SIZE, tickers.length)}/${tickers.length} tickers...</option>`;
+        }
+        
+        if (validTickers.length === 0) {
+            exploreSelect.innerHTML = '<option value="">No valid tickers found</option>';
+        } else {
+            populateDropdown('explore-stock', validTickers, true);
+        }
+        */
+    } catch (error) {
+        console.error("Error in filterAndPopulateExplorerDropdown:", error);
+        exploreSelect.innerHTML = '<option value="">Error loading tickers</option>';
     }
 }
 async function filterAndPopulatePredictionDropdown() {
