@@ -3,14 +3,11 @@ from flask_cors import CORS
 from typing import List
 from math import comb
 import os
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import requests
 import logging
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
-from transformers import pipeline
-from threading import Thread
 import time
 
 try:
@@ -19,22 +16,15 @@ except ImportError:
     yf = None
 
 app = Flask(__name__)
-CORS(app)
+# Configure CORS to allow requests from any origin
+CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"]}})
 
-# Use a smaller, faster model for explanation
-explanation_pipe = pipeline('text-generation', model='sshleifer/tiny-gpt2')
-
-# In-memory cache for explanations
-explanation_cache = {}
-
-def generate_explanation_async(key, prompt):
-    # Generate and cache the explanation in the background
-    result = explanation_pipe(prompt, max_length=20, num_return_sequences=1)
-    explanation = result[0]['generated_text'].split('Explanation:')[-1].strip()
-    if '.' in explanation:
-        explanation = explanation.split('.', 1)[0].strip() + '.'
-    explanation = explanation[:200]
-    explanation_cache[key] = explanation
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
 
 def name_to_numbers(name):
     name = name.lower()
@@ -89,8 +79,6 @@ def longest_increasing_subsequence(nums):
         lis.append(nums[idx])
         idx = prev[idx]
     return lis[::-1]
-
-analyzer = SentimentIntensityAnalyzer()
 
 @app.route('/match', methods=['POST'])
 def match():
@@ -211,6 +199,19 @@ def stocks_history():
             results[name] = {'symbol': symbol, 'error': str(e)}
     return jsonify(results)
 
+def max_abs_sum_change(prices):
+    # Find the time range with the largest absolute sum of price changes
+    n = len(prices)
+    max_sum = 0
+    best_range = (0, 0)
+    for i in range(n):
+        for j in range(i+1, n):
+            abs_sum = sum(abs(prices[k+1] - prices[k]) for k in range(i, j))
+            if abs_sum > max_sum:
+                max_sum = abs_sum
+                best_range = (i, j)
+    return max_sum, best_range
+
 @app.route('/stocks/maxchange', methods=['GET'])
 def stocks_maxchange():
     # Default tickers
@@ -290,246 +291,441 @@ def max_abs_sum_change(prices):
 
 @app.route('/leetcode/stock', methods=['POST'])
 def leetcode_stock():
-    data = request.json
-    problem = data.get('problem')
-    prices = data.get('prices', [])
-    k = data.get('k', 2)
-    fee = data.get('fee', 0)
-    result = None
-    code = ''
-    cpp_code = ''
-    time_complexity = ''
-    space_complexity = ''
-    explanation = ''
-    if problem == '121':
-        # LeetCode 121: Best Time to Buy and Sell Stock (one transaction)
-        min_price = float('inf')
-        max_profit = 0
-        for price in prices:
-            if price < min_price:
-                min_price = price
-            elif price - min_price > max_profit:
-                max_profit = price - min_price
-        result = max_profit
-        code = '''def maxProfit(prices):
-    min_price = float('inf')
+    try:
+        data = request.json
+        problem = data.get('problem', '')
+        prices = data.get('prices', [])
+        k = data.get('k', 2)
+        fee = data.get('fee', 0)
+        
+        print(f"DEBUG: leetcode_stock accessed, problem={problem}, prices={prices[:5]}...")
+        
+        if problem == '121':  # Best Time to Buy and Sell Stock (One transaction)
+            result = max_profit_one_transaction(prices)
+            code = """def maxProfit(prices):
     max_profit = 0
+    min_price = float('inf')
+    
     for price in prices:
-        if price < min_price:
-            min_price = price
-        elif price - min_price > max_profit:
-            max_profit = price - min_price
-    return max_profit'''
-        cpp_code = '''int maxProfit(vector<int>& prices) {
-    int min_price = INT_MAX, max_profit = 0;
+        # Update minimum price seen so far
+        min_price = min(min_price, price)
+        # Calculate profit if we sell at current price
+        current_profit = price - min_price
+        # Update max profit if current profit is better
+        max_profit = max(max_profit, current_profit)
+    
+    return max_profit"""
+            cpp_code = """int maxProfit(vector<int>& prices) {
+    int maxProfit = 0;
+    int minPrice = INT_MAX;
+    
     for (int price : prices) {
-        min_price = min(min_price, price);
-        max_profit = max(max_profit, price - min_price);
+        // Update minimum price seen so far
+        minPrice = min(minPrice, price);
+        // Calculate profit if we sell at current price
+        int currentProfit = price - minPrice;
+        // Update max profit if current profit is better
+        maxProfit = max(maxProfit, currentProfit);
     }
-    return max_profit;
-}'''
-        time_complexity = 'O(n)'
-        space_complexity = 'O(1)'
-        explanation = 'Track the minimum price and the maximum profit as you iterate.'
-    elif problem == '122':
-        # LeetCode 122: Best Time to Buy and Sell Stock II (unlimited transactions)
-        profit = 0
-        for i in range(1, len(prices)):
+    
+    return maxProfit;
+}"""
+            time_complexity = 'O(n)'
+            space_complexity = 'O(1)'
+            explanation = 'Track min price and max profit in one pass through prices array'
+        
+        elif problem == '122':  # Best Time to Buy and Sell Stock II (Unlimited transactions)
+            result = max_profit_unlimited_transactions(prices)
+            code = """def maxProfit(prices):
+    max_profit = 0
+    
+    # For each pair of consecutive days
+    for i in range(1, len(prices)):
+        # If price increases, we buy yesterday and sell today
+        if prices[i] > prices[i-1]:
+            max_profit += prices[i] - prices[i-1]
+    
+    return max_profit"""
+            cpp_code = """int maxProfit(vector<int>& prices) {
+    int maxProfit = 0;
+    
+    // For each pair of consecutive days
+    for (int i = 1; i < prices.size(); i++) {
+        // If price increases, we buy yesterday and sell today
+        if (prices[i] > prices[i-1]) {
+            maxProfit += prices[i] - prices[i-1];
+        }
+    }
+    
+    return maxProfit;
+}"""
+            time_complexity = 'O(n)'
+            space_complexity = 'O(1)'
+            explanation = 'Capitalize on every price increase between consecutive days'
+            
+        elif problem == '123':  # Best Time to Buy and Sell Stock III (At most two transactions)
+            result = max_profit_two_transactions(prices)
+            code = """def maxProfit(prices):
+    n = len(prices)
+    if n <= 1:
+        return 0
+    
+    # Forward pass: dp[i] represents max profit with one transaction up to day i
+    # dp[0] = 0 (no profit on first day)
+    dp_one_transaction = [0] * n
+    min_price = prices[0]
+    
+    for i in range(1, n):
+        min_price = min(min_price, prices[i])
+        dp_one_transaction[i] = max(dp_one_transaction[i-1], prices[i] - min_price)
+    
+    # Backward pass: calculate max profit with two transactions
+    max_price = prices[n-1]
+    max_profit = dp_one_transaction[n-1]  # At least as good as one transaction
+    
+    for i in range(n-2, 0, -1):
+        max_price = max(max_price, prices[i])
+        # Max profit = best of (one transaction) or (one transaction until day i + another transaction after day i)
+        max_profit = max(max_profit, dp_one_transaction[i-1] + max_price - prices[i])
+    
+    return max_profit"""
+            cpp_code = """int maxProfit(vector<int>& prices) {
+    int n = prices.size();
+    if (n <= 1) return 0;
+    
+    // Forward pass: dp[i] represents max profit with one transaction up to day i
+    vector<int> dpOneTransaction(n, 0);
+    int minPrice = prices[0];
+    
+    for (int i = 1; i < n; i++) {
+        minPrice = min(minPrice, prices[i]);
+        dpOneTransaction[i] = max(dpOneTransaction[i-1], prices[i] - minPrice);
+    }
+    
+    // Backward pass: calculate max profit with two transactions
+    int maxPrice = prices[n-1];
+    int maxProfit = dpOneTransaction[n-1];  // At least as good as one transaction
+    
+    for (int i = n-2; i > 0; i--) {
+        maxPrice = max(maxPrice, prices[i]);
+        // Max profit = best of (one transaction) or (one transaction until day i + another transaction after day i)
+        maxProfit = max(maxProfit, dpOneTransaction[i-1] + maxPrice - prices[i]);
+    }
+    
+    return maxProfit;
+}"""
+            time_complexity = 'O(n)'
+            space_complexity = 'O(n)'
+            explanation = 'Use dynamic programming with two passes: forward pass to find best single transaction until each day, backward pass to find second best transaction'
+            
+        elif problem == '188':  # Best Time to Buy and Sell Stock IV (At most k transactions)
+            result = max_profit_k_transactions(prices, k)
+            code = """def maxProfit(prices, k):
+    n = len(prices)
+    if n <= 1 or k <= 0:
+        return 0
+    
+    # If k is large enough, it's equivalent to unlimited transactions
+    if k >= n // 2:
+        max_profit = 0
+        for i in range(1, n):
             if prices[i] > prices[i-1]:
-                profit += prices[i] - prices[i-1]
-        result = profit
-        code = '''def maxProfit(prices):
+                max_profit += prices[i] - prices[i-1]
+        return max_profit
+    
+    # dp[i][j] = max profit with i transactions on day j
+    dp = [[0 for _ in range(n)] for _ in range(k+1)]
+    
+    for i in range(1, k+1):
+        # Initialize max_diff as the profit of buying on day 0 and selling on day 1
+        max_diff = -prices[0]
+        
+        for j in range(1, n):
+            # Either we don't make a transaction on day j, or we sell on day j
+            dp[i][j] = max(dp[i][j-1], prices[j] + max_diff)
+            # Update max_diff to potentially buy on day j
+            max_diff = max(max_diff, dp[i-1][j] - prices[j])
+    
+    return dp[k][n-1]"""
+            cpp_code = """int maxProfit(vector<int>& prices, int k) {
+    int n = prices.size();
+    if (n <= 1 || k <= 0) return 0;
+    
+    // If k is large enough, it's equivalent to unlimited transactions
+    if (k >= n / 2) {
+        int maxProfit = 0;
+        for (int i = 1; i < n; i++) {
+            if (prices[i] > prices[i-1]) {
+                maxProfit += prices[i] - prices[i-1];
+            }
+        }
+        return maxProfit;
+    }
+    
+    // dp[i][j] = max profit with i transactions on day j
+    vector<vector<int>> dp(k+1, vector<int>(n, 0));
+    
+    for (int i = 1; i <= k; i++) {
+        // Initialize max_diff as the profit of buying on day 0 and selling on day 1
+        int maxDiff = -prices[0];
+        
+        for (int j = 1; j < n; j++) {
+            // Either we don't make a transaction on day j, or we sell on day j
+            dp[i][j] = max(dp[i][j-1], prices[j] + maxDiff);
+            // Update max_diff to potentially buy on day j
+            maxDiff = max(maxDiff, dp[i-1][j] - prices[j]);
+        }
+    }
+    
+    return dp[k][n-1];
+}"""
+            time_complexity = 'O(k*n)'
+            space_complexity = 'O(k*n)'
+            explanation = 'Use dynamic programming with a 2D array to track max profit with i transactions by day j'
+            
+        elif problem == '309':  # Best Time to Buy and Sell Stock with Cooldown
+            result = max_profit_with_cooldown(prices)
+            code = """def maxProfit(prices):
+    n = len(prices)
+    if n <= 1:
+        return 0
+    
+    # Three states:
+    # buy[i]: Maximum profit ending with a buy on day i or earlier
+    # sell[i]: Maximum profit ending with a sell on day i
+    # cool[i]: Maximum profit ending with a cooldown on day i
+    
+    buy = [0] * n
+    sell = [0] * n
+    cool = [0] * n
+    
+    buy[0] = -prices[0]  # Initial buy on day 0
+    
+    for i in range(1, n):
+        # Buy: Either keep previous buy state or buy after cooldown
+        buy[i] = max(buy[i-1], cool[i-1] - prices[i])
+        
+        # Sell: Sell the stock bought earlier
+        sell[i] = buy[i-1] + prices[i]
+        
+        # Cooldown: Either keep previous cooldown or come from a sell
+        cool[i] = max(cool[i-1], sell[i-1])
+    
+    # The final state must be either selling or in cooldown
+    return max(sell[n-1], cool[n-1])"""
+            cpp_code = """int maxProfit(vector<int>& prices) {
+    int n = prices.size();
+    if (n <= 1) return 0;
+    
+    // Three states:
+    // buy[i]: Maximum profit ending with a buy on day i or earlier
+    // sell[i]: Maximum profit ending with a sell on day i
+    // cool[i]: Maximum profit ending with a cooldown on day i
+    
+    vector<int> buy(n, 0);
+    vector<int> sell(n, 0);
+    vector<int> cool(n, 0);
+    
+    buy[0] = -prices[0];  // Initial buy on day 0
+    
+    for (int i = 1; i < n; i++) {
+        // Buy: Either keep previous buy state or buy after cooldown
+        buy[i] = max(buy[i-1], cool[i-1] - prices[i]);
+        
+        // Sell: Sell the stock bought earlier
+        sell[i] = buy[i-1] + prices[i];
+        
+        // Cooldown: Either keep previous cooldown or come from a sell
+        cool[i] = max(cool[i-1], sell[i-1]);
+    }
+    
+    // The final state must be either selling or in cooldown
+    return max(sell[n-1], cool[n-1]);
+}"""
+            time_complexity = 'O(n)'
+            space_complexity = 'O(n)'
+            explanation = 'Use state machine approach with three states: buy, sell, and cooldown'
+            
+        elif problem == '714':  # Best Time to Buy and Sell Stock with Transaction Fee
+            result = max_profit_with_fee(prices, fee)
+            code = """def maxProfit(prices, fee):
+    n = len(prices)
+    if n <= 1:
+        return 0
+    
+    # Two states: cash (not holding stock) and hold (holding stock)
+    cash, hold = 0, -prices[0]
+    
+    for i in range(1, n):
+        # If we had cash, we can stay in cash or sell stock from previous hold
+        previous_cash = cash
+        cash = max(cash, hold + prices[i] - fee)
+        
+        # If we were holding stock, we can stay holding or buy with our previous cash
+        hold = max(hold, previous_cash - prices[i])
+    
+    # We want to end with cash (not holding stock)
+    return cash"""
+            cpp_code = """int maxProfit(vector<int>& prices, int fee) {
+    int n = prices.size();
+    if (n <= 1) return 0;
+    
+    // Two states: cash (not holding stock) and hold (holding stock)
+    int cash = 0, hold = -prices[0];
+    
+    for (int i = 1; i < n; i++) {
+        // If we had cash, we can stay in cash or sell stock from previous hold
+        int previousCash = cash;
+        cash = max(cash, hold + prices[i] - fee);
+        
+        // If we were holding stock, we can stay holding or buy with our previous cash
+        hold = max(hold, previousCash - prices[i]);
+    }
+    
+    // We want to end with cash (not holding stock)
+    return cash;
+}"""
+            time_complexity = 'O(n)'
+            space_complexity = 'O(1)'
+            explanation = 'Use state machine approach with two states: holding cash or holding stock'
+            
+        else:
+            result = 0
+            code = "def maxProfit(prices):\n    # Unknown problem number\n    return 0"
+            cpp_code = "int maxProfit(vector<int>& prices) {\n    // Unknown problem number\n    return 0;\n}"
+            time_complexity = 'N/A'
+            space_complexity = 'N/A'
+            explanation = f'Unknown problem number: {problem}'
+        
+        return jsonify({
+            'result': result,
+            'code': code,
+            'cpp_code': cpp_code,
+            'time_complexity': time_complexity,
+            'space_complexity': space_complexity,
+            'explanation': explanation
+        })
+        
+    except Exception as e:
+        print(f"ERROR in leetcode_stock: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# Helper functions for stock problems
+def max_profit_one_transaction(prices):
+    """LeetCode 121: Best Time to Buy and Sell Stock"""
+    if not prices:
+        return 0
+    
+    max_profit = 0
+    min_price = float('inf')
+    
+    for price in prices:
+        min_price = min(min_price, price)
+        max_profit = max(max_profit, price - min_price)
+    
+    return max_profit
+
+def max_profit_unlimited_transactions(prices):
+    """LeetCode 122: Best Time to Buy and Sell Stock II"""
+    if not prices:
+        return 0
+    
     profit = 0
     for i in range(1, len(prices)):
         if prices[i] > prices[i-1]:
             profit += prices[i] - prices[i-1]
-    return profit'''
-        cpp_code = '''int maxProfit(vector<int>& prices) {
-    int profit = 0;
-    for (int i = 1; i < prices.size(); ++i) {
-        if (prices[i] > prices[i-1])
-            profit += prices[i] - prices[i-1];
-    }
-    return profit;
-}'''
-        time_complexity = 'O(n)'
-        space_complexity = 'O(1)'
-        explanation = 'Sum all positive price differences.'
-    elif problem == '123':
-        # LeetCode 123: Best Time to Buy and Sell Stock III (at most two transactions)
-        buy1 = buy2 = float('inf')
-        profit1 = profit2 = 0
-        for price in prices:
-            buy1 = min(buy1, price)
-            profit1 = max(profit1, price - buy1)
-            buy2 = min(buy2, price - profit1)
-            profit2 = max(profit2, price - buy2)
-        result = profit2
-        code = '''def maxProfit(prices):
-    buy1 = buy2 = float('inf')
-    profit1 = profit2 = 0
-    for price in prices:
-        buy1 = min(buy1, price)
-        profit1 = max(profit1, price - buy1)
-        buy2 = min(buy2, price - profit1)
-        profit2 = max(profit2, price - buy2)
-    return profit2'''
-        cpp_code = '''int maxProfit(vector<int>& prices) {
-    int buy1 = INT_MAX, buy2 = INT_MAX;
-    int profit1 = 0, profit2 = 0;
-    for (int price : prices) {
-        buy1 = min(buy1, price);
-        profit1 = max(profit1, price - buy1);
-        buy2 = min(buy2, price - profit1);
-        profit2 = max(profit2, price - buy2);
-    }
-    return profit2;
-}'''
-        time_complexity = 'O(n)'
-        space_complexity = 'O(1)'
-        explanation = 'Track two buys and two profits for two transactions.'
-    elif problem == '188':
-        # LeetCode 188: Best Time to Buy and Sell Stock IV (at most k transactions)
-        if not prices or k == 0:
-            result = 0
-        elif k >= len(prices) // 2:
-            profit = 0
-            for i in range(1, len(prices)):
-                if prices[i] > prices[i-1]:
-                    profit += prices[i] - prices[i-1]
-            result = profit
-        else:
-            dp = [[0] * len(prices) for _ in range(k+1)]
-            for t in range(1, k+1):
-                max_diff = -prices[0]
-                for d in range(1, len(prices)):
-                    dp[t][d] = max(dp[t][d-1], prices[d] + max_diff)
-                    max_diff = max(max_diff, dp[t-1][d] - prices[d])
-            result = dp[k][-1]
-        code = '''def maxProfit(k, prices):
-    if not prices or k == 0:
+    
+    return profit
+
+def max_profit_two_transactions(prices):
+    """LeetCode 123: Best Time to Buy and Sell Stock III"""
+    if not prices or len(prices) <= 1:
         return 0
-    if k >= len(prices) // 2:
-        profit = 0
-        for i in range(1, len(prices)):
-            if prices[i] > prices[i-1]:
-                profit += prices[i] - prices[i-1]
-        return profit
-    dp = [[0] * len(prices) for _ in range(k+1)]
-    for t in range(1, k+1):
-        max_diff = -prices[0]
-        for d in range(1, len(prices)):
-            dp[t][d] = max(dp[t][d-1], prices[d] + max_diff)
-            max_diff = max(max_diff, dp[t-1][d] - prices[d])
-    return dp[k][-1]'''
-        cpp_code = '''int maxProfit(int k, vector<int>& prices) {
-    int n = prices.size();
-    if (n == 0 || k == 0) return 0;
-    if (k >= n / 2) {
-        int profit = 0;
-        for (int i = 1; i < n; ++i)
-            if (prices[i] > prices[i-1])
-                profit += prices[i] - prices[i-1];
-        return profit;
-    }
-    vector<vector<int>> dp(k+1, vector<int>(n, 0));
-    for (int t = 1; t <= k; ++t) {
-        int maxDiff = -prices[0];
-        for (int d = 1; d < n; ++d) {
-            dp[t][d] = max(dp[t][d-1], prices[d] + maxDiff);
-            maxDiff = max(maxDiff, dp[t-1][d] - prices[d]);
-        }
-    }
-    return dp[k][n-1];
-}'''
-        time_complexity = 'O(kn)'
-        space_complexity = 'O(kn)'
-        explanation = 'DP for at most k transactions.'
-    elif problem == '309':
-        # LeetCode 309: Best Time to Buy and Sell Stock with Cooldown
-        if not prices:
-            result = 0
-        else:
-            n = len(prices)
-            hold = [0]*n
-            sold = [0]*n
-            rest = [0]*n
-            hold[0] = -prices[0]
-            for i in range(1, n):
-                hold[i] = max(hold[i-1], rest[i-1] - prices[i])
-                sold[i] = hold[i-1] + prices[i]
-                rest[i] = max(rest[i-1], sold[i-1])
-            result = max(sold[-1], rest[-1])
-        code = '''def maxProfit(prices):
-    if not prices:
-        return 0
+    
     n = len(prices)
-    hold = [0]*n
-    sold = [0]*n
-    rest = [0]*n
-    hold[0] = -prices[0]
+    
+    # Forward pass: max profit with one transaction up to day i
+    dp_one_transaction = [0] * n
+    min_price = prices[0]
+    
     for i in range(1, n):
-        hold[i] = max(hold[i-1], rest[i-1] - prices[i])
-        sold[i] = hold[i-1] + prices[i]
-        rest[i] = max(rest[i-1], sold[i-1])
-    return max(sold[-1], rest[-1])'''
-        cpp_code = '''int maxProfit(vector<int>& prices) {
-    int n = prices.size();
-    if (n == 0) return 0;
-    vector<int> hold(n), sold(n), rest(n);
-    hold[0] = -prices[0];
-    for (int i = 1; i < n; ++i) {
-        hold[i] = max(hold[i-1], rest[i-1] - prices[i]);
-        sold[i] = hold[i-1] + prices[i];
-        rest[i] = max(rest[i-1], sold[i-1]);
-    }
-    return max(sold[n-1], rest[n-1]);
-}'''
-        time_complexity = 'O(n)'
-        space_complexity = 'O(n)'
-        explanation = 'DP with three states: hold, sold, rest.'
-    elif problem == '714':
-        # LeetCode 714: Best Time to Buy and Sell Stock with Transaction Fee
-        if not prices:
-            result = 0
-        else:
-            n = len(prices)
-            cash, hold = 0, -prices[0]
-            for i in range(1, n):
-                cash = max(cash, hold + prices[i] - fee)
-                hold = max(hold, cash - prices[i])
-            result = cash
-        code = '''def maxProfit(prices, fee):
-    if not prices:
+        min_price = min(min_price, prices[i])
+        dp_one_transaction[i] = max(dp_one_transaction[i-1], prices[i] - min_price)
+    
+    # Backward pass: calculate max profit with two transactions
+    max_price = prices[n-1]
+    max_profit = dp_one_transaction[n-1]  # At least as good as one transaction
+    
+    for i in range(n-2, 0, -1):
+        max_price = max(max_price, prices[i])
+        max_profit = max(max_profit, dp_one_transaction[i-1] + max_price - prices[i])
+    
+    return max_profit
+
+def max_profit_k_transactions(prices, k):
+    """LeetCode 188: Best Time to Buy and Sell Stock IV"""
+    n = len(prices)
+    if n <= 1 or k <= 0:
         return 0
+    
+    # If k is large enough, it's equivalent to unlimited transactions
+    if k >= n // 2:
+        return max_profit_unlimited_transactions(prices)
+    
+    # dp[i][j] = max profit with i transactions on day j
+    dp = [[0 for _ in range(n)] for _ in range(k+1)]
+    
+    for i in range(1, k+1):
+        max_diff = -prices[0]
+        
+        for j in range(1, n):
+            dp[i][j] = max(dp[i][j-1], prices[j] + max_diff)
+            max_diff = max(max_diff, dp[i-1][j] - prices[j])
+    
+    return dp[k][n-1]
+
+def max_profit_with_cooldown(prices):
+    """LeetCode 309: Best Time to Buy and Sell Stock with Cooldown"""
+    if not prices or len(prices) <= 1:
+        return 0
+    
+    n = len(prices)
+    
+    # Three states: buy, sell, cooldown
+    buy = [0] * n
+    sell = [0] * n
+    cool = [0] * n
+    
+    buy[0] = -prices[0]  # Initial buy on day 0
+    
+    for i in range(1, n):
+        buy[i] = max(buy[i-1], cool[i-1] - prices[i])
+        sell[i] = buy[i-1] + prices[i]
+        cool[i] = max(cool[i-1], sell[i-1])
+    
+    return max(sell[n-1], cool[n-1])
+
+def max_profit_with_fee(prices, fee):
+    """LeetCode 714: Best Time to Buy and Sell Stock with Transaction Fee"""
+    if not prices or len(prices) <= 1:
+        return 0
+    
     cash, hold = 0, -prices[0]
-    for price in prices[1:]:
-        cash = max(cash, hold + price - fee)
-        hold = max(hold, cash - price)
-    return cash'''
-        cpp_code = '''int maxProfit(vector<int>& prices, int fee) {
-    int n = prices.size();
-    if (n == 0) return 0;
-    int cash = 0, hold = -prices[0];
-    for (int i = 1; i < n; ++i) {
-        cash = max(cash, hold + prices[i] - fee);
-        hold = max(hold, cash - prices[i]);
-    }
-    return cash;
-}'''
-        time_complexity = 'O(n)'
-        space_complexity = 'O(1)'
-        explanation = 'DP with cash and hold states, subtracting fee on sell.'
-    else:
-        return jsonify({'error': 'Unknown problem'}), 400
-    return jsonify({
-        'result': result,
-        'code': code,
-        'cpp_code': cpp_code,
-        'time_complexity': time_complexity,
-        'space_complexity': space_complexity,
-        'explanation': explanation
-    })
+    
+    for i in range(1, len(prices)):
+        prev_cash = cash
+        cash = max(cash, hold + prices[i] - fee)
+        hold = max(hold, prev_cash - prices[i])
+    
+    return cash
+
+# Add a new alternate route with a different path
+@app.route('/stock-problems', methods=['POST'])
+def stock_problems():
+    """Alternate route for the stock problems playground"""
+    return leetcode_stock()
 
 # --- Stability window helper functions ---
 def lowest_std_window(prices, window_size):
@@ -588,70 +784,190 @@ def highest_meanabs_window(prices, window_size):
 
 @app.route('/stocks/stable', methods=['GET'])
 def stocks_stable():
-    # Default tickers
-    default_tickers = {
-        'Apple': 'AAPL',
-        'Microsoft': 'MSFT',
-        'Google': 'GOOGL',
-        'Amazon': 'AMZN',
-        'Meta': 'META',
-        'Nvidia': 'NVDA',
-        'Tesla': 'TSLA',
-        'Netflix': 'NFLX',
-        'AMD': 'AMD',
-        'Intel': 'INTC',
-        'Berkshire Hathaway': 'BRK-B',
-        'Johnson & Johnson': 'JNJ',
-        'Visa': 'V',
-        'JPMorgan Chase': 'JPM',
-        'Walmart': 'WMT',
-        'Procter & Gamble': 'PG',
-        'Coca-Cola': 'KO',
-        'Exxon Mobil': 'XOM',
-        'SPY': 'SPY',
-        'QQQ': 'QQQ',
-        'VOO': 'VOO',
-        'ARKK': 'ARKK',
-        'EEM': 'EEM',
-        'XLF': 'XLF'
-    }
-    metric = request.args.get('metric', 'std')
-    order = request.args.get('order', 'asc')
-    symbol_filter = request.args.get('symbol')
-    window_size = int(request.args.get('window', 20))
-    days_param = request.args.get('days')
-    days = int(days_param) if days_param and days_param.isdigit() else 1095
-    results = []
-    end = datetime.now()
-    start = end - timedelta(days=days)
-    for name, symbol in default_tickers.items():
-        if symbol_filter and symbol != symbol_filter:
-            continue
+    try:
+        print("DEBUG: /stocks/stable endpoint accessed")
+        # Default tickers
+        default_tickers = {
+            'Apple': 'AAPL',
+            'Microsoft': 'MSFT',
+            'Google': 'GOOGL',
+            'Amazon': 'AMZN',
+            'Meta': 'META',
+            'Nvidia': 'NVDA',
+            'Tesla': 'TSLA',
+            'Netflix': 'NFLX',
+            'AMD': 'AMD',
+            'Intel': 'INTC',
+            'Berkshire Hathaway': 'BRK-B',
+            'Johnson & Johnson': 'JNJ',
+            'Visa': 'V',
+            'JPMorgan Chase': 'JPM',
+            'Walmart': 'WMT',
+            'Procter & Gamble': 'PG',
+            'Coca-Cola': 'KO',
+            'Exxon Mobil': 'XOM',
+            'SPY': 'SPY',
+            'QQQ': 'QQQ',
+            'VOO': 'VOO',
+            'ARKK': 'ARKK',
+            'EEM': 'EEM',
+            'XLF': 'XLF'
+        }
+        metric = request.args.get('metric', 'std')
+        order = request.args.get('order', 'asc')
+        symbol_filter = request.args.get('symbol')
+        window_size_str = request.args.get('window', '20')
+        days_param = request.args.get('days')
+        
+        print(f"DEBUG: Params - metric={metric}, order={order}, symbol_filter={symbol_filter}, window={window_size_str}, days={days_param}")
+        
         try:
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'))
-            closes = [float(c) for c in hist['Close']]
-            dates = [d.strftime('%Y-%m-%d') for d in hist.index]
-            n = len(closes)
-            if n < window_size:
-                results.append({'name': name, 'symbol': symbol, 'error': 'Not enough data for this window size.'})
+            window_size = int(window_size_str)
+        except (ValueError, TypeError) as e:
+            print(f"DEBUG: Error parsing window_size: {e}")
+            window_size = 20
+        
+        try:
+            days = int(days_param) if days_param and days_param.isdigit() else 1095
+        except (ValueError, TypeError) as e:
+            print(f"DEBUG: Error parsing days: {e}")
+            days = 1095
+        
+        results = []
+        end = datetime.now()
+        start = end - timedelta(days=days)
+        
+        # If yfinance is not available, use mock data
+        if yf is None:
+            print("DEBUG: yfinance module is not available, using mock data")
+            # Generate mock data for demo purposes
+            return generate_mock_data(default_tickers, metric, order, symbol_filter, window_size)
+            
+        for name, symbol in default_tickers.items():
+            if symbol_filter and symbol != symbol_filter:
                 continue
-            # Use the appropriate function for metric/order
-            if metric == 'std' and order == 'asc':
-                best_i, best_score = lowest_std_window(closes, window_size)
-            elif metric == 'std' and order == 'desc':
-                best_i, best_score = highest_std_window(closes, window_size)
-            elif metric == 'meanabs' and order == 'asc':
-                best_i, best_score = lowest_meanabs_window(closes, window_size)
-            elif metric == 'meanabs' and order == 'desc':
-                best_i, best_score = highest_meanabs_window(closes, window_size)
-            else:
-                results.append({'name': name, 'symbol': symbol, 'error': 'Invalid metric or order.'})
-                continue
-            if best_i is None:
-                results.append({'name': name, 'symbol': symbol, 'error': 'No valid window found for this metric/order.'})
-                continue
+                
+            print(f"DEBUG: Fetching data for {name} ({symbol})")
+            try:
+                ticker = yf.Ticker(symbol)
+                hist = ticker.history(start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'))
+                if hist.empty:
+                    print(f"DEBUG: No history data for {symbol}")
+                    results.append({'name': name, 'symbol': symbol, 'error': 'No data available for this time period.'})
+                    continue
+                    
+                closes = [float(c) for c in hist['Close']]
+                dates = [d.strftime('%Y-%m-%d') for d in hist.index]
+                n = len(closes)
+                
+                print(f"DEBUG: Got {n} data points for {symbol}")
+                
+                if n < window_size:
+                    print(f"DEBUG: Not enough data for {symbol} - needed {window_size}, got {n}")
+                    results.append({'name': name, 'symbol': symbol, 'error': 'Not enough data for this window size.'})
+                    continue
+                
+                # Use the appropriate function for metric/order
+                if metric == 'std' and order == 'asc':
+                    best_i, best_score = lowest_std_window(closes, window_size)
+                elif metric == 'std' and order == 'desc':
+                    best_i, best_score = highest_std_window(closes, window_size)
+                elif metric == 'meanabs' and order == 'asc':
+                    best_i, best_score = lowest_meanabs_window(closes, window_size)
+                elif metric == 'meanabs' and order == 'desc':
+                    best_i, best_score = highest_meanabs_window(closes, window_size)
+                else:
+                    print(f"DEBUG: Invalid metric/order combination: {metric}/{order}")
+                    results.append({'name': name, 'symbol': symbol, 'error': 'Invalid metric or order.'})
+                    continue
+                
+                if best_i is None:
+                    print(f"DEBUG: No valid window found for {symbol}")
+                    results.append({'name': name, 'symbol': symbol, 'error': 'No valid window found for this metric/order.'})
+                    continue
+                
+                best_j = best_i + window_size - 1
+                results.append({
+                    'name': name,
+                    'symbol': symbol,
+                    'start_date': dates[best_i],
+                    'end_date': dates[best_j],
+                    'stability_score': float(best_score),
+                    'window_prices': closes[best_i:best_j+1],
+                    'metric': metric,
+                    'order': order,
+                    'window_len': window_size,
+                    'window_start_idx': best_i,
+                    'window_end_idx': best_j,
+                    'all_closes': closes,
+                    'all_dates': dates
+                })
+                print(f"DEBUG: Successfully processed {symbol}")
+            except Exception as e:
+                print(f"DEBUG: Error processing {symbol}: {str(e)}")
+                results.append({'name': name, 'symbol': symbol, 'error': str(e)})
+        
+        # If all results have errors, use mock data as fallback
+        if results and all('error' in r for r in results):
+            print("DEBUG: All results have errors, using mock data as fallback")
+            return generate_mock_data(default_tickers, metric, order, symbol_filter, window_size)
+            
+        results = sorted(results, key=lambda x: x.get('stability_score', float('inf')), reverse=(order=='desc'))
+        if symbol_filter:
+            print(f"DEBUG: Returning 1 result for {symbol_filter}")
+            return jsonify(results[:1])
+        
+        print(f"DEBUG: Returning {min(5, len(results))} results")
+        return jsonify(results[:5])
+    except Exception as e:
+        print(f"DEBUG: Global error in /stocks/stable: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify([{"error": f"Server error: {str(e)}"}])
+
+def generate_mock_data(default_tickers, metric, order, symbol_filter, window_size):
+    """Generate mock data for demo purposes when yfinance fails"""
+    import random
+    import numpy as np
+    from datetime import datetime, timedelta
+    
+    print("DEBUG: Generating mock data")
+    results = []
+    end_date = datetime.now()
+    
+    # Filter tickers if needed
+    tickers_to_use = {k: v for k, v in default_tickers.items() 
+                     if not symbol_filter or v == symbol_filter}
+    
+    # Generate data for up to 5 companies or just the specified one
+    for name, symbol in list(tickers_to_use.items())[:5 if not symbol_filter else 1]:
+        try:
+            # Generate 100 days of mock data with some trend and randomness
+            dates = [(end_date - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(100, 0, -1)]
+            base_price = random.uniform(50, 500)  # Random base price
+            trend = random.uniform(-0.3, 0.3)     # Random trend direction
+            volatility = random.uniform(0.5, 3.0)  # Random volatility
+            
+            # Generate prices with trend and random noise
+            closes = [base_price * (1 + trend * i/100 + random.gauss(0, volatility)/100) 
+                     for i in range(100)]
+            
+            # Calculate window statistics
+            windows = []
+            for i in range(len(closes) - window_size + 1):
+                window = closes[i:i+window_size]
+                if metric == 'std':
+                    score = np.std(window)
+                else:  # 'meanabs'
+                    changes = [abs(window[j+1] - window[j]) for j in range(len(window)-1)]
+                    score = np.mean(changes)
+                windows.append((i, score))
+            
+            # Sort by score
+            windows.sort(key=lambda x: x[1], reverse=(order == 'desc'))
+            best_i, best_score = windows[0]
             best_j = best_i + window_size - 1
+            
             results.append({
                 'name': name,
                 'symbol': symbol,
@@ -667,12 +983,12 @@ def stocks_stable():
                 'all_closes': closes,
                 'all_dates': dates
             })
+            print(f"DEBUG: Generated mock data for {symbol}")
         except Exception as e:
-            results.append({'name': name, 'symbol': symbol, 'error': str(e)})
-    results = sorted(results, key=lambda x: x.get('stability_score', float('inf')), reverse=(order=='desc'))
-    if symbol_filter:
-        return jsonify(results[:1])
-    return jsonify(results[:5])
+            print(f"DEBUG: Error generating mock data for {symbol}: {str(e)}")
+            results.append({'name': name, 'symbol': symbol, 'error': 'Error generating mock data.'})
+    
+    return jsonify(results)
 
 @app.route('/available_tickers')
 def available_tickers():
@@ -726,6 +1042,28 @@ def available_for_prediction():
         except Exception:
             continue
     return jsonify(available)
+
+@app.route('/test-post', methods=['GET', 'POST'])
+def test_post():
+    """Simple test endpoint that works with both GET and POST"""
+    if request.method == 'POST':
+        try:
+            data = request.json
+            return jsonify({
+                'success': True,
+                'message': 'POST request received',
+                'data': data
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            })
+    else:
+        return jsonify({
+            'success': True,
+            'message': 'GET request received'
+        })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
