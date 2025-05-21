@@ -153,10 +153,24 @@
                 </select>
             </div>
         </div>
-        <button onclick="fetchStockTrends()" style="font-size:0.98rem;padding:7px 0;">Show Stock Trends</button>
+        
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button onclick="fetchStockTrends()" style="background:#ff69b4;color:#fff;border:none;padding:4px 16px;border-radius:5px;font-size:0.97rem;height:32px;">Apply</button>
+            <button onclick="resetStockTrendsSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:4px 16px;border-radius:5px;height:32px;">Reset</button>
+        </div>
         <div id="stock-trends-result" style="margin-top:16px;font-size:0.97rem;"></div>
         <div style="width:100%;max-width:350px;margin:0 auto;">
             <canvas id="stockChartMulti" width="350" height="350" style="display:none;background:#fff;border-radius:12px;"></canvas>
+        </div>
+        
+        <!-- Time Range Slider -->
+        <div style="margin-top:15px;margin-bottom:15px;font-size:0.95rem;">
+            <label style="display:block;margin-bottom:5px;">Time Range (max 3 years):</label>
+            <div id="time-range-slider"></div>
+            <div style="display:flex;justify-content:space-between;margin-top:5px;">
+                <span id="time-range-start">Start: -</span>
+                <span id="time-range-end">End: -</span>
+            </div>
         </div>
     </div>
     <div class="container">
@@ -210,7 +224,21 @@
                 <option value="ETH=F">Ethereum Futures (ETH=F)</option>
             </select>
         </div>
-        <button onclick="fetchMaxChange()" style="font-size:0.98rem;padding:7px 0;">Show Largest Change Ranking</button>
+        
+        <!-- Time Range Slider -->
+        <div style="margin-bottom:15px;font-size:0.95rem;">
+            <label style="display:block;margin-bottom:5px;">Time Range (max 3 years):</label>
+            <div id="maxchange-time-range-slider"></div>
+            <div style="display:flex;justify-content:space-between;margin-top:5px;">
+                <span id="maxchange-time-range-start">Start: -</span>
+                <span id="maxchange-time-range-end">End: -</span>
+            </div>
+        </div>
+        
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button onclick="fetchMaxChange()" style="background:#ff69b4;color:#fff;border:none;padding:4px 16px;border-radius:5px;font-size:0.97rem;height:32px;">Apply</button>
+            <button onclick="resetMaxChangeSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:4px 16px;border-radius:5px;height:32px;">Reset</button>
+        </div>
         <div id="maxchange-result" style="margin-top:16px;font-size:0.97rem;"></div>
     </div>
     <div class="container">
@@ -238,7 +266,10 @@
             <label for="lc-fee" style="font-size:0.95rem;">Transaction Fee:</label>
             <input id="lc-fee" type="number" min="0" value="0" style="width:100px;font-size:0.95rem;padding:6px;">
         </div>
-        <button onclick="solveLcStock()" style="font-size:0.98rem;padding:7px 0;">Calculate</button>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button onclick="solveLcStock()" style="background:#ff69b4;color:#fff;border:none;padding:4px 16px;border-radius:5px;font-size:0.97rem;height:32px;">Apply</button>
+            <button onclick="resetLcStockSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:4px 16px;border-radius:5px;height:32px;">Reset</button>
+        </div>
         <div style="margin-top:10px;text-align:center;">
             <div id="lc-code-toggle" style="display:inline-block;background:#f7f7f7;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-bottom:8px;">
                 <button id="btn-py" onclick="setLcCodeLang('py')" style="border:none;background:#ff69b4;color:#fff;padding:6px 18px;font-size:1rem;cursor:pointer;outline:none;">Python</button>
@@ -281,8 +312,10 @@
                 <option value="60">60 days</option>
             </select>
         </div>
-        <button onclick="resetStableSection()" style="margin-bottom:10px;background:#eee;color:#333;border:1px solid #ccc;">Reset</button>
-        <button onclick="fetchStableChange()" style="font-size:0.98rem;padding:7px 0;">Find Most Stable Stocks</button>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button onclick="fetchStableChange()" style="background:#ff69b4;color:#fff;border:none;padding:4px 16px;border-radius:5px;font-size:0.97rem;height:32px;">Apply</button>
+            <button onclick="resetStableSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:4px 16px;border-radius:5px;height:32px;">Reset</button>
+        </div>
         <div id="stable-cards" style="margin-top:16px;"></div>
     </div>
     <div class="container">
@@ -317,8 +350,8 @@
             </select>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <button onclick="fetchAndShowExploreCard()" style="background:#2196f3;color:#fff;border:none;padding:5px 16px;border-radius:5px;font-size:0.97rem;">Apply</button>
-            <button onclick="resetExplorerSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:5px 16px;border-radius:5px;font-size:0.97rem;">Reset</button>
+            <button onclick="fetchAndShowExploreCard()" style="background:#2196f3;color:#fff;border:none;padding:4px 16px;border-radius:5px;font-size:0.97rem;height:32px;">Apply</button>
+            <button onclick="resetExplorerSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:4px 16px;border-radius:5px;height:32px;">Reset</button>
         </div>
         <div id="explore-card" style="margin-top:16px;"></div>
         <div id="auto-stability-explanation" style="margin-top:24px;font-size:1.07rem;color:#444;"></div>

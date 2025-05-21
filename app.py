@@ -180,9 +180,32 @@ def stocks_history():
                 tickers[s] = s
     else:
         tickers = default_tickers
+    
+    # Parse date ranges
+    end_date_str = request.args.get('end_date')
+    start_date_str = request.args.get('start_date')
+    
+    try:
+        # Default end date is today
+        end = datetime.now() if not end_date_str else datetime.strptime(end_date_str, '%Y-%m-%d')
+        
+        # If start_date is provided, use it; otherwise use days or default to 31 days
+        if start_date_str:
+            start = datetime.strptime(start_date_str, '%Y-%m-%d')
+        else:
+            days_param = request.args.get('days')
+            days = int(days_param) if days_param and days_param.isdigit() else 31
+            start = end - timedelta(days=days)
+        
+        # Validate the date range doesn't exceed 3 years (1095 days)
+        max_range = timedelta(days=1095)  # 3 years
+        if end - start > max_range:
+            start = end - max_range
+    except ValueError as e:
+        # Handle invalid date format
+        return jsonify({"error": f"Invalid date format: {str(e)}"}), 400
+    
     results = {}
-    end = datetime.now()
-    start = end - timedelta(days=31)
     for name, symbol in tickers.items():
         try:
             ticker = yf.Ticker(symbol)
@@ -244,9 +267,32 @@ def stocks_maxchange():
                 tickers[s] = s
     else:
         tickers = default_tickers
+    
+    # Parse date ranges
+    end_date_str = request.args.get('end_date')
+    start_date_str = request.args.get('start_date')
+    
+    try:
+        # Default end date is today
+        end = datetime.now() if not end_date_str else datetime.strptime(end_date_str, '%Y-%m-%d')
+        
+        # If start_date is provided, use it; otherwise use days or default to 31 days
+        if start_date_str:
+            start = datetime.strptime(start_date_str, '%Y-%m-%d')
+        else:
+            days_param = request.args.get('days')
+            days = int(days_param) if days_param and days_param.isdigit() else 31
+            start = end - timedelta(days=days)
+        
+        # Validate the date range doesn't exceed 3 years (1095 days)
+        max_range = timedelta(days=1095)  # 3 years
+        if end - start > max_range:
+            start = end - max_range
+    except ValueError as e:
+        # Handle invalid date format
+        return jsonify({"error": f"Invalid date format: {str(e)}"}), 400
+    
     results = []
-    end = datetime.now()
-    start = end - timedelta(days=31)
     for name, symbol in tickers.items():
         try:
             ticker = yf.Ticker(symbol)
@@ -817,9 +863,12 @@ def stocks_stable():
         order = request.args.get('order', 'asc')
         symbol_filter = request.args.get('symbol')
         window_size_str = request.args.get('window', '20')
-        days_param = request.args.get('days')
         
-        print(f"DEBUG: Params - metric={metric}, order={order}, symbol_filter={symbol_filter}, window={window_size_str}, days={days_param}")
+        # Parse date ranges
+        end_date_str = request.args.get('end_date')
+        start_date_str = request.args.get('start_date')
+        
+        print(f"DEBUG: Params - metric={metric}, order={order}, symbol_filter={symbol_filter}, window={window_size_str}, start_date={start_date_str}, end_date={end_date_str}")
         
         try:
             window_size = int(window_size_str)
@@ -827,15 +876,30 @@ def stocks_stable():
             print(f"DEBUG: Error parsing window_size: {e}")
             window_size = 20
         
+        # Handle date ranges
         try:
-            days = int(days_param) if days_param and days_param.isdigit() else 1095
-        except (ValueError, TypeError) as e:
-            print(f"DEBUG: Error parsing days: {e}")
-            days = 1095
+            # Default end date is today
+            end = datetime.now() if not end_date_str else datetime.strptime(end_date_str, '%Y-%m-%d')
+            
+            # If start_date is provided, use it; otherwise use days parameter
+            if start_date_str:
+                start = datetime.strptime(start_date_str, '%Y-%m-%d')
+            else:
+                days_param = request.args.get('days')
+                days = int(days_param) if days_param and days_param.isdigit() else 1095
+                start = end - timedelta(days=days)
+            
+            # Validate the date range doesn't exceed 3 years (1095 days)
+            max_range = timedelta(days=1095)  # 3 years
+            if end - start > max_range:
+                start = end - max_range
+                print(f"DEBUG: Date range exceeded 3 years, adjusted to max range")
+        except ValueError as e:
+            print(f"DEBUG: Error parsing dates: {e}")
+            end = datetime.now()
+            start = end - timedelta(days=1095)  # Default to 3 years if date parsing fails
         
         results = []
-        end = datetime.now()
-        start = end - timedelta(days=days)
         
         # If yfinance is not available, use mock data
         if yf is None:
@@ -934,6 +998,7 @@ def generate_mock_data(default_tickers, metric, order, symbol_filter, window_siz
     print("DEBUG: Generating mock data")
     results = []
     end_date = datetime.now()
+    start_date = end_date - timedelta(days=1095)  # Default to 3 years of data
     
     # Filter tickers if needed
     tickers_to_use = {k: v for k, v in default_tickers.items() 
@@ -942,15 +1007,22 @@ def generate_mock_data(default_tickers, metric, order, symbol_filter, window_siz
     # Generate data for up to 5 companies or just the specified one
     for name, symbol in list(tickers_to_use.items())[:5 if not symbol_filter else 1]:
         try:
-            # Generate 100 days of mock data with some trend and randomness
-            dates = [(end_date - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(100, 0, -1)]
+            # Generate days between start and end date
+            days_count = (end_date - start_date).days + 1
+            # Ensure we don't generate too much data
+            days_to_generate = min(days_count, 100)
+            
+            # Generate dates from start_date to end_date
+            dates = [(end_date - timedelta(days=i)).strftime('%Y-%m-%d') 
+                    for i in range(days_to_generate - 1, -1, -1)]
+            
             base_price = random.uniform(50, 500)  # Random base price
             trend = random.uniform(-0.3, 0.3)     # Random trend direction
             volatility = random.uniform(0.5, 3.0)  # Random volatility
             
             # Generate prices with trend and random noise
             closes = [base_price * (1 + trend * i/100 + random.gauss(0, volatility)/100) 
-                     for i in range(100)]
+                     for i in range(days_to_generate)]
             
             # Calculate window statistics
             windows = []
@@ -1042,26 +1114,50 @@ def available_tickers():
 
 @app.route('/explain_stability')
 def explain_stability():
-    print("!!!!!!!!!!!! DEBUG: /explain_stability endpoint accessed")
+    print("DEBUG: /explain_stability endpoint accessed")
     try:
-        print("DEBUG: /explain_stability endpoint accessed")
         if request.method == 'POST':
             data = request.json
             stock = data.get('stock')
+            start_date_str = data.get('start_date')
+            end_date_str = data.get('end_date')
         else:  # GET
             stock = request.args.get('stock', 'NVDA')
+            start_date_str = request.args.get('start_date')
+            end_date_str = request.args.get('end_date')
+            
         if not stock:
             return jsonify({'explanation': 'Missing required parameter: stock.'})
-        from datetime import datetime
-        year = datetime.now().year
-        year_start = f"{year}-01-01"
-        year_end = f"{year}-12-31"
+        
+        # Parse date ranges
+        try:
+            # Default end date is today
+            end = datetime.now() if not end_date_str else datetime.strptime(end_date_str, '%Y-%m-%d')
+            
+            # If start_date is provided, use it; otherwise default to start of current year
+            if start_date_str:
+                start = datetime.strptime(start_date_str, '%Y-%m-%d')
+            else:
+                # Default to start of current year
+                year = datetime.now().year
+                start = datetime.strptime(f"{year}-01-01", '%Y-%m-%d')
+            
+            # Validate the date range doesn't exceed 3 years (1095 days)
+            max_range = timedelta(days=1095)  # 3 years
+            if end - start > max_range:
+                start = end - max_range
+        except ValueError as e:
+            return jsonify({'explanation': f"Invalid date format: {str(e)}"})
+        
         ticker = yf.Ticker(stock)
-        hist = ticker.history(start=year_start, end=year_end)
+        hist = ticker.history(start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'))
+        
         if hist.empty:
-            return jsonify({'explanation': f"No data available for {stock} in {year}."})
+            return jsonify({'explanation': f"No data available for {stock} in the selected date range."})
+            
         closes = hist['Close'].tolist()
         dates = [d.strftime('%Y-%m-%d') for d in hist.index]
+        
         daily_changes = []
         for i in range(1, len(closes)):
             pct_change = ((closes[i] - closes[i-1]) / closes[i-1]) * 100
@@ -1069,14 +1165,19 @@ def explain_stability():
                 'date': dates[i],
                 'change': pct_change
             })
+            
         top_events = sorted(daily_changes, key=lambda x: abs(x['change']), reverse=True)[:3]
-        explanation = f"Biggest price movement events for {stock} in {year}:\n\n"
+        
+        date_range_str = f"from {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}"
+        explanation = f"Biggest price movement events for {stock} {date_range_str}:\n\n"
+        
         if not top_events:
-            explanation += "No significant price movements detected this year."
+            explanation += "No significant price movements detected in this period."
         else:
             for event in top_events:
                 direction = 'up' if event['change'] > 0 else 'down'
                 explanation += f"• {event['date']}: {direction} {abs(event['change']):.2f}%\n"
+                
         return jsonify({'explanation': explanation})
     except Exception as e:
         import traceback
@@ -1094,10 +1195,31 @@ def available_for_prediction():
         'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZS=F', 'ZW=F',
         'VX=F', 'BTC=F', 'ETH=F'
     ]
-    days_param = request.args.get('days')
-    days = int(days_param) if days_param and days_param.isdigit() else 1095
-    end = datetime.now()
-    start = end - timedelta(days=days)
+    
+    # Parse date ranges
+    end_date_str = request.args.get('end_date')
+    start_date_str = request.args.get('start_date')
+    
+    try:
+        # Default end date is today
+        end = datetime.now() if not end_date_str else datetime.strptime(end_date_str, '%Y-%m-%d')
+        
+        # If start_date is provided, use it; otherwise use days parameter
+        if start_date_str:
+            start = datetime.strptime(start_date_str, '%Y-%m-%d')
+        else:
+            days_param = request.args.get('days')
+            days = int(days_param) if days_param and days_param.isdigit() else 1095
+            start = end - timedelta(days=days)
+        
+        # Validate the date range doesn't exceed 3 years (1095 days)
+        max_range = timedelta(days=1095)  # 3 years
+        if end - start > max_range:
+            start = end - max_range
+    except ValueError as e:
+        # Handle invalid date format
+        return jsonify({"error": f"Invalid date format: {str(e)}"}), 400
+    
     available = []
     for t in default_tickers:
         try:

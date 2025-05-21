@@ -1,69 +1,367 @@
 console.log('main.js loaded');
 
-// Custom JavaScript moved from index.html
-async function fetchStockTrends() {
+// Initialize time range sliders when the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM fully loaded, initializing components...');
+    
+    // Initialize time range sliders
+    try {
+        console.log('Initializing time range sliders...');
+        initTimeRangeSliders();
+        console.log('Time range sliders initialized successfully');
+    } catch (e) {
+        console.error('Error initializing time range sliders:', e);
+    }
+    
+    // Update initial spans showing the date range
+    const timeRangeSlider = document.getElementById('time-range-slider');
+    const maxChangeTimeRangeSlider = document.getElementById('maxchange-time-range-slider');
+    
+    if (timeRangeSlider && timeRangeSlider.noUiSlider) {
+        const values = timeRangeSlider.noUiSlider.get();
+        const startDate = new Date(parseInt(values[0]));
+        const endDate = new Date(parseInt(values[1]));
+        
+        document.getElementById('time-range-start').textContent = 'Start: ' + startDate.toISOString().split('T')[0];
+        document.getElementById('time-range-end').textContent = 'End: ' + endDate.toISOString().split('T')[0];
+        
+        console.log(`Initial stock trends date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+    } else {
+        console.warn('Stock trends slider not initialized properly');
+    }
+    
+    if (maxChangeTimeRangeSlider && maxChangeTimeRangeSlider.noUiSlider) {
+        const values = maxChangeTimeRangeSlider.noUiSlider.get();
+        const startDate = new Date(parseInt(values[0]));
+        const endDate = new Date(parseInt(values[1]));
+        
+        document.getElementById('maxchange-time-range-start').textContent = 'Start: ' + startDate.toISOString().split('T')[0];
+        document.getElementById('maxchange-time-range-end').textContent = 'End: ' + endDate.toISOString().split('T')[0];
+        
+        console.log(`Initial max change date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+    } else {
+        console.warn('Max change slider not initialized properly');
+    }
+    
+    // Auto-fetch data when page loads (with a slight delay to ensure everything is initialized)
+    setTimeout(() => {
+        console.log("Auto-fetching initial stock data...");
+        
+        // Fetch initial stock trends data with full 3-year range
+        fetchStockTrends(true);
+    }, 500);
+});
+
+// Debounce function to limit how often a function can be called
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// Function to initialize time range sliders
+function initTimeRangeSliders() {
+    // Calculate date ranges
+    const today = new Date();
+    const threeYearsAgo = new Date();
+    threeYearsAgo.setFullYear(today.getFullYear() - 3);
+    
+    // For initial display, default to past month
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(today.getMonth() - 1);
+    
+    // Format dates for display
+    const formatDate = date => {
+        return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    };
+    
+    // Create debounced versions of our fetch functions
+    const debouncedFetchStockTrends = debounce(fetchStockTrends, 500);
+    const debouncedFetchMaxChange = debounce(fetchMaxChange, 500);
+    
+    // Initialize Stock Trends slider
+    const timeRangeSlider = document.getElementById('time-range-slider');
+    if (timeRangeSlider) {
+        noUiSlider.create(timeRangeSlider, {
+            start: [oneMonthAgo.getTime(), today.getTime()], // Default to past month
+            connect: true,
+            range: {
+                'min': threeYearsAgo.getTime(), // Allow selecting up to 3 years
+                'max': today.getTime()
+            },
+            step: 24 * 60 * 60 * 1000, // One day in milliseconds
+            tooltips: [
+                {
+                    to: value => formatDate(new Date(parseInt(value)))
+                },
+                {
+                    to: value => formatDate(new Date(parseInt(value)))
+                }
+            ]
+        });
+        
+        // Update display spans when slider values change
+        timeRangeSlider.noUiSlider.on('update', function(values, handle) {
+            const dateStart = new Date(parseInt(values[0]));
+            const dateEnd = new Date(parseInt(values[1]));
+            
+            document.getElementById('time-range-start').textContent = 'Start: ' + formatDate(dateStart);
+            document.getElementById('time-range-end').textContent = 'End: ' + formatDate(dateEnd);
+            
+            // Update chart in real-time during slider movement for ultra-smooth updates
+            updateStockTrendsChart(formatDate(dateStart), formatDate(dateEnd));
+        });
+    }
+    
+    // Initialize Max Change slider - also default to past month
+    const maxChangeTimeRangeSlider = document.getElementById('maxchange-time-range-slider');
+    if (maxChangeTimeRangeSlider) {
+        noUiSlider.create(maxChangeTimeRangeSlider, {
+            start: [oneMonthAgo.getTime(), today.getTime()], // Default to past month
+            connect: true,
+            range: {
+                'min': threeYearsAgo.getTime(), // Allow selecting up to 3 years
+                'max': today.getTime()
+            },
+            step: 24 * 60 * 60 * 1000, // One day in milliseconds
+            tooltips: [
+                {
+                    to: value => formatDate(new Date(parseInt(value)))
+                },
+                {
+                    to: value => formatDate(new Date(parseInt(value)))
+                }
+            ]
+        });
+        
+        // Update display spans when slider values change
+        maxChangeTimeRangeSlider.noUiSlider.on('update', function(values, handle) {
+            const dateStart = new Date(parseInt(values[0]));
+            const dateEnd = new Date(parseInt(values[1]));
+            
+            document.getElementById('maxchange-time-range-start').textContent = 'Start: ' + formatDate(dateStart);
+            document.getElementById('maxchange-time-range-end').textContent = 'End: ' + formatDate(dateEnd);
+        });
+        
+        // Add a 'change' event handler to fetch new data when slider is moved
+        maxChangeTimeRangeSlider.noUiSlider.on('change', function(values, handle) {
+            console.log("Max change slider changed, fetching new data...");
+            // Call debounced fetchMaxChange to update the results with new date range
+            debouncedFetchMaxChange();
+        });
+    }
+}
+
+// Store all fetched stock data globally to avoid repeated server calls
+let stockTrendsData = {};
+
+// Modified function to fetch and display stock trends
+async function fetchStockTrends(initialLoad = false) {
     document.getElementById('stock-trends-result').innerText = 'Loading...';
     document.getElementById('stockChartMulti').style.display = 'none';
     const select = document.getElementById('stock-select');
     const selected = Array.from(select.selectedOptions).map(opt => opt.value);
-    let url = '/stocks/history';
-    if (selected.length > 0) {
-        url += '?symbols=' + selected.join(',');
+
+    if (selected.length === 0) {
+        document.getElementById('stock-trends-result').innerHTML = 'Please select at least one stock to display.';
+        return;
     }
-    try {
-        const res = await fetch(url);
-        const data = await res.json();
-        let msg = '';
-        let chartData = [];
-        let chartLabels = [];
-        let first = true;
-        let statsTable = '<table style="width:100%;margin-top:10px;font-size:0.98rem;text-align:center;border-collapse:collapse;"><tr><th>Stock</th><th>Open</th><th>High</th><th>Low</th><th>Close</th></tr>';
-        let summaryMsg = '';
-        for (const [name, info] of Object.entries(data)) {
-            if (info.dates && info.closes) {
-                msg += `<b>${name} (${info.symbol})</b><br>`;
-                if (first) {
-                    chartLabels = info.dates;
-                    first = false;
+    
+    // Only get the full date range on initial load (3 years)
+    // or when the selected stocks change
+    let needToFetchData = initialLoad;
+    for (const symbol of selected) {
+        if (!stockTrendsData[symbol]) {
+            needToFetchData = true;
+            break;
+        }
+    }
+    
+    // If we need to fetch data, get the full 3 years
+    if (needToFetchData) {
+        console.log("Fetching full stock data from server...");
+        
+        // Use max date range for initial data fetch (3 years)
+        const today = new Date();
+        const threeYearsAgo = new Date();
+        threeYearsAgo.setFullYear(today.getFullYear() - 3);
+        
+        const startDate = threeYearsAgo.toISOString().split('T')[0];
+        const endDate = today.toISOString().split('T')[0];
+        
+        // Build URL with parameters
+        let url = '/stocks/history';
+        const params = new URLSearchParams();
+        if (selected.length > 0) {
+            params.append('symbols', selected.join(','));
+        }
+        params.append('start_date', startDate);
+        params.append('end_date', endDate);
+        
+        // Append parameters to URL
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+        
+        console.log(`Fetching full stock data from URL: ${url}`);
+        
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if (data.error) {
+                console.error(`Error from server: ${data.error}`);
+                document.getElementById('stock-trends-result').innerText = `Error: ${data.error}`;
+                return;
+            }
+            
+            console.log(`Received data for ${Object.keys(data).length} stocks`);
+            
+            // Store data globally
+            for (const [name, info] of Object.entries(data)) {
+                if (info.dates && info.closes) {
+                    stockTrendsData[info.symbol] = {
+                        name: name,
+                        symbol: info.symbol,
+                        dates: info.dates,
+                        closes: info.closes
+                    };
                 }
-                // Calculate stats
-                const open = info.closes[0];
-                const close = info.closes[info.closes.length-1];
-                const high = Math.max(...info.closes);
-                const low = Math.min(...info.closes);
-                const change = close - open;
-                const changePct = (change / open) * 100;
-                const color = change >= 0 ? 'green' : 'red';
-                summaryMsg += `<div style="margin-bottom:6px;"><b>${name} (${info.symbol})</b>: <span style="color:${color}">${change>=0?'+':''}${change.toFixed(2)} (${changePct>=0?'+':''}${changePct.toFixed(2)}%)</span></div>`;
-                statsTable += `<tr><td>${name} (${info.symbol})</td><td>${open.toFixed(2)}</td><td>${high.toFixed(2)}</td><td>${low.toFixed(2)}</td><td>${close.toFixed(2)}</td></tr>`;
-                // Color line green/red, area fill, highlight latest point
-                chartData.push({
-                    label: `${name} (${info.symbol})`,
-                    data: info.closes,
-                    borderColor: color,
-                    backgroundColor: color === 'green' ? 'rgba(76,175,80,0.12)' : 'rgba(233,30,99,0.12)',
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: info.closes.map((v,i)=>i===info.closes.length-1?6:0),
-                    pointBackgroundColor: info.closes.map((v,i)=>i===info.closes.length-1?color:'rgba(0,0,0,0)'),
-                    pointBorderColor: info.closes.map((v,i)=>i===info.closes.length-1?color:'rgba(0,0,0,0)'),
-                    pointBorderWidth: info.closes.map((v,i)=>i===info.closes.length-1?2:0)
-                });
-            } else {
-                msg += `<b>${name} (${info.symbol}):</b> ${info.error}<br>`;
+            }
+        } catch (e) {
+            document.getElementById('stock-trends-result').innerText = 'Failed to fetch stock trends.';
+            return;
+        }
+    }
+    
+    // Now filter the data based on the time range slider
+    const slider = document.getElementById('time-range-slider');
+    let startDate, endDate;
+    
+    if (slider && slider.noUiSlider) {
+        const values = slider.noUiSlider.get();
+        startDate = new Date(parseInt(values[0])).toISOString().split('T')[0];
+        endDate = new Date(parseInt(values[1])).toISOString().split('T')[0];
+        console.log(`Filtering stock data from ${startDate} to ${endDate}`);
+    } else {
+        console.warn("No slider or noUiSlider found");
+        return;
+    }
+    
+    // Filter the data by date range
+    let filteredData = {};
+    for (const symbol of selected) {
+        if (stockTrendsData[symbol]) {
+            const stockData = stockTrendsData[symbol];
+            const dateRangeIndices = getDateRangeIndices(stockData.dates, startDate, endDate);
+            
+            if (dateRangeIndices) {
+                filteredData[stockData.name] = {
+                    symbol: stockData.symbol,
+                    dates: stockData.dates.slice(dateRangeIndices.startIdx, dateRangeIndices.endIdx + 1),
+                    closes: stockData.closes.slice(dateRangeIndices.startIdx, dateRangeIndices.endIdx + 1)
+                };
             }
         }
-        statsTable += '</table>';
-        if (chartData.length > 0) {
-            const scaleType = document.getElementById('scale-select').value;
-            renderStockMultiChart('stockChartMulti', chartLabels, chartData, scaleType);
-            document.getElementById('stockChartMulti').style.display = 'block';
-        }
-        document.getElementById('stock-trends-result').innerHTML = summaryMsg + msg + statsTable;
-    } catch (e) {
-        document.getElementById('stock-trends-result').innerText = 'Failed to fetch stock trends.';
     }
+    
+    // Display the filtered data
+    displayStockTrendsData(filteredData, startDate, endDate);
 }
+
+// Helper function to get array indices for a date range
+function getDateRangeIndices(dates, startDate, endDate) {
+    if (!dates || dates.length === 0) return null;
+    
+    let startIdx = 0;
+    let endIdx = dates.length - 1;
+    
+    // Find start index
+    for (let i = 0; i < dates.length; i++) {
+        if (dates[i] >= startDate) {
+            startIdx = i;
+            break;
+        }
+    }
+    
+    // Find end index
+    for (let i = dates.length - 1; i >= 0; i--) {
+        if (dates[i] <= endDate) {
+            endIdx = i;
+            break;
+        }
+    }
+    
+    // Make sure we have valid indices
+    if (startIdx > endIdx) return null;
+    return { startIdx, endIdx };
+}
+
+// Function to display the filtered data
+function displayStockTrendsData(data, startDate, endDate) {
+    let msg = '';
+    let chartData = [];
+    let chartLabels = [];
+    let first = true;
+    let statsTable = '<table style="width:100%;margin-top:10px;font-size:0.98rem;text-align:center;border-collapse:collapse;"><tr><th>Stock</th><th>Open</th><th>High</th><th>Low</th><th>Close</th></tr>';
+    let summaryMsg = '';
+    
+    for (const [name, info] of Object.entries(data)) {
+        if (info.dates && info.closes && info.closes.length > 0) {
+            msg += `<b>${name} (${info.symbol})</b><br>`;
+            if (first) {
+                chartLabels = info.dates;
+                first = false;
+            }
+            // Calculate stats
+            const open = info.closes[0];
+            const close = info.closes[info.closes.length-1];
+            const high = Math.max(...info.closes);
+            const low = Math.min(...info.closes);
+            const change = close - open;
+            const changePct = (change / open) * 100;
+            const color = change >= 0 ? 'green' : 'red';
+            summaryMsg += `<div style="margin-bottom:6px;"><b>${name} (${info.symbol})</b>: <span style="color:${color}">${change>=0?'+':''}${change.toFixed(2)} (${changePct>=0?'+':''}${changePct.toFixed(2)}%)</span></div>`;
+            statsTable += `<tr><td>${name} (${info.symbol})</td><td>${open.toFixed(2)}</td><td>${high.toFixed(2)}</td><td>${low.toFixed(2)}</td><td>${close.toFixed(2)}</td></tr>`;
+            // Color line green/red, area fill, highlight latest point
+            chartData.push({
+                label: `${name} (${info.symbol})`,
+                data: info.closes,
+                borderColor: color,
+                backgroundColor: color === 'green' ? 'rgba(76,175,80,0.12)' : 'rgba(233,30,99,0.12)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: info.closes.map((v,i)=>i===info.closes.length-1?6:0),
+                pointBackgroundColor: info.closes.map((v,i)=>i===info.closes.length-1?color:'rgba(0,0,0,0)'),
+                pointBorderColor: info.closes.map((v,i)=>i===info.closes.length-1?color:'rgba(0,0,0,0)'),
+                pointBorderWidth: info.closes.map((v,i)=>i===info.closes.length-1?2:0)
+            });
+        } else {
+            msg += `<b>${name} (${info.symbol}):</b> No data available for the selected date range<br>`;
+        }
+    }
+    statsTable += '</table>';
+    
+    if (chartData.length > 0) {
+        const scaleType = document.getElementById('scale-select').value;
+        
+        // Update chart title to show date range
+        const chartTitle = startDate && endDate 
+            ? `Stock Price Trend (${startDate} to ${endDate})`
+            : 'Stock Price Trend (Past Month)';
+            
+        renderStockMultiChart('stockChartMulti', chartLabels, chartData, scaleType, chartTitle);
+        document.getElementById('stockChartMulti').style.display = 'block';
+    } else {
+        document.getElementById('stock-trends-result').innerHTML = 'No data available for the selected stocks and date range.';
+        return;
+    }
+    
+    document.getElementById('stock-trends-result').innerHTML = summaryMsg + msg + statsTable;
+}
+
 function getStockColor(symbol, alpha=1) {
     const colors = {
         'GOOGL': 'rgba(33,150,243,ALPHA)',
@@ -81,7 +379,7 @@ function getStockColor(symbol, alpha=1) {
     return (colors[symbol] || 'rgba(33,33,33,ALPHA)').replace('ALPHA', alpha);
 }
 let stockCharts = {};
-function renderStockMultiChart(canvasId, labels, datasets, scaleType='linear') {
+function renderStockMultiChart(canvasId, labels, datasets, scaleType='linear', chartTitle='') {
     if (stockCharts[canvasId]) {
         stockCharts[canvasId].destroy();
     }
@@ -148,9 +446,10 @@ function renderStockMultiChart(canvasId, labels, datasets, scaleType='linear') {
         },
         options: {
             responsive: true,
+            animation: 'none',
             plugins: {
                 legend: { display: true, position: 'top', labels: { font: { size: 15 } } },
-                title: { display: true, text: 'Stock Price Trend (Past 1 Month)', font: { size: 18 } },
+                title: { display: true, text: chartTitle, font: { size: 18 } },
                 tooltip: { enabled: true, mode: 'index', intersect: false },
                 annotation: {
                     annotations: annotationPlugins
@@ -204,13 +503,57 @@ async function fetchMaxChange() {
     document.getElementById('maxchange-result').innerText = 'Loading...';
     const select = document.getElementById('maxchange-stock-select');
     const selected = Array.from(select.selectedOptions).map(opt => opt.value);
-    let url = '/stocks/maxchange';
-    if (selected.length > 0) {
-        url += '?symbols=' + selected.join(',');
+    
+    // Get date range from slider
+    let startDate, endDate;
+    const slider = document.getElementById('maxchange-time-range-slider');
+    if (slider && slider.noUiSlider) {
+        const values = slider.noUiSlider.get();
+        startDate = new Date(parseInt(values[0])).toISOString().split('T')[0];
+        endDate = new Date(parseInt(values[1])).toISOString().split('T')[0];
+        console.log(`Fetching max change data from ${startDate} to ${endDate}`);
+    } else {
+        console.warn("No max change slider or noUiSlider found");
     }
+    
+    // Build URL with parameters
+    let url = '/stocks/maxchange';
+    const params = new URLSearchParams();
+    if (selected.length > 0) {
+        params.append('symbols', selected.join(','));
+    }
+    if (startDate) {
+        params.append('start_date', startDate);
+    }
+    if (endDate) {
+        params.append('end_date', endDate);
+    }
+    
+    // Append parameters to URL
+    if (params.toString()) {
+        url += '?' + params.toString();
+    }
+    
+    console.log(`Fetching max change data from URL: ${url}`);
+    
     try {
         const res = await fetch(url);
         const data = await res.json();
+        
+        if (data.error) {
+            console.error(`Error from server: ${data.error}`);
+            document.getElementById('maxchange-result').innerText = `Error: ${data.error}`;
+            return;
+        }
+        
+        console.log(`Received data for ${data.length} stocks`);
+        
+        // Create date range subtitle for the results
+        let dateRangeInfo = '';
+        if (startDate && endDate) {
+            dateRangeInfo = `<div style="margin-bottom:10px;font-style:italic;color:#666;text-align:center;">Date range: ${startDate} to ${endDate}</div>`;
+        }
+        
         let table = `<table style='width:100%;margin-top:10px;font-size:0.97rem;text-align:center;border-collapse:collapse;'><tr><th>Rank</th><th>Stock</th><th>Max Abs Change</th><th>Start Date</th><th>End Date</th><th>Start Price</th><th>End Price</th></tr>`;
         data.forEach((item, idx) => {
             if (item.max_abs_sum !== undefined) {
@@ -220,7 +563,7 @@ async function fetchMaxChange() {
             }
         });
         table += '</table>';
-        document.getElementById('maxchange-result').innerHTML = table;
+        document.getElementById('maxchange-result').innerHTML = dateRangeInfo + table;
     } catch (e) {
         document.getElementById('maxchange-result').innerText = 'Failed to fetch ranking.';
     }
@@ -1020,4 +1363,169 @@ async function filterAndPopulatePredictionDropdown() {
     } else {
         populateDropdown('prediction-stock', tickers, true);
     }
+}
+// Function to efficiently update the Stock Trends chart without recreating it
+function updateStockTrendsChart(startDate, endDate) {
+    // Skip if no chart exists yet or no data available
+    if (!stockCharts['stockChartMulti'] || Object.keys(stockTrendsData).length === 0) {
+        return;
+    }
+    
+    const select = document.getElementById('stock-select');
+    const selected = Array.from(select.selectedOptions).map(opt => opt.value);
+    
+    if (selected.length === 0) {
+        return;
+    }
+    
+    console.log(`Directly updating chart for range ${startDate} to ${endDate}`);
+    
+    // Filter data for the selected range
+    let filteredData = {};
+    let allChartData = [];
+    let chartLabels = [];
+    let first = true;
+    
+    for (const symbol of selected) {
+        if (stockTrendsData[symbol]) {
+            const stockData = stockTrendsData[symbol];
+            const dateRangeIndices = getDateRangeIndices(stockData.dates, startDate, endDate);
+            
+            if (dateRangeIndices) {
+                const slicedDates = stockData.dates.slice(dateRangeIndices.startIdx, dateRangeIndices.endIdx + 1);
+                const slicedCloses = stockData.closes.slice(dateRangeIndices.startIdx, dateRangeIndices.endIdx + 1);
+                
+                if (slicedCloses.length > 0) {
+                    if (first) {
+                        chartLabels = slicedDates;
+                        first = false;
+                    }
+                    
+                    // Calculate basic stats for visualization
+                    const open = slicedCloses[0];
+                    const close = slicedCloses[slicedCloses.length-1];
+                    const color = close >= open ? 'green' : 'red';
+                    
+                    // Prepare data for chart
+                    allChartData.push({
+                        label: `${stockData.name} (${stockData.symbol})`,
+                        data: slicedCloses,
+                        borderColor: color,
+                        backgroundColor: color === 'green' ? 'rgba(76,175,80,0.12)' : 'rgba(233,30,99,0.12)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: slicedCloses.map((v,i)=>i===slicedCloses.length-1?6:0),
+                        pointBackgroundColor: slicedCloses.map((v,i)=>i===slicedCloses.length-1?color:'rgba(0,0,0,0)'),
+                        pointBorderColor: slicedCloses.map((v,i)=>i===slicedCloses.length-1?color:'rgba(0,0,0,0)'),
+                        pointBorderWidth: slicedCloses.map((v,i)=>i===slicedCloses.length-1?2:0)
+                    });
+                    
+                    filteredData[stockData.name] = {
+                        symbol: stockData.symbol,
+                        dates: slicedDates,
+                        closes: slicedCloses
+                    };
+                }
+            }
+        }
+    }
+    
+    if (allChartData.length === 0 || chartLabels.length === 0) {
+        return;
+    }
+    
+    // Update the existing chart with new data
+    const chart = stockCharts['stockChartMulti'];
+    chart.data.labels = chartLabels;
+    chart.data.datasets = allChartData;
+    
+    // Update chart title
+    chart.options.plugins.title.text = `Stock Price Trend (${startDate} to ${endDate})`;
+    
+    // Update the chart (with animation duration of 0 for maximum smoothness)
+    chart.update('none');
+    
+    // We only update the chart here - the stats table is only updated when fetchStockTrends is called
+    // This makes the slider extremely responsive
+}
+
+function resetStockTrendsSection() {
+    // Reset stock selection
+    const select = document.getElementById('stock-select');
+    if (select) {
+        for (let i = 0; i < select.options.length; i++) {
+            select.options[i].selected = false;
+        }
+    }
+    
+    // Reset Y-axis scale to default
+    const scaleSelect = document.getElementById('scale-select');
+    if (scaleSelect) {
+        scaleSelect.selectedIndex = 0; // Linear
+    }
+    
+    // Clear results and hide chart
+    document.getElementById('stock-trends-result').innerHTML = '';
+    document.getElementById('stockChartMulti').style.display = 'none';
+    
+    // Reset time range slider to default (past month)
+    const slider = document.getElementById('time-range-slider');
+    if (slider && slider.noUiSlider) {
+        const today = new Date();
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(today.getMonth() - 1);
+        slider.noUiSlider.set([oneMonthAgo.getTime(), today.getTime()]);
+    }
+}
+
+function resetMaxChangeSection() {
+    // Reset stock selection
+    const select = document.getElementById('maxchange-stock-select');
+    if (select) {
+        for (let i = 0; i < select.options.length; i++) {
+            select.options[i].selected = false;
+        }
+    }
+    
+    // Clear results
+    document.getElementById('maxchange-result').innerHTML = '';
+    
+    // Reset time range slider to default (past month)
+    const slider = document.getElementById('maxchange-time-range-slider');
+    if (slider && slider.noUiSlider) {
+        const today = new Date();
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(today.getMonth() - 1);
+        slider.noUiSlider.set([oneMonthAgo.getTime(), today.getTime()]);
+    }
+}
+
+function resetLcStockSection() {
+    // Reset problem to first option
+    const problemSelect = document.getElementById('lc-problem');
+    if (problemSelect) {
+        problemSelect.selectedIndex = 0;
+        updateLcInputs(); // Update visibility of related inputs
+    }
+    
+    // Clear prices input
+    const pricesInput = document.getElementById('lc-prices');
+    if (pricesInput) {
+        pricesInput.value = '';
+    }
+    
+    // Reset k to default
+    const kInput = document.getElementById('lc-k');
+    if (kInput) {
+        kInput.value = '2';
+    }
+    
+    // Reset fee to default
+    const feeInput = document.getElementById('lc-fee');
+    if (feeInput) {
+        feeInput.value = '0';
+    }
+    
+    // Clear results
+    document.getElementById('lc-result').innerHTML = '';
 } 
