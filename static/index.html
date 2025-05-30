@@ -356,6 +356,75 @@
         <div id="explore-card" style="margin-top:16px;"></div>
         <div id="auto-stability-explanation" style="margin-top:24px;font-size:1.07rem;color:#444;"></div>
     </div>
+    
+    <!-- New Mood Analyzer Section -->
+    <div class="container">
+        <h2>Mood Analyzer</h2>
+        <div style="margin-bottom:10px;font-size:0.97rem;color:#444;background:#f7f7fa;padding:10px 14px 10px 14px;border-radius:7px;margin-bottom:18px;line-height:1.6;">
+            <b>Track Your Daily Mood:</b> <br>
+            1. Record your daily mood (1-10) and notes.<br>
+            2. View trends in your mood over time.<br>
+            3. Analyze patterns to improve your well-being.<br>
+            <span style="color:#888;font-size:0.95em;">Tip: Regular mood tracking can help identify factors that affect your emotional state.</span>
+        </div>
+        
+        <!-- Mood Entry Form -->
+        <div style="margin-bottom:20px;padding:15px;background:#f5f5f5;border-radius:8px;">
+            <h3 style="margin-top:0;margin-bottom:12px;font-size:1.1rem;">Record Today's Mood</h3>
+            <div style="margin-bottom:15px;">
+                <label for="mood-date" style="display:block;margin-bottom:5px;font-size:0.95rem;">Date:</label>
+                <input type="date" id="mood-date" style="width:100%;padding:8px;border-radius:4px;border:1px solid #ccc;">
+            </div>
+            <div style="margin-bottom:15px;">
+                <label style="display:block;margin-bottom:5px;font-size:0.95rem;">Mood Score (1-10):</label>
+                <div style="display:flex;align-items:center;">
+                    <input type="range" id="mood-score" min="1" max="10" value="5" style="flex-grow:1;margin-right:10px;">
+                    <span id="mood-score-display" style="font-size:1.1rem;font-weight:bold;min-width:30px;text-align:center;">5</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:3px;">
+                    <span style="font-size:0.8rem;color:#888;">Poor</span>
+                    <span style="font-size:0.8rem;color:#888;">Excellent</span>
+                </div>
+            </div>
+            <div style="margin-bottom:15px;">
+                <label for="mood-note" style="display:block;margin-bottom:5px;font-size:0.95rem;">Notes:</label>
+                <textarea id="mood-note" placeholder="How do you feel today? What factors affected your mood?" style="width:100%;padding:8px;border-radius:4px;border:1px solid #ccc;min-height:80px;"></textarea>
+            </div>
+            <div style="margin-bottom:15px;">
+                <label for="mood-tags" style="display:block;margin-bottom:5px;font-size:0.95rem;">Tags (comma-separated):</label>
+                <input type="text" id="mood-tags" placeholder="e.g., work, exercise, family" style="width:100%;padding:8px;border-radius:4px;border:1px solid #ccc;">
+            </div>
+            <button onclick="saveMoodEntry()" style="background:#ff69b4;color:#fff;border:none;padding:8px 16px;border-radius:5px;font-size:0.97rem;width:100%;">Save Mood Entry</button>
+        </div>
+        
+        <!-- Mood Analysis Section -->
+        <div>
+            <h3 style="margin-top:0;margin-bottom:12px;font-size:1.1rem;">Mood Analysis</h3>
+            
+            <!-- Date Range Selection -->
+            <div style="margin-bottom:15px;font-size:0.95rem;">
+                <label style="display:block;margin-bottom:5px;">Analyze Time Period:</label>
+                <div id="mood-time-range-slider"></div>
+                <div style="display:flex;justify-content:space-between;margin-top:5px;">
+                    <span id="mood-time-range-start">Start: -</span>
+                    <span id="mood-time-range-end">End: -</span>
+                </div>
+            </div>
+            
+            <button onclick="analyzeMood()" style="background:#2196f3;color:#fff;border:none;padding:8px 16px;border-radius:5px;font-size:0.97rem;width:100%;margin-bottom:15px;">Analyze Mood Data</button>
+            
+            <!-- Mood Chart -->
+            <div style="width:100%;max-width:350px;margin:0 auto 20px auto;">
+                <canvas id="moodChart" width="350" height="250" style="display:none;background:#fff;border-radius:12px;"></canvas>
+            </div>
+            
+            <!-- Mood Statistics -->
+            <div id="mood-stats" style="margin-bottom:20px;"></div>
+            
+            <!-- Mood Entries List -->
+            <div id="mood-entries" style="margin-top:20px;"></div>
+        </div>
+    </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>

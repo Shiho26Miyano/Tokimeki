@@ -15,6 +15,10 @@ try:
 except ImportError:
     yf = None
 
+# Add sqlite for mood tracking
+import sqlite3
+import json
+
 app = Flask(__name__)
 # Configure CORS to allow requests from any origin
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"]}})
@@ -1251,6 +1255,155 @@ def test_post():
             'success': True,
             'message': 'GET request received'
         })
+
+# Initialize SQLite database for mood tracking
+def init_mood_db():
+    conn = sqlite3.connect('mood_tracker.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS mood_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        mood_score INTEGER NOT NULL,
+        mood_note TEXT,
+        tags TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Initialize database on startup
+init_mood_db()
+
+@app.route('/mood/entries', methods=['GET'])
+def get_mood_entries():
+    try:
+        # Get date range parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        # Default to last 30 days if no dates provided
+        if not end_date:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        if not start_date:
+            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+        
+        conn = sqlite3.connect('mood_tracker.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        query = '''
+        SELECT * FROM mood_entries 
+        WHERE date BETWEEN ? AND ? 
+        ORDER BY date DESC
+        '''
+        
+        cursor.execute(query, (start_date, end_date))
+        entries = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return jsonify({"entries": entries})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/mood/add', methods=['POST'])
+def add_mood_entry():
+    try:
+        data = request.json
+        date = data.get('date', datetime.now().strftime('%Y-%m-%d'))
+        mood_score = data.get('mood_score')
+        mood_note = data.get('mood_note', '')
+        tags = data.get('tags', [])
+        
+        # Validate inputs
+        if mood_score is None or not (1 <= mood_score <= 10):
+            return jsonify({"error": "Mood score must be between 1 and 10"}), 400
+        
+        # Store tags as JSON
+        tags_json = json.dumps(tags)
+        
+        conn = sqlite3.connect('mood_tracker.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO mood_entries (date, mood_score, mood_note, tags) VALUES (?, ?, ?, ?)',
+            (date, mood_score, mood_note, tags_json)
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
+        conn.close()
+        
+        return jsonify({"success": True, "id": new_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/mood/stats', methods=['GET'])
+def get_mood_stats():
+    try:
+        # Get date range parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        # Default to last 30 days if no dates provided
+        if not end_date:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        if not start_date:
+            start_date = (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+        
+        conn = sqlite3.connect('mood_tracker.db')
+        cursor = conn.cursor()
+        
+        # Get average mood
+        cursor.execute(
+            'SELECT AVG(mood_score) FROM mood_entries WHERE date BETWEEN ? AND ?',
+            (start_date, end_date)
+        )
+        avg_mood = cursor.fetchone()[0]
+        
+        # Get mood trend (day by day)
+        cursor.execute(
+            'SELECT date, mood_score FROM mood_entries WHERE date BETWEEN ? AND ? ORDER BY date',
+            (start_date, end_date)
+        )
+        mood_trend = cursor.fetchall()
+        
+        # Get most mentioned tags
+        cursor.execute(
+            'SELECT tags FROM mood_entries WHERE date BETWEEN ? AND ?',
+            (start_date, end_date)
+        )
+        tag_mentions = {}
+        for (tags_json,) in cursor.fetchall():
+            if tags_json:
+                tags = json.loads(tags_json)
+                for tag in tags:
+                    tag_mentions[tag] = tag_mentions.get(tag, 0) + 1
+        
+        # Convert to sorted list of [tag, count]
+        top_tags = sorted(tag_mentions.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        conn.close()
+        
+        return jsonify({
+            "avg_mood": avg_mood if avg_mood else 0,
+            "mood_trend": mood_trend,
+            "top_tags": top_tags
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/mood/delete/<int:entry_id>', methods=['DELETE'])
+def delete_mood_entry(entry_id):
+    try:
+        conn = sqlite3.connect('mood_tracker.db')
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM mood_entries WHERE id = ?', (entry_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

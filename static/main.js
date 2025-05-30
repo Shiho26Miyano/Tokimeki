@@ -1528,4 +1528,366 @@ function resetLcStockSection() {
     
     // Clear results
     document.getElementById('lc-result').innerHTML = '';
+}
+
+// =============================================
+// Mood Analyzer Functions
+// =============================================
+
+// Initialize the mood date picker with today's date
+document.addEventListener('DOMContentLoaded', function() {
+    // Set today's date as default for mood entry
+    const today = new Date();
+    const formattedDate = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    document.getElementById('mood-date').value = formattedDate;
+    
+    // Initialize mood score slider
+    const moodScoreSlider = document.getElementById('mood-score');
+    if (moodScoreSlider) {
+        moodScoreSlider.addEventListener('input', function() {
+            document.getElementById('mood-score-display').textContent = this.value;
+        });
+    }
+    
+    // Initialize mood time range slider
+    initMoodTimeRangeSlider();
+    
+    // Fetch initial mood data
+    setTimeout(() => {
+        analyzeMood();
+    }, 1000);
+});
+
+// Initialize the mood time range slider
+function initMoodTimeRangeSlider() {
+    // Calculate date ranges
+    const today = new Date();
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(today.getMonth() - 3);
+    
+    // Format dates for display
+    const formatDate = date => {
+        return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    };
+    
+    // Initialize Mood Analyzer slider
+    const moodTimeRangeSlider = document.getElementById('mood-time-range-slider');
+    if (moodTimeRangeSlider) {
+        noUiSlider.create(moodTimeRangeSlider, {
+            start: [threeMonthsAgo.getTime(), today.getTime()], // Default to past 3 months
+            connect: true,
+            range: {
+                'min': new Date(today.getFullYear() - 2, today.getMonth(), today.getDate()).getTime(), // 2 years ago
+                'max': today.getTime()
+            },
+            step: 24 * 60 * 60 * 1000, // One day in milliseconds
+            tooltips: [
+                {
+                    to: value => formatDate(new Date(parseInt(value)))
+                },
+                {
+                    to: value => formatDate(new Date(parseInt(value)))
+                }
+            ]
+        });
+        
+        // Update display spans when slider values change
+        moodTimeRangeSlider.noUiSlider.on('update', function(values, handle) {
+            const dateStart = new Date(parseInt(values[0]));
+            const dateEnd = new Date(parseInt(values[1]));
+            
+            document.getElementById('mood-time-range-start').textContent = 'Start: ' + formatDate(dateStart);
+            document.getElementById('mood-time-range-end').textContent = 'End: ' + formatDate(dateEnd);
+        });
+    }
+}
+
+// Save a new mood entry
+async function saveMoodEntry() {
+    // Get values from form
+    const date = document.getElementById('mood-date').value;
+    const moodScore = parseInt(document.getElementById('mood-score').value);
+    const moodNote = document.getElementById('mood-note').value;
+    const tagsInput = document.getElementById('mood-tags').value;
+    
+    // Parse comma-separated tags and trim whitespace
+    const tags = tagsInput.split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+    
+    // Validate inputs
+    if (!date) {
+        alert('Please select a date');
+        return;
+    }
+    if (isNaN(moodScore) || moodScore < 1 || moodScore > 10) {
+        alert('Please select a valid mood score between 1 and 10');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/mood/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                date,
+                mood_score: moodScore,
+                mood_note: moodNote,
+                tags: tags
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            // Reset form
+            document.getElementById('mood-note').value = '';
+            document.getElementById('mood-tags').value = '';
+            document.getElementById('mood-score').value = 5;
+            document.getElementById('mood-score-display').textContent = '5';
+            
+            // Refresh mood analysis
+            analyzeMood();
+            
+            alert('Mood entry saved successfully!');
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error saving mood entry:', error);
+        alert('Error saving mood entry. Please try again.');
+    }
+}
+
+// Analyze mood data
+async function analyzeMood() {
+    try {
+        // Show loading indicators
+        document.getElementById('mood-stats').innerHTML = '<p>Loading statistics...</p>';
+        document.getElementById('mood-entries').innerHTML = '<p>Loading entries...</p>';
+        document.getElementById('moodChart').style.display = 'none';
+        
+        // Get date range from slider
+        const moodTimeRangeSlider = document.getElementById('mood-time-range-slider');
+        if (!moodTimeRangeSlider || !moodTimeRangeSlider.noUiSlider) {
+            console.error('Mood time range slider not initialized');
+            return;
+        }
+        
+        const values = moodTimeRangeSlider.noUiSlider.get();
+        const startDate = new Date(parseInt(values[0])).toISOString().split('T')[0];
+        const endDate = new Date(parseInt(values[1])).toISOString().split('T')[0];
+        
+        // Fetch mood statistics
+        const statsResponse = await fetch(`/mood/stats?start_date=${startDate}&end_date=${endDate}`);
+        const statsData = await statsResponse.json();
+        
+        // Fetch mood entries
+        const entriesResponse = await fetch(`/mood/entries?start_date=${startDate}&end_date=${endDate}`);
+        const entriesData = await entriesResponse.json();
+        
+        // Display mood statistics
+        displayMoodStats(statsData);
+        
+        // Display mood entries
+        displayMoodEntries(entriesData.entries);
+        
+        // Create mood chart
+        createMoodChart(statsData.mood_trend);
+    } catch (error) {
+        console.error('Error analyzing mood:', error);
+        document.getElementById('mood-stats').innerHTML = '<p class="error">Error loading mood data</p>';
+        document.getElementById('mood-entries').innerHTML = '';
+    }
+}
+
+// Display mood statistics
+function displayMoodStats(stats) {
+    const statsContainer = document.getElementById('mood-stats');
+    
+    if (!stats.avg_mood && stats.top_tags.length === 0) {
+        statsContainer.innerHTML = '<p>No mood data available for selected period</p>';
+        return;
+    }
+    
+    let html = '<div style="background:#f7f7fa;padding:15px;border-radius:8px;">';
+    
+    // Average mood
+    const avgMood = stats.avg_mood ? parseFloat(stats.avg_mood).toFixed(1) : 'N/A';
+    html += `<div style="margin-bottom:10px;">
+        <h4 style="margin:0 0 5px 0;font-size:1rem;">Average Mood Score</h4>
+        <div style="font-size:1.8rem;font-weight:bold;color:#2196f3;">${avgMood}</div>
+    </div>`;
+    
+    // Top mentioned tags
+    if (stats.top_tags && stats.top_tags.length > 0) {
+        html += `<div>
+            <h4 style="margin:0 0 5px 0;font-size:1rem;">Most Common Tags</h4>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+        
+        stats.top_tags.forEach(([tag, count]) => {
+            html += `<span style="background:#e1f5fe;color:#0277bd;padding:4px 8px;border-radius:4px;font-size:0.9rem;">${tag} (${count})</span>`;
+        });
+        
+        html += `</div>
+        </div>`;
+    }
+    
+    html += '</div>';
+    statsContainer.innerHTML = html;
+}
+
+// Display mood entries list
+function displayMoodEntries(entries) {
+    const entriesContainer = document.getElementById('mood-entries');
+    
+    if (!entries || entries.length === 0) {
+        entriesContainer.innerHTML = '<p>No mood entries found for selected period</p>';
+        return;
+    }
+    
+    let html = '<h4 style="margin:0 0 10px 0;font-size:1rem;">Mood Entries</h4>';
+    
+    entries.forEach(entry => {
+        // Parse tags from JSON string
+        let tags = [];
+        try {
+            tags = JSON.parse(entry.tags || '[]');
+        } catch (e) {
+            console.warn('Failed to parse tags:', e);
+        }
+        
+        // Create a badge color based on mood score
+        let badgeColor = '#64b5f6'; // Default blue
+        if (entry.mood_score >= 8) badgeColor = '#66bb6a'; // Green for high scores
+        else if (entry.mood_score <= 3) badgeColor = '#ef5350'; // Red for low scores
+        else if (entry.mood_score <= 5) badgeColor = '#ffa726'; // Orange for medium-low scores
+        
+        html += `
+        <div style="margin-bottom:10px;padding:12px;border:1px solid #eee;border-radius:6px;background:#fafafa;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div style="font-weight:bold;">${entry.date}</div>
+                <div style="background:${badgeColor};color:white;padding:2px 8px;border-radius:12px;font-weight:bold;">${entry.mood_score}</div>
+            </div>
+            ${entry.mood_note ? `<div style="margin-bottom:8px;white-space:pre-line;">${entry.mood_note}</div>` : ''}
+            ${tags.length > 0 ? `
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
+                    ${tags.map(tag => `<span style="background:#e1f5fe;color:#0277bd;padding:2px 6px;border-radius:4px;font-size:0.85rem;">${tag}</span>`).join('')}
+                </div>
+            ` : ''}
+            <div style="text-align:right;margin-top:8px;">
+                <button onclick="deleteMoodEntry(${entry.id})" style="background:none;border:none;color:#f44336;cursor:pointer;font-size:0.85rem;">Delete</button>
+            </div>
+        </div>
+        `;
+    });
+    
+    entriesContainer.innerHTML = html;
+}
+
+// Create mood trend chart
+function createMoodChart(moodTrend) {
+    if (!moodTrend || moodTrend.length === 0) {
+        document.getElementById('moodChart').style.display = 'none';
+        return;
+    }
+    
+    const labels = moodTrend.map(item => item[0]);
+    const data = moodTrend.map(item => item[1]);
+    
+    const ctx = document.getElementById('moodChart').getContext('2d');
+    
+    // Check if chart already exists and destroy it
+    if (window.moodChartInstance) {
+        window.moodChartInstance.destroy();
+    }
+    
+    window.moodChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Mood Score',
+                data: data,
+                borderColor: '#ff69b4',
+                backgroundColor: 'rgba(255, 105, 180, 0.1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true,
+                pointBackgroundColor: '#ff69b4',
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    min: 0,
+                    max: 10,
+                    title: {
+                        display: true,
+                        text: 'Mood Score'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    titleColor: '#333',
+                    bodyColor: '#333',
+                    borderColor: '#ddd',
+                    borderWidth: 1,
+                    displayColors: false,
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            return tooltipItems[0].label;
+                        },
+                        label: function(context) {
+                            return `Mood Score: ${context.raw}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    document.getElementById('moodChart').style.display = 'block';
+}
+
+// Delete a mood entry
+async function deleteMoodEntry(id) {
+    if (!confirm('Are you sure you want to delete this mood entry?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/mood/delete/${id}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            // Refresh mood analysis
+            analyzeMood();
+            alert('Mood entry deleted successfully');
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting mood entry:', error);
+        alert('Error deleting mood entry. Please try again.');
+    }
 } 
