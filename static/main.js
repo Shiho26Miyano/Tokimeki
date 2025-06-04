@@ -301,6 +301,22 @@ function getDateRangeIndices(dates, startDate, endDate) {
 
 // Function to display the filtered data
 function displayStockTrendsData(data, startDate, endDate) {
+    // Reset prediction overlays and original data
+    if (stockCharts['stockChartMulti']) {
+        stockCharts['stockChartMulti'].data.datasets.forEach(ds => {
+            if (ds._originalData) delete ds._originalData;
+            ds.segment = undefined;
+            ds.pointRadius = undefined;
+            ds.pointBackgroundColor = undefined;
+            ds.pointBorderColor = undefined;
+            ds.pointBorderWidth = undefined;
+        });
+        if (stockCharts['stockChartMulti'].options.plugins &&
+            stockCharts['stockChartMulti'].options.plugins.annotation &&
+            stockCharts['stockChartMulti'].options.plugins.annotation.annotations) {
+            delete stockCharts['stockChartMulti'].options.plugins.annotation.annotations['predictedLabel'];
+        }
+    }
     let msg = '';
     let chartData = [];
     let chartLabels = [];
@@ -1889,5 +1905,167 @@ async function deleteMoodEntry(id) {
     } catch (error) {
         console.error('Error deleting mood entry:', error);
         alert('Error deleting mood entry. Please try again.');
+    }
+}
+
+// Predict Tomorrow's Move (ML Feature)
+async function predictStockMove() {
+    // Use the currently selected stock and its closes
+    const select = document.getElementById('stock-select');
+    const selected = Array.from(select.selectedOptions).map(opt => opt.value);
+    if (selected.length !== 1) {
+        alert('Select exactly one stock for prediction.');
+        return;
+    }
+    const stockData = stockTrendsData[selected[0]];
+    if (!stockData || !stockData.closes || stockData.closes.length < 7) {
+        alert('Not enough data for prediction.');
+        return;
+    }
+    // Get the filtered data and labels from the chart (not mutated)
+    const chart = stockCharts['stockChartMulti'];
+    let basePrices, baseLabels;
+    if (chart) {
+        const datasetIdx = chart.data.datasets.findIndex(ds => ds.label.startsWith(stockData.name));
+        if (datasetIdx !== -1) {
+            basePrices = chart.data.datasets[datasetIdx].data.slice();
+            baseLabels = chart.data.labels.slice();
+        } else {
+            basePrices = stockData.closes.slice();
+            baseLabels = stockData.dates.slice();
+        }
+    } else {
+        basePrices = stockData.closes.slice();
+        baseLabels = stockData.dates.slice();
+    }
+    const daysInput = document.getElementById('predict-days');
+    let daysAhead = 1;
+    if (daysInput) {
+        daysAhead = Math.max(1, Math.min(30, parseInt(daysInput.value) || 1));
+    }
+    const factorInput = document.getElementById('predict-factor');
+    const manualFactor = factorInput ? factorInput.value : '';
+    document.getElementById('stock-move-prediction').innerText = 'Predicting...';
+
+    // Remove previous prediction overlays
+    if (chart) {
+        chart.data.datasets.forEach(ds => {
+            ds.segment = undefined;
+            ds.pointRadius = undefined;
+            ds.pointBackgroundColor = undefined;
+            ds.pointBorderColor = undefined;
+            ds.pointBorderWidth = undefined;
+        });
+        if (chart.options.plugins &&
+            chart.options.plugins.annotation &&
+            chart.options.plugins.annotation.annotations) {
+            delete chart.options.plugins.annotation.annotations['predictedLabel'];
+        }
+    }
+
+    // Chain predictions for each day ahead
+    let predPrices = basePrices.slice();
+    let predLabels = baseLabels.slice();
+    let predResults = [];
+    for (let i = 0; i < daysAhead; i++) {
+        const res = await fetch('/predict/stock-move', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({prices: predPrices, window: 5, factor: manualFactor})
+        });
+        const data = await res.json();
+        if (data.error) {
+            document.getElementById('stock-move-prediction').innerText = data.error;
+            return;
+        }
+        predResults.push(data);
+        // Predict next value (use 1% move for visualization)
+        const lastPrice = predPrices[predPrices.length-1];
+        const predUp = data.prob_up > data.prob_down;
+        const predChange = lastPrice * 0.01 * (predUp ? 1 : -1);
+        const predictedPrice = lastPrice + predChange;
+        predPrices.push(predictedPrice);
+        // Add new label (next day)
+        let lastDate = predLabels[predLabels.length-1];
+        let nextDate;
+        if (/\d{4}-\d{2}-\d{2}/.test(lastDate)) {
+            const d = new Date(lastDate);
+            d.setDate(d.getDate() + 1);
+            nextDate = d.toISOString().split('T')[0];
+        } else {
+            nextDate = 'Predicted ' + (i+1);
+        }
+        predLabels.push(nextDate);
+    }
+    // Show prediction summary
+    const lastResult = predResults[predResults.length-1];
+    let factorLabel = '';
+    if (manualFactor) {
+        const factorMap = {
+            covid: 'COVID-19 Pandemic',
+            ukraine_war: 'Russia-Ukraine War',
+            us_china_trade: 'US-China Trade War',
+            tech_layoffs: 'Major Tech Layoffs',
+            rate_hike: 'US Interest Rate Hike',
+            bank_crisis: 'Banking Crisis',
+            ai_boom: 'AI Boom',
+            debt_ceiling: 'US Debt Ceiling Crisis',
+            inflation: 'Inflation Surge',
+            supply_chain: 'Supply Chain Crisis',
+            rate_cut: 'Fed Rate Cut',
+            stimulus: 'Major Stimulus Package',
+            med_breakthrough: 'Breakthrough Medical News',
+            peace_treaty: 'Peace Treaty Signed',
+            tech_breakthrough: 'Tech Breakthrough',
+            jobs_report: 'Strong Jobs Report',
+            record_earnings: 'Record Corporate Earnings',
+            trade_deal: 'Trade Deal Signed',
+            inflation_drop: 'Inflation Drops Sharply',
+            tax_cut: 'Major Tax Cut',
+            recovery: 'Global Economic Recovery',
+            confidence_surge: 'Consumer Confidence Surge'
+        };
+        factorLabel = ` (Factor: ${factorMap[manualFactor] || manualFactor})`;
+    }
+    document.getElementById('stock-move-prediction').innerText =
+        `Probability Up: ${(lastResult.prob_up*100).toFixed(1)}% | Down: ${(lastResult.prob_down*100).toFixed(1)}%${factorLabel}`;
+
+    // --- Add predicted points to the chart visually only ---
+    if (chart) {
+        const datasetIdx = chart.data.datasets.findIndex(ds => ds.label.startsWith(stockData.name));
+        if (datasetIdx === -1) return;
+        const ds = chart.data.datasets[datasetIdx];
+        // Use a copy for overlay
+        ds.data = predPrices;
+        chart.data.labels = predLabels;
+        // Dotted line for predicted segment(s)
+        const baseLen = basePrices.length;
+        ds.segment = {
+            borderDash: ctx => ctx.p0DataIndex >= baseLen-1 ? [6, 6] : undefined,
+            borderColor: ctx => ctx.p0DataIndex >= baseLen-1 ? (predResults[ctx.p0DataIndex-baseLen+1]?.prob_up > predResults[ctx.p0DataIndex-baseLen+1]?.prob_down ? '#388e3c' : '#d32f2f') : ds.borderColor
+        };
+        // Style predicted points
+        ds.pointRadius = ds.data.map((v,i) => i >= baseLen ? (i===ds.data.length-1?7:4) : 0);
+        ds.pointBackgroundColor = ds.data.map((v,i) => i >= baseLen ? (predResults[i-baseLen]?.prob_up > predResults[i-baseLen]?.prob_down ? '#388e3c' : '#d32f2f') : 'rgba(0,0,0,0)');
+        ds.pointBorderColor = ds.pointBackgroundColor;
+        ds.pointBorderWidth = ds.data.map((v,i) => i===ds.data.length-1?2:0);
+        // Add a label annotation for the last predicted point
+        if (chart.options.plugins && chart.options.plugins.annotation) {
+            chart.options.plugins.annotation.annotations = chart.options.plugins.annotation.annotations || {};
+            chart.options.plugins.annotation.annotations['predictedLabel'] = {
+                type: 'label',
+                xValue: predLabels[predLabels.length-1],
+                yValue: predPrices[predPrices.length-1],
+                backgroundColor: lastResult.prob_up > lastResult.prob_down ? '#388e3c' : '#d32f2f',
+                color: '#fff',
+                content: ['Predicted'],
+                font: { weight: 'bold', size: 13 },
+                position: 'center',
+                padding: 6,
+                borderRadius: 6,
+                display: true
+            };
+        }
+        chart.update();
     }
 } 
