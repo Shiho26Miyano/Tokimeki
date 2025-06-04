@@ -162,6 +162,43 @@
         <div style="width:100%;max-width:350px;margin:0 auto;">
             <canvas id="stockChartMulti" width="350" height="350" style="display:none;background:#fff;border-radius:12px;"></canvas>
         </div>
+        <!-- Prediction Button and Result -->
+        <div style="margin-top:10px;text-align:center;">
+            <button onclick="predictStockMove()" style="background:#2196f3;color:#fff;border:none;padding:8px 16px;border-radius:5px;font-size:0.97rem;">Predict Tomorrow's Move</button>
+            <div style="margin-top:8px;">
+                <label for="predict-days" style="font-size:0.97rem;">Days Ahead:</label>
+                <input id="predict-days" type="number" min="1" max="30" value="1" style="width:60px;margin-left:8px;">
+            </div>
+            <div style="margin-top:8px;">
+                <label for="predict-factor" style="font-size:0.97rem;">Manual Factor:</label>
+                <select id="predict-factor" style="width:280px;margin-left:8px;">
+                    <option value="">None</option>
+                    <option value="covid">COVID-19 Pandemic</option>
+                    <option value="ukraine_war">Russia-Ukraine War</option>
+                    <option value="us_china_trade">US-China Trade War</option>
+                    <option value="tech_layoffs">Major Tech Layoffs</option>
+                    <option value="rate_hike">US Interest Rate Hike</option>
+                    <option value="bank_crisis">Banking Crisis (SVB, etc.)</option>
+                    <option value="ai_boom">AI Boom</option>
+                    <option value="debt_ceiling">US Debt Ceiling Crisis</option>
+                    <option value="inflation">Inflation Surge</option>
+                    <option value="supply_chain">Supply Chain Crisis</option>
+                    <option value="rate_cut">Fed Rate Cut</option>
+                    <option value="stimulus">Major Stimulus Package</option>
+                    <option value="med_breakthrough">Breakthrough Medical News</option>
+                    <option value="peace_treaty">Peace Treaty Signed</option>
+                    <option value="tech_breakthrough">Tech Breakthrough</option>
+                    <option value="jobs_report">Strong Jobs Report</option>
+                    <option value="record_earnings">Record Corporate Earnings</option>
+                    <option value="trade_deal">Trade Deal Signed</option>
+                    <option value="inflation_drop">Inflation Drops Sharply</option>
+                    <option value="tax_cut">Major Tax Cut</option>
+                    <option value="recovery">Global Economic Recovery</option>
+                    <option value="confidence_surge">Consumer Confidence Surge</option>
+                </select>
+            </div>
+            <div id="stock-move-prediction" style="margin-top:8px;font-size:1.05rem;color:#333;"></div>
+        </div>
         
         <!-- Time Range Slider -->
         <div style="margin-top:15px;margin-bottom:15px;font-size:0.95rem;">

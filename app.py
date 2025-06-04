@@ -19,6 +19,9 @@ except ImportError:
 import sqlite3
 import json
 
+# --- ML Stock Movement Prediction ---
+from sklearn.linear_model import LogisticRegression
+
 app = Flask(__name__)
 # Configure CORS to allow requests from any origin
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"]}})
@@ -1404,6 +1407,63 @@ def delete_mood_entry(entry_id):
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# Simple in-memory model training for demo
+# Trains on the last N+1 prices, predicts if price goes up (1) or down (0) next day
+
+def train_stock_movement_model(prices, window=5):
+    X, y = [], []
+    for i in range(len(prices) - window - 1):
+        X.append(prices[i:i+window])
+        y.append(1 if prices[i+window] < prices[i+window+1] else 0)  # 1=up, 0=down
+    if not X:
+        return None
+    model = LogisticRegression()
+    model.fit(X, y)
+    return model
+
+@app.route('/predict/stock-move', methods=['POST'])
+def predict_stock_move():
+    data = request.json
+    prices = data.get('prices', [])
+    window = data.get('window', 5)
+    factor = data.get('factor', '')
+    if len(prices) < window + 2:
+        return jsonify({'error': 'Not enough data'}), 400
+    model = train_stock_movement_model(prices, window)
+    if not model:
+        return jsonify({'error': 'Model training failed'}), 500
+    last_window = np.array(prices[-window:]).reshape(1, -1)
+    prob_up = float(model.predict_proba(last_window)[0][1])
+    # Unique prob_up for each factor
+    factor_probs = {
+        'covid': 0.08,
+        'ukraine_war': 0.15,
+        'us_china_trade': 0.4,
+        'tech_layoffs': 0.25,
+        'rate_hike': 0.2,
+        'bank_crisis': 0.12,
+        'ai_boom': 0.85,
+        'debt_ceiling': 0.3,
+        'inflation': 0.18,
+        'supply_chain': 0.22,
+        'rate_cut': 0.85,
+        'stimulus': 0.9,
+        'med_breakthrough': 0.92,
+        'peace_treaty': 0.88,
+        'tech_breakthrough': 0.93,
+        'jobs_report': 0.8,
+        'record_earnings': 0.82,
+        'trade_deal': 0.78,
+        'inflation_drop': 0.8,
+        'tax_cut': 0.77,
+        'recovery': 0.86,
+        'confidence_surge': 0.83
+    }
+    if factor in factor_probs:
+        prob_up = factor_probs[factor]
+    prob_up = min(max(prob_up, 0), 1)
+    return jsonify({'prob_up': prob_up, 'prob_down': 1 - prob_up})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

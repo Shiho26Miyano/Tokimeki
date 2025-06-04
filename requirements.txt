@@ -2,4 +2,6 @@ Flask
 Flask-Cors
 vaderSentiment
 requests
-yfinance 
+yfinance
+scikit-learn
+numpy 
