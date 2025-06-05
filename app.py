@@ -22,6 +22,8 @@ import json
 # --- ML Stock Movement Prediction ---
 from sklearn.linear_model import LogisticRegression
 
+from transformers import pipeline, set_seed
+
 app = Flask(__name__)
 # Configure CORS to allow requests from any origin
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"]}})
@@ -1464,6 +1466,26 @@ def predict_stock_move():
         prob_up = factor_probs[factor]
     prob_up = min(max(prob_up, 0), 1)
     return jsonify({'prob_up': prob_up, 'prob_down': 1 - prob_up})
+
+# Initialize the local GPT-2 pipeline once (for efficiency)
+poetry_generator = pipeline('text-generation', model='gpt2')
+set_seed(42)
+
+@app.route('/poetry/generate', methods=['POST'])
+def generate_poem():
+    data = request.json
+    term = str(data.get('term', '')).strip()
+    if not term:
+        return jsonify({'error': 'No term provided'}), 400
+
+    prompt = f"Write a 5-line poem about {term}:\n"
+    try:
+        result = poetry_generator(prompt, max_length=60, num_return_sequences=1)
+        poem_text = result[0]['generated_text'].replace(prompt, '').strip()
+        poem_lines = [line.strip() for line in poem_text.split('\n') if line.strip()][:5]
+        return jsonify({'poem': poem_lines, 'source': 'Generated locally by GPT-2'})
+    except Exception as e:
+        return jsonify({'error': f'Local GPT-2 generation failed: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
