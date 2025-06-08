@@ -11,6 +11,8 @@ from routes.stock import stock_bp
 app.register_blueprint(stock_bp)
 from routes.util import util_bp
 app.register_blueprint(util_bp)
+from routes.tweet import tweet_bp
+app.register_blueprint(tweet_bp)
 
 @app.after_request
 def after_request(response):
@@ -22,6 +24,10 @@ def after_request(response):
 @app.route('/')
 def index():
     return send_from_directory('static', 'index.html')
+
+@app.route('/test')
+def test():
+    return 'Hello, world!'
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

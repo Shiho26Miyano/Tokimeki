@@ -455,7 +455,6 @@ function renderVolatilityCorrelationChart(data) {
     // Slice data for visible range
     const dates = data.dates.slice(startIdx, endIdx + 1).map(d3.timeParse('%Y-%m-%d'));
     const vol = data.volatility.slice(startIdx, endIdx + 1);
-    const sent = data.avg_sentiment.slice(startIdx, endIdx + 1);
     const eventCount = data.event_count.slice(startIdx, endIdx + 1);
     const eventTitles = (data.event_titles || []).slice(startIdx, endIdx + 1);
     // X scale
@@ -466,18 +465,6 @@ function renderVolatilityCorrelationChart(data) {
     const yLeft = d3.scaleLinear()
         .domain([0, d3.max(vol.filter(v => v !== null)) * 1.2])
         .range([height, 0]);
-    // Y scale for sentiment
-    const yRight = d3.scaleLinear()
-        .domain([-1, 1])
-        .range([height, 0]);
-    // --- Annotate the time range with a shaded background ---
-    g.append('rect')
-        .attr('x', x(dates[0]))
-        .attr('y', 0)
-        .attr('width', x(dates[dates.length-1]) - x(dates[0]))
-        .attr('height', height)
-        .attr('fill', '#e3e8f7')
-        .attr('opacity', 0.25);
     // Draw full volatility line in blue
     const line = d3.line()
         .defined((d, i) => vol[i] !== null)
@@ -549,18 +536,6 @@ function renderVolatilityCorrelationChart(data) {
             }
         }
     }
-    // Sentiment line
-    const sentLine = d3.line()
-        .defined((d, i) => sent[i] !== null)
-        .x((d, i) => x(dates[i]))
-        .y((d, i) => yRight(sent[i]));
-    g.append('path')
-        .datum(sent)
-        .attr('fill', 'none')
-        .attr('stroke', '#ff69b4')
-        .attr('stroke-width', 2)
-        .attr('stroke-dasharray', '4 2')
-        .attr('d', sentLine);
     // Event count as bars (optional)
     const barWidth = Math.max(1, width / dates.length * 0.7);
     g.selectAll('.event-bar')
@@ -588,25 +563,6 @@ function renderVolatilityCorrelationChart(data) {
         .attr('font-size', '1rem')
         .attr('font-weight', 600)
         .text('Volatility');
-    g.append('g')
-        .attr('transform', `translate(${width},0)`)
-        .call(d3.axisRight(yRight).ticks(5))
-        .append('text')
-        .attr('fill', '#ff69b4')
-        .attr('x', 40)
-        .attr('y', -10)
-        .attr('text-anchor', 'end')
-        .attr('font-size', '1rem')
-        .attr('font-weight', 600)
-        .text('Sentiment');
-    // Legend
-    g.append('text')
-        .attr('x', 0)
-        .attr('y', -15)
-        .attr('font-size', '1rem')
-        .attr('font-weight', 600)
-        .attr('fill', '#183153')
-        .text('Volatility (left, blue) & Sentiment (right, pink)');
     // --- Tooltip logic ---
     const tooltip = d3.select('#volatility-correlation-chart')
         .append('div')
@@ -648,13 +604,12 @@ function renderVolatilityCorrelationChart(data) {
             // Tooltip content
             let html = `<b>${d3.timeFormat('%Y-%m-%d')(dates[idx])}</b><br>`;
             html += `Volatility: <b>${vol[idx] !== null ? vol[idx].toFixed(4) : 'N/A'}</b><br>`;
-            html += `Sentiment: <b>${sent[idx] !== null ? sent[idx].toFixed(3) : 'N/A'}</b><br>`;
             html += `Event count: <b>${eventCount[idx]}</b><br>`;
             // Always show the lowest volatility window date range
             if (highlightStartDate && highlightEndDate) {
                 html += `<span style='color:#ff9800'><b>Lowest Volatility Window:</b><br>${highlightStartDate} to ${highlightEndDate}</span><br>`;
             }
-            // Always show news titles for this date, even if sentiment/event count is N/A
+            // Always show news titles for this date, even if event count is N/A
             if (eventTitles && eventTitles[idx] && eventTitles[idx].length > 0) {
                 html += '<hr style="margin:4px 0;">';
                 html += '<b>News headlines:</b><ul style="margin:0 0 0 1em;padding:0;">';
@@ -676,4 +631,29 @@ function renderVolatilityCorrelationChart(data) {
             g.selectAll('.hover-dot').remove();
         });
 }
+
+window.fetchTweetVolatilityAnalysis = function() {
+    const resultDiv = document.getElementById('tweet-volatility-result');
+    resultDiv.innerHTML = 'Running analysis...';
+    fetch('/tweet_volatility_analysis')
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                resultDiv.innerHTML = `<span style='color:#c00;'>${data.error}</span>`;
+                return;
+            }
+            let html = `<b>Accuracy:</b> ${(data.accuracy * 100).toFixed(2)}%<br>`;
+            html += `<b>F1 Score:</b> ${data.f1_score.toFixed(2)}<br>`;
+            html += `<b>Feature Importances:</b><ul style='margin:0 0 0 1em;'>`;
+            html += `<li>Mean Sentiment: ${(data.feature_importances.mean_sentiment * 100).toFixed(1)}%</li>`;
+            html += `<li>Mean Retweets: ${(data.feature_importances.mean_retweets * 100).toFixed(1)}%</li>`;
+            html += `</ul>`;
+            html += `<b>Days Analyzed:</b> ${data.n_days}<br>`;
+            html += `<b>Summary:</b> <span style='color:#183153;'>${data.summary}</span>`;
+            resultDiv.innerHTML = html;
+        })
+        .catch(err => {
+            resultDiv.innerHTML = `<span style='color:#c00;'>Error: ${err}</span>`;
+        });
+};
   

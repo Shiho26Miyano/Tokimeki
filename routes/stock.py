@@ -5,6 +5,12 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from transformers import pipeline
 import requests
+import bs4
+import logging
+from bs4 import BeautifulSoup
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 stock_bp = Blueprint('stock', __name__)
 
@@ -193,47 +199,30 @@ def volatility_event_correlation():
                 min_vol_date = valid_dates[min_idx]
     except Exception as e:
         return jsonify({'error': f'Error fetching stock data: {str(e)}'}), 500
-    # Step 2: Fetch GDELT DOC 2.0 articles
+    # Step 2: Fetch Yahoo Finance news articles using BeautifulSoup
     try:
-        # Use company name for query, fallback to symbol if not mapped
-        company_name = symbol  # You can map ticker to name if you want
-        start_str = start_date.replace('-', '') + '000000'
-        end_str = end_date.replace('-', '') + '235959'
-        gdelt_url = (
-            f'https://api.gdeltproject.org/api/v2/doc/doc?query={company_name}&mode=artlist&maxrecords=50&format=json&startdatetime={start_str}&enddatetime={end_str}'
-        )
-        resp = requests.get(gdelt_url)
-        events = []
-        if resp.status_code == 200:
-            data = resp.json()
-            for item in data.get('articles', []):
-                events.append({
-                    'date': item.get('seendate', '')[:10],
-                    'title': item.get('title', ''),
-                    'url': item.get('url', ''),
-                    'source': item.get('source', ''),
-                    'domain': item.get('domain', '')
-                })
+        articles = fetch_yahoo_news(symbol)
+        logger.info(f"[DEBUG] Yahoo News: Total fetched for {symbol}: {len(articles)}")
     except Exception as e:
-        return jsonify({'error': f'Error fetching GDELT articles: {str(e)}'}), 500
+        return jsonify({'error': f'Error fetching Yahoo Finance news: {str(e)}'}), 500
     # Step 3: Analyze event sentiment (DistilBERT)
     try:
         nlp = pipeline('sentiment-analysis', model='distilbert-base-uncased-finetuned-sst-2-english')
-        texts = [event['title'] for event in events]
+        texts = [event['title'] for event in articles]
         sentiments = []
         if texts:
             results = nlp(texts)
-            for event, result in zip(events, results):
+            for event, result in zip(articles, results):
                 event['sentiment'] = result['score'] * (1 if result['label'] == 'POSITIVE' else -1)
         else:
-            for event in events:
+            for event in articles:
                 event['sentiment'] = 0
     except Exception as e:
         return jsonify({'error': f'Error running sentiment model: {str(e)}'}), 500
     # Step 4: Align volatility and sentiment by date
     date_to_events = {}
     date_to_titles = {}
-    for event in events:
+    for event in articles:
         d = event['date']
         if d not in date_to_events:
             date_to_events[d] = []
@@ -259,12 +248,31 @@ def volatility_event_correlation():
     return jsonify({
         'dates': dates,
         'volatility': rolling_vol,
-        'avg_sentiment': avg_sentiment,
         'event_count': event_count,
         'event_titles': event_titles,
         'min_vol': min_vol,
         'min_vol_date': min_vol_date
     })
+
+def fetch_yahoo_news(ticker, max_articles=20):
+    url = f'https://finance.yahoo.com/quote/{ticker}/news?p={ticker}'
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    resp = requests.get(url, headers=headers)
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    articles = []
+    for item in soup.select('li[data-test-locator=\"mega\"]'):
+        title_tag = item.find('h3')
+        link_tag = item.find('a')
+        time_tag = item.find('time')
+        if title_tag and link_tag and time_tag:
+            title = title_tag.text.strip()
+            url = 'https://finance.yahoo.com' + link_tag['href']
+            date_str = time_tag['datetime']
+            date = datetime.fromisoformat(date_str.replace('Z', '+00:00')).strftime('%Y-%m-%d')
+            articles.append({'date': date, 'title': title, 'url': url})
+        if len(articles) >= max_articles:
+            break
+    return articles
 
 # Add any additional helpers or mock data generators as needed
 
