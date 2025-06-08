@@ -4,6 +4,4 @@ vaderSentiment
 requests
 yfinance
 scikit-learn
-numpy
-transformers
-torch 
+numpy 
