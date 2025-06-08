@@ -347,4 +347,329 @@ window.resetStockTrendsSection = function() {
         highlightInfo: null
     };
 };
+
+// --- Event-Driven Volatility Explorer ---
+window._volatilityChartState = {
+    data: null,
+    range: null // [startIdx, endIdx]
+};
+
+function fetchAndRenderVolatilityCorrelation() {
+    // Use the first selected company from #stock-select
+    const stockSelect = document.getElementById('stock-select');
+    const symbols = Array.from(stockSelect.selectedOptions).map(opt => opt.value);
+    if (!symbols.length) {
+        document.getElementById('volatility-correlation-chart').innerHTML = 'Please select a company above.';
+        return;
+    }
+    const symbol = symbols[0];
+    // Get window and years from UI
+    const windowInput = document.getElementById('vol-window');
+    const yearsInput = document.getElementById('vol-years');
+    const windowSize = windowInput ? parseInt(windowInput.value) || 10 : 10;
+    const years = yearsInput ? parseInt(yearsInput.value) || 2 : 2;
+    const today = new Date();
+    const start = new Date();
+    start.setFullYear(today.getFullYear() - years);
+    const start_date = start.toISOString().split('T')[0];
+    const end_date = today.toISOString().split('T')[0];
+    const chartDiv = document.getElementById('volatility-correlation-chart');
+    chartDiv.innerHTML = 'Loading...';
+    fetch(`/volatility_event_correlation?symbol=${symbol}&start_date=${start_date}&end_date=${end_date}&window=${windowSize}`)
+        .then(res => res.json())
+        .then(data => {
+            chartDiv.innerHTML = '';
+            window._volatilityChartState.data = data;
+            // Initialize slider to full range
+            if (data.dates && data.dates.length > 0) {
+                setupVolatilityRangeSlider(data.dates);
+                window._volatilityChartState.range = [0, data.dates.length - 1];
+            }
+            renderVolatilityCorrelationChart(data);
+        })
+        .catch(() => {
+            chartDiv.innerHTML = 'Error fetching data.';
+        });
+}
+
+function setupVolatilityRangeSlider(dates) {
+    const slider = document.getElementById('volatility-range-slider');
+    if (slider.noUiSlider) slider.noUiSlider.destroy();
+    d3.select('#volatility-range-slider').selectAll('*').remove();
+    if (!dates || dates.length === 0) return;
+    const minTime = new Date(dates[0]).getTime();
+    const maxTime = new Date(dates[dates.length-1]).getTime();
+    noUiSlider.create(slider, {
+        start: [minTime, maxTime],
+        connect: true,
+        range: { min: minTime, max: maxTime },
+        step: 24 * 60 * 60 * 1000,
+        tooltips: [
+            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
+            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
+        ]
+    });
+    slider.noUiSlider.on('update', function(values) {
+        const startIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[0]));
+        let endIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[1]));
+        if (endIdx === -1) endIdx = dates.length - 1;
+        window._volatilityChartState.range = [startIdx, endIdx];
+        document.getElementById('volatility-range-start').textContent = 'Start: ' + dates[startIdx];
+        document.getElementById('volatility-range-end').textContent = 'End: ' + dates[endIdx];
+        renderVolatilityCorrelationChart(window._volatilityChartState.data);
+    });
+    // Set initial label values
+    document.getElementById('volatility-range-start').textContent = 'Start: ' + dates[0];
+    document.getElementById('volatility-range-end').textContent = 'End: ' + dates[dates.length-1];
+}
+
+function renderVolatilityCorrelationChart(data) {
+    d3.select('#volatility-correlation-chart').selectAll('*').remove();
+    if (!data || !data.dates || data.dates.length === 0) return;
+    const margin = {top: 30, right: 60, bottom: 60, left: 70};
+    const chartDiv = document.getElementById('volatility-correlation-chart');
+    const fullWidth = chartDiv.clientWidth || 700;
+    const fullHeight = chartDiv.clientHeight || 340;
+    const width = fullWidth - margin.left - margin.right;
+    const height = fullHeight - margin.top - margin.bottom;
+    const svg = d3.select('#volatility-correlation-chart')
+        .append('svg')
+        .attr('width', '100%')
+        .attr('height', '100%')
+        .attr('viewBox', `0 0 ${fullWidth} ${fullHeight}`);
+    svg.append('rect')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', fullWidth)
+        .attr('height', fullHeight)
+        .attr('fill', '#fff');
+    const g = svg.append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+    // Use slider range if set
+    let range = window._volatilityChartState.range;
+    let startIdx = 0, endIdx = data.dates.length - 1;
+    if (range && Array.isArray(range)) {
+        startIdx = Math.max(0, range[0]);
+        endIdx = Math.min(data.dates.length - 1, range[1]);
+    }
+    // Slice data for visible range
+    const dates = data.dates.slice(startIdx, endIdx + 1).map(d3.timeParse('%Y-%m-%d'));
+    const vol = data.volatility.slice(startIdx, endIdx + 1);
+    const sent = data.avg_sentiment.slice(startIdx, endIdx + 1);
+    const eventCount = data.event_count.slice(startIdx, endIdx + 1);
+    const eventTitles = (data.event_titles || []).slice(startIdx, endIdx + 1);
+    // X scale
+    const x = d3.scaleTime()
+        .domain(d3.extent(dates))
+        .range([0, width]);
+    // Y scale for volatility
+    const yLeft = d3.scaleLinear()
+        .domain([0, d3.max(vol.filter(v => v !== null)) * 1.2])
+        .range([height, 0]);
+    // Y scale for sentiment
+    const yRight = d3.scaleLinear()
+        .domain([-1, 1])
+        .range([height, 0]);
+    // --- Annotate the time range with a shaded background ---
+    g.append('rect')
+        .attr('x', x(dates[0]))
+        .attr('y', 0)
+        .attr('width', x(dates[dates.length-1]) - x(dates[0]))
+        .attr('height', height)
+        .attr('fill', '#e3e8f7')
+        .attr('opacity', 0.25);
+    // Draw full volatility line in blue
+    const line = d3.line()
+        .defined((d, i) => vol[i] !== null)
+        .x((d, i) => x(dates[i]))
+        .y((d, i) => yLeft(vol[i]));
+    g.append('path')
+        .datum(vol)
+        .attr('fill', 'none')
+        .attr('stroke', '#183153')
+        .attr('stroke-width', 2.5)
+        .attr('d', line);
+    // Overlay highlight segment for lowest volatility window (same thickness as main line)
+    let highlightStart = -1, highlightEnd = -1, highlightDates = [], highlightVols = [];
+    let highlightLabelX, highlightLabelY, highlightLabelText;
+    let highlightStartDate, highlightEndDate;
+    if (data.min_vol_date && data.volatility && data.dates) {
+        const windowSize = (data.volatility.length - data.volatility.filter(v => v === null).length) > 0 ? (data.volatility.findIndex(v => v !== null) + 1) : 10;
+        const minIdx = data.dates.findIndex(d => d === data.min_vol_date);
+        if (minIdx !== -1 && windowSize > 1) {
+            highlightStart = Math.max(startIdx, minIdx - windowSize + 1);
+            highlightEnd = Math.min(endIdx, minIdx);
+            if (highlightEnd >= highlightStart) {
+                highlightVols = vol.slice(highlightStart - startIdx, highlightEnd - startIdx + 1);
+                highlightDates = dates.slice(highlightStart - startIdx, highlightEnd - startIdx + 1);
+                highlightStartDate = data.dates[highlightStart];
+                highlightEndDate = data.dates[highlightEnd];
+                const highlightLine = d3.line()
+                    .defined((d, i) => highlightVols[i] !== null)
+                    .x((d, i) => x(highlightDates[i]))
+                    .y((d, i) => yLeft(highlightVols[i]));
+                g.append('path')
+                    .datum(highlightVols)
+                    .attr('fill', 'none')
+                    .attr('stroke', '#ff9800')
+                    .attr('stroke-width', 2.5)
+                    .attr('opacity', 0.95)
+                    .attr('d', highlightLine);
+                // Persistent label for the highlight window
+                highlightLabelX = x(highlightDates[highlightDates.length - 1]) + 18;
+                highlightLabelY = yLeft(highlightVols[highlightVols.length - 1]) - 25;
+                highlightLabelText = 'Lowest Volatility';
+                // Draw background rectangle for label
+                const textPadding = 4;
+                const tempText = g.append('text')
+                    .attr('x', highlightLabelX)
+                    .attr('y', highlightLabelY)
+                    .attr('font-size', '0.95rem')
+                    .attr('font-weight', 700)
+                    .attr('fill', '#ff9800')
+                    .text(highlightLabelText);
+                const textWidth = tempText.node().getBBox().width;
+                const textHeight = tempText.node().getBBox().height;
+                tempText.remove();
+                g.append('rect')
+                    .attr('x', highlightLabelX - textPadding)
+                    .attr('y', highlightLabelY - textHeight + textPadding)
+                    .attr('width', textWidth + 2 * textPadding)
+                    .attr('height', textHeight + 2 * textPadding)
+                    .attr('fill', '#fff')
+                    .attr('opacity', 0.85)
+                    .lower();
+                g.append('text')
+                    .attr('x', highlightLabelX)
+                    .attr('y', highlightLabelY)
+                    .attr('font-size', '0.95rem')
+                    .attr('font-weight', 700)
+                    .attr('fill', '#ff9800')
+                    .text(highlightLabelText);
+            }
+        }
+    }
+    // Sentiment line
+    const sentLine = d3.line()
+        .defined((d, i) => sent[i] !== null)
+        .x((d, i) => x(dates[i]))
+        .y((d, i) => yRight(sent[i]));
+    g.append('path')
+        .datum(sent)
+        .attr('fill', 'none')
+        .attr('stroke', '#ff69b4')
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '4 2')
+        .attr('d', sentLine);
+    // Event count as bars (optional)
+    const barWidth = Math.max(1, width / dates.length * 0.7);
+    g.selectAll('.event-bar')
+        .data(eventCount)
+        .enter()
+        .append('rect')
+        .attr('class', 'event-bar')
+        .attr('x', (d, i) => x(dates[i]) - barWidth/2)
+        .attr('y', (d, i) => yLeft((vol[i] !== null ? 0 : null)))
+        .attr('width', barWidth)
+        .attr('height', (d, i) => d > 0 ? 8 : 0)
+        .attr('fill', '#2196f3')
+        .attr('opacity', 0.25);
+    // Axes
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).tickSizeOuter(0));
+    g.append('g')
+        .call(d3.axisLeft(yLeft).ticks(6))
+        .append('text')
+        .attr('fill', '#183153')
+        .attr('x', -40)
+        .attr('y', -10)
+        .attr('text-anchor', 'start')
+        .attr('font-size', '1rem')
+        .attr('font-weight', 600)
+        .text('Volatility');
+    g.append('g')
+        .attr('transform', `translate(${width},0)`)
+        .call(d3.axisRight(yRight).ticks(5))
+        .append('text')
+        .attr('fill', '#ff69b4')
+        .attr('x', 40)
+        .attr('y', -10)
+        .attr('text-anchor', 'end')
+        .attr('font-size', '1rem')
+        .attr('font-weight', 600)
+        .text('Sentiment');
+    // Legend
+    g.append('text')
+        .attr('x', 0)
+        .attr('y', -15)
+        .attr('font-size', '1rem')
+        .attr('font-weight', 600)
+        .attr('fill', '#183153')
+        .text('Volatility (left, blue) & Sentiment (right, pink)');
+    // --- Tooltip logic ---
+    const tooltip = d3.select('#volatility-correlation-chart')
+        .append('div')
+        .attr('class', 'd3-tooltip')
+        .style('position', 'absolute')
+        .style('background', '#fff')
+        .style('border', '1px solid #183153')
+        .style('border-radius', '8px')
+        .style('padding', '10px 14px')
+        .style('pointer-events', 'none')
+        .style('font-size', '1rem')
+        .style('color', '#183153')
+        .style('box-shadow', '0 2px 8px rgba(24,49,83,0.13)')
+        .style('display', 'none');
+    // Add invisible rect for mouse tracking
+    svg.append('rect')
+        .attr('x', margin.left)
+        .attr('y', margin.top)
+        .attr('width', width)
+        .attr('height', height)
+        .attr('fill', 'none')
+        .attr('pointer-events', 'all')
+        .on('mousemove', function(event) {
+            const [mx] = d3.pointer(event, this);
+            const x0 = x.invert(mx - margin.left);
+            let idx = d3.bisector(d => d).left(dates, x0, 1) - 1;
+            idx = Math.max(0, Math.min(idx, dates.length - 1));
+            if (!dates[idx]) return;
+            // Highlight point
+            g.selectAll('.hover-dot').remove();
+            g.append('circle')
+                .attr('class', 'hover-dot')
+                .attr('cx', x(dates[idx]))
+                .attr('cy', yLeft(vol[idx]))
+                .attr('r', 6)
+                .attr('fill', '#ff9800')
+                .attr('stroke', '#183153')
+                .attr('stroke-width', 2);
+            // Tooltip content
+            let html = `<b>${d3.timeFormat('%Y-%m-%d')(dates[idx])}</b><br>`;
+            html += `Volatility: <b>${vol[idx] !== null ? vol[idx].toFixed(4) : 'N/A'}</b><br>`;
+            html += `Sentiment: <b>${sent[idx] !== null ? sent[idx].toFixed(3) : 'N/A'}</b><br>`;
+            html += `Event count: <b>${eventCount[idx]}</b><br>`;
+            // Always show the lowest volatility window date range
+            if (highlightStartDate && highlightEndDate) {
+                html += `<span style='color:#ff9800'><b>Lowest Volatility Window:</b><br>${highlightStartDate} to ${highlightEndDate}</span><br>`;
+            }
+            if (eventTitles && eventTitles[idx] && eventTitles[idx].length > 0) {
+                html += '<hr style="margin:4px 0;">';
+                html += '<b>Top event(s):</b><ul style="margin:0 0 0 1em;padding:0;">';
+                eventTitles[idx].slice(0,3).forEach(title => {
+                    html += `<li>${title}</li>`;
+                });
+                html += '</ul>';
+            }
+            tooltip.html(html)
+                .style('left', (event.offsetX + 30) + 'px')
+                .style('top', (event.offsetY - 30) + 'px')
+                .style('display', 'block');
+        })
+        .on('mouseleave', function() {
+            tooltip.style('display', 'none');
+            g.selectAll('.hover-dot').remove();
+        });
+}
   

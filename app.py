@@ -1,13 +1,12 @@
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 import os
+import numpy as np
 
 app = Flask(__name__, static_folder='static')
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"]}})
 
 # Import and register blueprints
-from routes.poetry import poetry_bp
-app.register_blueprint(poetry_bp)
 from routes.stock import stock_bp
 app.register_blueprint(stock_bp)
 from routes.util import util_bp

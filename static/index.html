@@ -23,7 +23,7 @@
         .card-title { font-family: Inter, Roboto, Arial, sans-serif; font-size: 1.1rem; font-weight: 600; color: #183153; letter-spacing: 0.01em; text-align: left; margin-bottom: 0; line-height: 1.1; text-transform: none; white-space: nowrap; }
         .card-section-vertical { display: flex; flex-direction: column; gap: 0.7rem; }
         .chart-area { background: #fff; border-radius: 12px; padding: 0.7rem 0.7rem 0.7rem 0.7rem; min-width: 320px; width: 100%; max-width: 700px; height: 260px; aspect-ratio: unset; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0 auto; }
-        #d3-stock-chart, #d3-stability-chart { width: 100%; height: 100%; min-height: 0; min-width: 0; max-width: 100%; margin: 0 auto; overflow-x: auto; background: transparent; }
+        #d3-stock-chart, #d3-stability-chart, #volatility-correlation-chart { width: 100%; height: 100%; min-height: 0; min-width: 0; max-width: 100%; margin: 0 auto; overflow-x: auto; background: transparent; }
         .market-controls, .explore-controls, .poetry-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; margin-bottom: 0; }
         .market-controls .form-label, .form-label { color: #222; font-weight: 500; font-size: 1rem; margin-bottom: 0; white-space: nowrap; }
         .btn-dark-bbg { background: #183153; color: #fff; font-weight: 500; border: none; font-size: 1rem; padding: 0.38rem 1.1rem; }
@@ -126,21 +126,35 @@
                     </div>
                 </div>
             </div>
-            <!-- AI Poetry Generator -->
+            <!-- Event-Driven Volatility Explorer -->
             <div class="col-12 d-flex">
                 <div class="card shadow-sm flex-fill d-flex flex-column">
                     <div class="card-body d-flex flex-column">
                         <div class="card-header-row">
-                            <span class="card-title">AI Poetry Generator <span class="fs-6 text-muted" style="color:#183153 !important; font-size:1rem; font-weight:400;">(Powered by HuggingFace GPT-2)</span></span>
-                            <form class="poetry-controls d-flex flex-wrap align-items-center gap-2">
-                                <label for="poetry-term" class="form-label mb-0">Word or phrase:</label>
-                                <input type="text" id="poetry-term" class="form-control w-auto" placeholder="e.g., sunrise, hope, AI revolution">
-                                <button type="button" onclick="generatePoem()" class="btn btn-dark-bbg">Generate Poem</button>
-                            </form>
+                            <span class="card-title">Event-Driven Volatility Explorer</span>
                         </div>
                         <div class="card-section-vertical">
-                            <div class="chart-area"><div id="poetry-result" class="p-3 rounded mb-2" style="min-height:60px;font-size:1.08rem;color:#183153;background:transparent;"></div></div>
-                            <div id="poetry-attribution" class="text-muted" style="font-size:0.93rem;color:#183153 !important;"></div>
+                            <div class="mb-2" style="color:#183153;font-size:1.04rem;">
+                                <span style="font-size:1.1rem;">📈 <b>rolling volatility</b> reveals when the stock experienced sharp price movements.<br>
+                                📰 <b>Global news headlines</b> are fetched for the same period, capturing real-world context.<br>
+                                🤖 <b>Each headline is scored using AI sentiment analysis</b>, highlighting emotional tone.<br>
+                                🔗 <b>By aligning both, the chart exposes clear correlations between news mood and market stress.</b></span>
+                            </div>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="volatility-controls">
+                                <label for="vol-window" class="form-label mb-0">Rolling Window (days):</label>
+                                <input type="number" id="vol-window" class="form-control w-auto" value="10" min="1" style="max-width:80px;">
+                                <label for="vol-years" class="form-label mb-0">Time Range (years):</label>
+                                <input type="number" id="vol-years" class="form-control w-auto" value="2" min="1" style="max-width:80px;">
+                                <button type="button" onclick="fetchAndRenderVolatilityCorrelation()" class="btn btn-dark-bbg">Fetch & Visualize</button>
+                            </div>
+                            <div class="mb-2" style="width:100%;max-width:700px;">
+                                <div id="volatility-range-slider"></div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <span id="volatility-range-start" style="font-size:0.98rem;"></span>
+                                    <span id="volatility-range-end" style="font-size:0.98rem;"></span>
+                                </div>
+                            </div>
+                            <div class="chart-area"><div id="volatility-correlation-chart"></div></div>
                         </div>
                     </div>
                 </div>
