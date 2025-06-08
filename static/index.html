@@ -8,6 +8,33 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
     <style>
+        body, .card-title, .form-label, .card-body, .card-section-vertical, .mb-2, .mb-3, .mb-4, .market-controls, .explore-controls, .poetry-controls, .d3-tooltip, .chart-area, .container, .row, .col-12, .d-flex, .text-center, .text-muted, .fs-6 {
+            font-family: 'Inter', 'Roboto', Arial, sans-serif !important;
+            color: #183153 !important;
+            font-size: 1rem;
+        }
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #183153 !important;
+            letter-spacing: 0.01em;
+            text-align: left;
+            margin-bottom: 0;
+            line-height: 1.1;
+            text-transform: none;
+            white-space: nowrap;
+        }
+        .form-label {
+            color: #183153 !important;
+            font-weight: 500;
+            font-size: 1rem;
+            margin-bottom: 0;
+            white-space: nowrap;
+        }
+        .d3-tooltip {
+            color: #183153 !important;
+            font-size: 1rem;
+        }
         body { font-family: Inter, Roboto, Arial, sans-serif; background: #fff; color: #222; }
         .container { max-width: 900px; margin: 0 auto; padding-top: 2.5rem; }
         .letsplay-row img { width: 60px; height: 60px; object-fit: cover; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.13); margin-bottom: 4px; }
@@ -18,31 +45,59 @@
         .noUi-tooltip { background: #fff; color: #183153; border-radius: 6px; border: 1px solid #183153; font-size: 0.95em; padding: 2px 8px; }
         select:disabled { background: #f3f3f3; color: #aaa; border-color: #ddd; cursor: not-allowed; }
         .row.g-4 { gap: 1.5rem 0; flex-direction: column; }
-        .card { min-height: 100%; background: #fff; border: 1px solid #e0e0e0; box-shadow: 0 2px 16px rgba(16,26,43,0.07); border-radius: 14px; padding: 1.2rem 1.2rem 1.2rem 1.2rem; display: flex; flex-direction: column; justify-content: stretch; margin-bottom: 1.5rem; }
+        .card { min-height: 100%; background: #fff; border: 1px solid #e0e0e0; box-shadow: 0 2px 16px rgba(16,26,43,0.07); border-radius: 14px; padding: 1.2rem 1.2rem 1.2rem 1.2rem; display: flex; flex-direction: column; justify-content: stretch; margin-bottom: 0.6rem; }
         .card-header-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1.1rem; margin-bottom: 0.7rem; }
-        .card-title { font-family: Inter, Roboto, Arial, sans-serif; font-size: 1.1rem; font-weight: 600; color: #183153; letter-spacing: 0.01em; text-align: left; margin-bottom: 0; line-height: 1.1; text-transform: none; white-space: nowrap; }
-        .card-section-vertical { display: flex; flex-direction: column; gap: 0.7rem; }
-        .chart-area { background: #fff; border-radius: 12px; padding: 0.7rem 0.7rem 0.7rem 0.7rem; min-width: 320px; width: 100%; max-width: 700px; height: 260px; aspect-ratio: unset; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0 auto; }
-        #d3-stock-chart, #d3-stability-chart, #volatility-correlation-chart { width: 100%; height: 100%; min-height: 0; min-width: 0; max-width: 100%; margin: 0 auto; overflow-x: auto; background: transparent; }
+        .card-section-vertical { display: flex; flex-direction: column; gap: 0.4rem; }
+        .chart-area {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.2rem 1.2rem 1.2rem 1.2rem;
+            min-width: 320px;
+            width: 100%;
+            max-width: 900px;
+            height: 340px;
+            aspect-ratio: unset;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            margin: 0 auto;
+        }
+        #d3-stock-chart, #volatility-correlation-chart {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            min-width: 0;
+            max-width: 100%;
+            margin: 0 auto;
+            overflow-x: auto;
+            background: transparent;
+        }
         .market-controls, .explore-controls, .poetry-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; margin-bottom: 0; }
-        .market-controls .form-label, .form-label { color: #222; font-weight: 500; font-size: 1rem; margin-bottom: 0; white-space: nowrap; }
         .btn-dark-bbg { background: #183153; color: #fff; font-weight: 500; border: none; font-size: 1rem; padding: 0.38rem 1.1rem; }
         .btn-dark-bbg:hover { background: #27457c; color: #fff; }
         .btn-outline-secondary { border-color: #183153; color: #183153; background: transparent; font-size: 1rem; padding: 0.38rem 1.1rem; }
         .btn-outline-secondary:hover { background: #183153; color: #fff; }
         .form-select, .form-control { background: #fff; color: #222; border: 1px solid #ccc; font-size: 1rem; }
         .form-select:focus, .form-control:focus { border-color: #183153; box-shadow: 0 0 0 2px #18315333; }
-        .mb-2, .mb-3, .mb-4 { margin-bottom: 1.1rem !important; }
-        .mb-4 { margin-bottom: 1.5rem !important; }
-        .d-flex.align-items-end.gap-2 { gap: 0.5rem; }
+        .mb-2, .mb-3, .mb-4 { margin-bottom: 0.7rem !important; }
+        .mb-4 { margin-bottom: 1.1rem !important; }
+        .d-flex.align-items-end.gap-2 { gap: 0.3rem; }
         .row.g-4 > [class^='col-'] { display: flex; flex-direction: column; }
-        .card-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+        .card-body { flex: 1 1 auto; display: flex; flex-direction: column; padding: 0.6rem 1rem 0.6rem 1rem; }
         .divider { display: none; }
         @media (max-width: 991px) {
-            .container { padding: 1rem; }
-            .card-header-row, .market-controls, .explore-controls, .poetry-controls { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
-            .chart-area { min-width: 0; max-width: 100%; width: 100%; height: 220px; }
+            .container { padding: 0.5rem; }
+            .card-header-row, .market-controls, .explore-controls, .poetry-controls { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+            .chart-area {
+                min-width: 0;
+                max-width: 100%;
+                width: 100%;
+                height: 220px;
+                padding: 0.7rem;
+            }
         }
+        .col-12.d-flex + .col-12.d-flex { margin-top: -0.2rem; }
     </style>
 </head>
 <body>
@@ -126,19 +181,16 @@
                     </div>
                 </div>
             </div>
-            <!-- Event-Driven Volatility Explorer -->
+            <!-- Volatility Explorer -->
             <div class="col-12 d-flex">
                 <div class="card shadow-sm flex-fill d-flex flex-column">
                     <div class="card-body d-flex flex-column">
                         <div class="card-header-row">
-                            <span class="card-title">Event-Driven Volatility Explorer</span>
+                            <span class="card-title">Volatility Explorer</span>
                         </div>
                         <div class="card-section-vertical">
                             <div class="mb-2" style="color:#183153;font-size:1.04rem;">
-                                <span style="font-size:1.1rem;">📈 <b>rolling volatility</b> reveals when the stock experienced sharp price movements.<br>
-                                📰 <b>Global news headlines</b> are fetched for the same period, capturing real-world context.<br>
-                                🤖 <b>Each headline is scored using AI sentiment analysis</b>, highlighting emotional tone.<br>
-                                🔗 <b>By aligning both, the chart exposes clear correlations between news mood and market stress.</b></span>
+                                <span style="font-size:1.1rem;">📈 <b>10-day rolling volatility</b> reveals when the stock experienced sharp price movements.</span>
                             </div>
                             <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="volatility-controls">
                                 <label for="vol-window" class="form-label mb-0">Rolling Window (days):</label>
@@ -155,6 +207,20 @@
                                 </div>
                             </div>
                             <div class="chart-area"><div id="volatility-correlation-chart"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Tweet Sentiment & Volatility Analysis -->
+            <div class="col-12 d-flex">
+                <div class="card shadow-sm flex-fill d-flex flex-column">
+                    <div class="card-body d-flex flex-column">
+                        <div class="card-header-row">
+                            <span class="card-title">Tweet Sentiment & Volatility Analysis</span>
+                            <button type="button" class="btn btn-dark-bbg" onclick="fetchTweetVolatilityAnalysis()">Run Analysis</button>
+                        </div>
+                        <div class="card-section-vertical">
+                            <div id="tweet-volatility-result" class="mb-2" style="font-size:1.05rem;"></div>
                         </div>
                     </div>
                 </div>
