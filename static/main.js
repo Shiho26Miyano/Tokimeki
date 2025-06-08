@@ -78,45 +78,48 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         stockSelect.classList.add('choices-initialized');
     }
+    // Auto-fetch charts when companies or metric/range/window are changed
+    if (stockSelect) {
+        stockSelect.addEventListener('change', function() {
+            window.fetchStockTrends();
+        });
+    }
+    const metricSelect = document.getElementById('metric-select');
+    const rangeSelect = document.getElementById('range-select');
+    const windowSelect = document.getElementById('window-select');
+    if (metricSelect) {
+        metricSelect.addEventListener('change', function() {
+            window.fetchStockTrends();
+        });
+    }
+    if (rangeSelect) {
+        rangeSelect.addEventListener('change', function() {
+            window.fetchStockTrends();
+        });
+    }
+    if (windowSelect) {
+        windowSelect.addEventListener('change', function() {
+            window.fetchStockTrends();
+        });
+    }
 });
 
-// --- Market Overtime (D3 line chart with time range slider) ---
-function setupMarketOvertimeSlider(dates, onChange) {
-    const marketSlider = document.getElementById('market-slider');
-    if (marketSlider.noUiSlider) {
-        marketSlider.noUiSlider.destroy();
-    }
-    d3.select('#market-slider').selectAll('*').remove();
-    if (!dates || dates.length === 0) return;
-    const minTime = new Date(dates[0]).getTime();
-    const maxTime = new Date(dates[dates.length-1]).getTime();
-    const defaultStart = new Date(dates[Math.max(0, dates.length-22)]).getTime(); // ~1 month
-    const defaultEnd = maxTime;
-    noUiSlider.create(marketSlider, {
-        start: [defaultStart, defaultEnd],
-        connect: true,
-        range: { min: minTime, max: maxTime },
-        step: 24 * 60 * 60 * 1000,
-        tooltips: [
-            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
-            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
-        ]
-    });
-    marketSlider.noUiSlider.on('update', function(values) {
-        const startIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[0]));
-        const endIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[1]));
-        onChange(startIdx, endIdx === -1 ? dates.length-1 : endIdx);
-    });
-    // Initial call
-    const startIdx = dates.findIndex(d => new Date(d).getTime() >= defaultStart);
-    const endIdx = dates.length-1;
-    onChange(startIdx, endIdx);
-}
+// Store last fetched data and chart state
+window._marketOvertimeState = {
+    data: null,
+    startIdx: null,
+    endIdx: null,
+    windowSize: null,
+    metric: null,
+    yScale: 'linear',
+    highlightInfo: null
+};
 
 window.fetchStockTrends = function() {
-    console.log('fetchStockTrends called');
     const select = document.getElementById('stock-select');
     const symbols = Array.from(select.selectedOptions).map(opt => opt.value);
+    // Default to 3 years (1095 days)
+    const range = 1095;
     if (!symbols.length) {
         document.getElementById('stock-trends-result').innerText = 'Please select at least one company.';
         d3.select('#d3-stock-chart').selectAll('*').remove();
@@ -124,8 +127,7 @@ window.fetchStockTrends = function() {
         return;
     }
     document.getElementById('stock-trends-result').innerText = 'Loading...';
-    // Fetch up to 1 year of data
-    let url = `/stocks/history?symbols=${symbols.join(',')}&days=365`;
+    let url = `/stocks/history?symbols=${symbols.join(',')}&days=${range}`;
     fetch(url)
         .then(res => res.json())
         .then(data => {
@@ -143,11 +145,13 @@ window.fetchStockTrends = function() {
                 return;
             }
             document.getElementById('stock-trends-result').innerText = '';
-            // Use the dates from the first stock for the slider
             const firstKey = Object.keys(matchedData)[0];
             const allDates = matchedData[firstKey].dates;
             setupMarketOvertimeSlider(allDates, (startIdx, endIdx) => {
-                renderD3MarketOvertimeChart(matchedData, startIdx, endIdx);
+                window._marketOvertimeState.data = matchedData;
+                window._marketOvertimeState.startIdx = startIdx;
+                window._marketOvertimeState.endIdx = endIdx;
+                renderD3StockHistoryChart(matchedData, startIdx, endIdx);
             });
         })
         .catch((err) => {
@@ -158,13 +162,12 @@ window.fetchStockTrends = function() {
         });
 };
 
-function renderD3MarketOvertimeChart(data, startIdx, endIdx) {
+function renderD3StockHistoryChart(data, startIdx, endIdx) {
     d3.select('#d3-stock-chart').selectAll('*').remove();
     const stocks = Object.keys(data);
     if (stocks.length === 0) return;
     const margin = {top: 30, right: 30, bottom: 60, left: 70};
     const chartDiv = document.getElementById('d3-stock-chart');
-    // Use the parent .chart-area for height if available
     const parent = chartDiv.closest('.chart-area') || chartDiv;
     const fullWidth = parent.clientWidth || 700;
     const fullHeight = parent.clientHeight || 340;
@@ -175,7 +178,6 @@ function renderD3MarketOvertimeChart(data, startIdx, endIdx) {
         .attr('width', '100%')
         .attr('height', '100%')
         .attr('viewBox', `0 0 ${fullWidth} ${fullHeight}`);
-    // White background
     svg.append('rect')
         .attr('x', 0)
         .attr('y', 0)
@@ -184,7 +186,6 @@ function renderD3MarketOvertimeChart(data, startIdx, endIdx) {
         .attr('fill', '#fff');
     const g = svg.append('g')
         .attr('transform', `translate(${margin.left},${margin.top})`);
-    // Prepare data for line chart
     let allSeries = [];
     stocks.forEach(name => {
         const info = data[name];
@@ -197,8 +198,7 @@ function renderD3MarketOvertimeChart(data, startIdx, endIdx) {
                     close: +info.closes[startIdx + i],
                     rawDate: date
                 })),
-                open: info.closes[startIdx],
-                close: info.closes[endIdx],
+                closes: info.closes.slice(startIdx, endIdx+1),
                 dates: info.dates.slice(startIdx, endIdx+1)
             });
         }
@@ -265,7 +265,7 @@ function renderD3MarketOvertimeChart(data, startIdx, endIdx) {
     const line = d3.line()
         .x(d => x(d.date))
         .y(d => y(d.close));
-    // Draw lines
+    // Draw lines only (no highlight)
     allSeries.forEach((series, i) => {
         g.append('path')
             .datum(series.values)
@@ -273,19 +273,11 @@ function renderD3MarketOvertimeChart(data, startIdx, endIdx) {
             .attr('stroke', color(series.symbol))
             .attr('stroke-width', 2.5)
             .attr('d', line);
-        // Add label at the end of each line, shift left if near right edge
+        // Add label at the end of each line
         g.append('text')
             .datum(series.values[series.values.length - 1])
-            .attr('transform', d => {
-                const xPos = x(d.date);
-                const rightEdge = width;
-                return `translate(${xPos},${y(d.close)})`;
-            })
-            .attr('x', function(d) {
-                const xPos = x(d.date);
-                const rightEdge = width;
-                return (xPos > rightEdge - 40) ? -40 : 5;
-            })
+            .attr('transform', d => `translate(${x(d.date)},${y(d.close)})`)
+            .attr('x', 5)
             .attr('dy', '0.35em')
             .style('font-size', '13px')
             .style('font-family', 'Inter, Roboto, Arial, sans-serif')
@@ -293,302 +285,66 @@ function renderD3MarketOvertimeChart(data, startIdx, endIdx) {
             .style('fill', color(series.symbol))
             .text(series.symbol);
     });
-    // Tooltip for line chart: show date, open, close
-    const focus = g.append('g').style('display', 'none');
-    focus.append('circle').attr('r', 5).attr('fill', 'black');
-    focus.append('rect')
-        .attr('class', 'tooltip')
-        .attr('width', 140)
-        .attr('height', 54)
-        .attr('x', 10)
-        .attr('y', -32)
-        .attr('rx', 4)
-        .attr('ry', 4)
-        .attr('fill', '#fff')
-        .attr('stroke', '#333');
-    g.append('rect')
-        .attr('width', width)
-        .attr('height', height)
-        .style('fill', 'none')
-        .style('pointer-events', 'all')
-        .on('mouseover', () => focus.style('display', null))
-        .on('mouseout', () => focus.style('display', 'none'))
-        .on('mousemove', function(event) {
-            const mouse = d3.pointer(event, this);
-            const xm = x.invert(mouse[0]);
-            let closest, minDist = Infinity, closestSeries;
-            allSeries.forEach(series => {
-                series.values.forEach((d, idx) => {
-                    const dist = Math.abs(d.date - xm);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        closest = d;
-                        closestSeries = series;
-                        closest.idx = idx;
-                    }
-                });
-            });
-            if (closest && closestSeries) {
-                focus.attr('transform', `translate(${x(closest.date)},${y(closest.close)})`);
-                focus.selectAll('text').remove();
-                focus.append('text').attr('x', 18).attr('y', -12).text(`Date: ${closest.rawDate}`).style('font-family', 'Inter, Roboto, Arial, sans-serif').style('font-size', '13px').style('font-weight', 500);
-                focus.append('text').attr('x', 18).attr('y', 4).text(`Open: ${closestSeries.open.toFixed(2)}`).style('font-family', 'Inter, Roboto, Arial, sans-serif').style('font-size', '13px').style('font-weight', 500);
-                focus.append('text').attr('x', 18).attr('y', 20).text(`Close: ${closestSeries.close.toFixed(2)}`).style('font-family', 'Inter, Roboto, Arial, sans-serif').style('font-size', '13px').style('font-weight', 500);
-            }
-        });
 }
 
-// --- Stock Stability Explorer: D3 chart with slider ---
-function renderD3StabilityChart(dates, closes, windowStart, windowEnd) {
-    d3.select('#d3-stability-chart').selectAll('*').remove();
-    if (!dates || !closes || dates.length === 0) return;
-    const margin = {top: 30, right: 30, bottom: 60, left: 70};
-    const chartDiv = document.getElementById('d3-stability-chart');
-    const parent = chartDiv.closest('.chart-area') || chartDiv;
-    const fullWidth = parent.clientWidth || 700;
-    const fullHeight = parent.clientHeight || 340;
-    const width = fullWidth - margin.left - margin.right;
-    const height = fullHeight - margin.top - margin.bottom;
-    const svg = d3.select('#d3-stability-chart')
-        .append('svg')
-        .attr('width', '100%')
-        .attr('height', '100%')
-        .attr('viewBox', `0 0 ${fullWidth} ${fullHeight}`);
-    // White background
-    svg.append('rect')
-        .attr('x', 0)
-        .attr('y', 0)
-        .attr('width', fullWidth)
-        .attr('height', fullHeight)
-        .attr('fill', '#fff');
-    const g = svg.append('g')
-        .attr('transform', `translate(${margin.left},${margin.top})`);
-    const parseDate = d3.timeParse('%Y-%m-%d');
-    const x = d3.scaleTime()
-        .domain([parseDate(dates[0]), parseDate(dates[dates.length-1])])
-        .range([0, width]);
-    const y = d3.scaleLinear()
-        .domain([d3.min(closes), d3.max(closes)])
-        .nice()
-        .range([height, 0]);
-    // Gridlines
-    g.append('g')
-        .attr('class', 'grid')
-        .call(d3.axisLeft(y)
-            .tickSize(-width)
-            .tickFormat('')
-        )
-        .selectAll('line')
-        .attr('stroke', '#e0e0e0');
-    // Axes
-    g.append('g')
-        .attr('transform', `translate(0,${height})`)
-        .call(d3.axisBottom(x).tickSizeOuter(0))
-        .selectAll('text')
-        .style('font-family', 'Inter, Roboto, Arial, sans-serif')
-        .style('font-weight', 500)
-        .style('fill', '#222');
-    g.append('g')
-        .call(d3.axisLeft(y).tickSizeOuter(0))
-        .selectAll('text')
-        .style('font-family', 'Inter, Roboto, Arial, sans-serif')
-        .style('font-weight', 500)
-        .style('fill', '#222');
-    // X axis label
-    g.append('text')
-        .attr('text-anchor', 'middle')
-        .attr('x', width / 2)
-        .attr('y', height + 40)
-        .style('font-family', 'Inter, Roboto, Arial, sans-serif')
-        .style('font-size', '1rem')
-        .style('fill', '#444')
-        .text('Date');
-    // Y axis label
-    g.append('text')
-        .attr('text-anchor', 'middle')
-        .attr('transform', `rotate(-90)`)
-        .attr('x', -height / 2)
-        .attr('y', -50)
-        .style('font-family', 'Inter, Roboto, Arial, sans-serif')
-        .style('font-size', '1rem')
-        .style('fill', '#444')
-        .text('Price');
-    // Draw full line
-    const lineData = dates.map((d, i) => ({date: parseDate(d), close: closes[i], rawDate: d}));
-    g.append('path')
-        .datum(lineData)
-        .attr('fill', 'none')
-        .attr('stroke', '#2196f3')
-        .attr('stroke-width', 2.5)
-        .attr('d', d3.line()
-            .x(d => x(d.date))
-            .y(d => y(d.close))
-        );
-    // Highlight window
-    if (windowStart !== undefined && windowEnd !== undefined) {
-        g.append('path')
-            .datum(dates.slice(windowStart, windowEnd+1).map((d, i) => ({date: parseDate(d), close: closes[windowStart + i], rawDate: d})))
-            .attr('fill', 'none')
-            .attr('stroke', '#ff69b4')
-            .attr('stroke-width', 4)
-            .attr('d', d3.line()
-                .x(d => x(d.date))
-                .y(d => y(d.close))
-            );
+function setupMarketOvertimeSlider(dates, onChange) {
+    const marketSlider = document.getElementById('market-slider');
+    if (marketSlider.noUiSlider) {
+        marketSlider.noUiSlider.destroy();
     }
-    // Tooltip for line chart: show date, open, close
-    const focus = g.append('g').style('display', 'none');
-    focus.append('circle').attr('r', 5).attr('fill', 'black');
-    focus.append('rect')
-        .attr('class', 'tooltip')
-        .attr('width', 140)
-        .attr('height', 54)
-        .attr('x', 10)
-        .attr('y', -32)
-        .attr('rx', 4)
-        .attr('ry', 4)
-        .attr('fill', '#fff')
-        .attr('stroke', '#333');
-    g.append('rect')
-        .attr('width', width)
-        .attr('height', height)
-        .style('fill', 'none')
-        .style('pointer-events', 'all')
-        .on('mouseover', () => focus.style('display', null))
-        .on('mouseout', () => focus.style('display', 'none'))
-        .on('mousemove', function(event) {
-            const mouse = d3.pointer(event, this);
-            const xm = x.invert(mouse[0]);
-            // Find closest index
-            let minDist = Infinity, idx = 0;
-            lineData.forEach((d, i) => {
-                const dist = Math.abs(d.date - xm);
-                if (dist < minDist) {
-                    minDist = dist;
-                    idx = i;
-                }
-            });
-            const d = lineData[idx];
-            if (d) {
-                focus.attr('transform', `translate(${x(d.date)},${y(d.close)})`);
-                // Open = first price in window, Close = last price in window
-                const open = closes[windowStart];
-                const close = closes[windowEnd];
-                focus.selectAll('text').remove();
-                focus.append('text').attr('x', 18).attr('y', -12).text(`Date: ${dates[idx]}`).style('font-family', 'Inter, Roboto, Arial, sans-serif').style('font-size', '13px').style('font-weight', 500);
-                focus.append('text').attr('x', 18).attr('y', 4).text(`Open: ${open.toFixed(2)}`).style('font-family', 'Inter, Roboto, Arial, sans-serif').style('font-size', '13px').style('font-weight', 500);
-                focus.append('text').attr('x', 18).attr('y', 20).text(`Close: ${close.toFixed(2)}`).style('font-family', 'Inter, Roboto, Arial, sans-serif').style('font-size', '13px').style('font-weight', 500);
-            }
-        });
-}
-
-// --- Stock Stability Explorer logic ---
-window.fetchAndShowExploreCard = function() {
-    const stock = document.getElementById('explore-stock').value;
-    const metric = document.getElementById('explore-metric').value;
-    const days = document.getElementById('explore-range').value;
-    const windowSize = parseInt(document.getElementById('explore-window').value);
-    if (!stock) {
-        document.getElementById('explore-card').innerText = 'Please select a stock.';
-        d3.select('#d3-stability-chart').selectAll('*').remove();
-        d3.select('#stability-slider').selectAll('*').remove();
-        return;
-    }
-    document.getElementById('explore-card').innerText = 'Loading...';
-    fetch(`/stocks/history?symbols=${stock}&days=${days}`)
-        .then(res => res.json())
-        .then(data => {
-            // Find the correct key
-            const key = Object.keys(data).find(k => data[k].symbol === stock && data[k].closes && data[k].closes.length > 0);
-            if (!key) {
-                document.getElementById('explore-card').innerText = 'No data available.';
-                d3.select('#d3-stability-chart').selectAll('*').remove();
-                d3.select('#stability-slider').selectAll('*').remove();
-                return;
-            }
-            const info = data[key];
-            const closes = info.closes;
-            const dates = info.dates;
-            // Default window: last windowSize days
-            let windowEnd = closes.length - 1;
-            let windowStart = Math.max(0, windowEnd - windowSize + 1);
-            renderD3StabilityChart(dates, closes, windowStart, windowEnd);
-            // Add slider
-            d3.select('#stability-slider').selectAll('*').remove();
-            const sliderDiv = document.getElementById('stability-slider');
-            if (sliderDiv.noUiSlider) {
-                sliderDiv.noUiSlider.destroy();
-            }
-            noUiSlider.create(sliderDiv, {
-                start: [windowStart, windowEnd],
-                connect: true,
-                range: { min: 0, max: closes.length - 1 },
-                step: 1,
-                tooltips: [true, true],
-                format: {
-                    to: v => Math.round(v),
-                    from: v => Math.round(v)
-                }
-            });
-            sliderDiv.noUiSlider.on('update', function(values) {
-                windowStart = Number(values[0]);
-                windowEnd = Number(values[1]);
-                if (windowEnd - windowStart < 1) return;
-                renderD3StabilityChart(dates, closes, windowStart, windowEnd);
-                // Calculate and show stability metric
-                let score = 0;
-                if (metric === 'meanabs' || metric === 'maxmeanabs') {
-                    const windowPrices = closes.slice(windowStart, windowEnd+1);
-                    score = windowPrices.length > 1 ? windowPrices.slice(1).reduce((acc, v, i) => acc + Math.abs(v - windowPrices[i]), 0) / (windowPrices.length-1) : 0;
-                } else {
-                    const windowPrices = closes.slice(windowStart, windowEnd+1);
-                    const changes = windowPrices.slice(1).map((v,i)=>v-windowPrices[i]);
-                    score = changes.length > 0 ? Math.sqrt(changes.reduce((acc, v) => acc + v*v, 0) / changes.length) : 0;
-                }
-                document.getElementById('explore-card').innerHTML = `<b>Stability Score:</b> ${score.toFixed(4)}<br><b>Window:</b> ${dates[windowStart]} ~ ${dates[windowEnd]}`;
-            });
-            // Initial metric
-            sliderDiv.noUiSlider.set([windowStart, windowEnd]);
-        })
-        .catch(() => {
-            document.getElementById('explore-card').innerText = 'Error connecting to server.';
-            d3.select('#d3-stability-chart').selectAll('*').remove();
-            d3.select('#stability-slider').selectAll('*').remove();
-        });
-};
-
-window.resetExplorerSection = function() {
-    document.getElementById('explore-stock').selectedIndex = 0;
-    document.getElementById('explore-card').innerText = '';
-    document.getElementById('auto-stability-explanation').innerText = '';
-};
-
-// --- AI Poetry Generator ---
-window.generatePoem = function() {
-    const term = document.getElementById('poetry-term').value.trim();
-    if (!term) {
-        document.getElementById('poetry-result').innerText = 'Please enter a word or phrase.';
-        return;
-    }
-    document.getElementById('poetry-result').innerText = 'Generating...';
-    fetch('/poetry/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ term })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.poem) {
-            document.getElementById('poetry-result').innerText = data.poem.join('\n');
-            document.getElementById('poetry-attribution').innerText = data.source || '';
-        } else {
-            document.getElementById('poetry-result').innerText = data.error || 'Error generating poem.';
-            document.getElementById('poetry-attribution').innerText = '';
-        }
-    })
-    .catch(() => {
-        document.getElementById('poetry-result').innerText = 'Error connecting to server.';
-        document.getElementById('poetry-attribution').innerText = '';
+    d3.select('#market-slider').selectAll('*').remove();
+    if (!dates || dates.length === 0) return;
+    const minTime = new Date(dates[0]).getTime();
+    const maxTime = new Date(dates[dates.length-1]).getTime();
+    const defaultStart = new Date(dates[Math.max(0, dates.length-22)]).getTime(); // ~1 month
+    const defaultEnd = maxTime;
+    noUiSlider.create(marketSlider, {
+        start: [defaultStart, defaultEnd],
+        connect: true,
+        range: { min: minTime, max: maxTime },
+        step: 24 * 60 * 60 * 1000,
+        tooltips: [
+            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
+            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
+        ]
     });
+    marketSlider.noUiSlider.on('update', function(values) {
+        const startIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[0]));
+        const endIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[1]));
+        onChange(startIdx, endIdx === -1 ? dates.length-1 : endIdx);
+    });
+    // Initial call
+    const startIdx = dates.findIndex(d => new Date(d).getTime() >= defaultStart);
+    const endIdx = dates.length-1;
+    onChange(startIdx, endIdx);
+}
+
+window.resetStockTrendsSection = function() {
+    // Reset all filters to default
+    const stockSelect = document.getElementById('stock-select');
+    if (stockSelect && stockSelect.choices) {
+        stockSelect.choices.clearStore();
+    } else if (stockSelect) {
+        Array.from(stockSelect.options).forEach(opt => opt.selected = false);
+    }
+    document.getElementById('metric-select').value = 'std';
+    document.getElementById('range-select').value = '1095';
+    document.getElementById('window-select').value = '20';
+    // Clear chart, legend, and result
+    d3.select('#d3-stock-chart').selectAll('*').remove();
+    d3.select('#d3-metric-chart').selectAll('*').remove();
+    d3.select('#market-slider').selectAll('*').remove();
+    document.getElementById('stock-trends-result').innerText = '';
+    document.getElementById('market-legend').innerHTML = '';
+    // Clear cache/state
+    window._marketOvertimeState = {
+        data: null,
+        startIdx: null,
+        endIdx: null,
+        windowSize: null,
+        metric: null,
+        yScale: 'linear',
+        highlightInfo: null
+    };
 };
   
