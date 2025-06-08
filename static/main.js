@@ -654,13 +654,17 @@ function renderVolatilityCorrelationChart(data) {
             if (highlightStartDate && highlightEndDate) {
                 html += `<span style='color:#ff9800'><b>Lowest Volatility Window:</b><br>${highlightStartDate} to ${highlightEndDate}</span><br>`;
             }
+            // Always show news titles for this date, even if sentiment/event count is N/A
             if (eventTitles && eventTitles[idx] && eventTitles[idx].length > 0) {
                 html += '<hr style="margin:4px 0;">';
-                html += '<b>Top event(s):</b><ul style="margin:0 0 0 1em;padding:0;">';
+                html += '<b>News headlines:</b><ul style="margin:0 0 0 1em;padding:0;">';
                 eventTitles[idx].slice(0,3).forEach(title => {
                     html += `<li>${title}</li>`;
                 });
                 html += '</ul>';
+            } else {
+                html += '<hr style="margin:4px 0;">';
+                html += '<span style="color:#888">No news headlines for this date.</span>';
             }
             tooltip.html(html)
                 .style('left', (event.offsetX + 30) + 'px')
