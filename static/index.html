@@ -4,476 +4,154 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tokimeki</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
     <style>
-        body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 40px; }
-        .main-flex { display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; }
-        .container { background: #fff; padding: 30px; border-radius: 8px; max-width: 400px; min-width: 280px; flex: 1 1 340px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        h2 { text-align: center; }
-        input, textarea { width: 100%; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #ccc; font-size: 1rem; }
-        button { width: 100%; padding: 12px; background: #ff69b4; color: #fff; border: none; border-radius: 4px; font-size: 1.1rem; cursor: pointer; }
-        button:hover { background: #ff1493; }
-        .result { margin-top: 20px; text-align: center; font-size: 1.15rem; color: #333; }
-        /* --- Modern noUiSlider Custom Style --- */
-        .noUi-target {
-            background: #e0e0e0;
-            border-radius: 8px;
-            box-shadow: none;
-            border: none;
-            height: 8px;
-            margin-top: 18px;
-        }
-        .noUi-connect {
-            background: #2196f3;
-            border-radius: 8px;
-            box-shadow: 0 1px 4px rgba(33,150,243,0.08);
-        }
-        .noUi-horizontal .noUi-handle {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #2196f3;
-            border: 2px solid #fff;
-            box-shadow: 0 2px 8px rgba(33,150,243,0.13);
-            top: -5px;
-            cursor: pointer;
-            transition: box-shadow 0.2s;
-        }
-        .noUi-horizontal .noUi-handle:hover {
-            box-shadow: 0 4px 16px rgba(33,150,243,0.18);
-        }
-        .noUi-handle:after, .noUi-handle:before {
-            display: none;
-        }
-        .noUi-tooltip {
-            background: #fff;
-            color: #2196f3;
-            border-radius: 6px;
-            border: 1px solid #2196f3;
-            font-size: 0.95em;
-            box-shadow: 0 1px 4px rgba(33,150,243,0.08);
-            padding: 2px 8px;
-        }
-        /* --- End noUiSlider Custom Style --- */
-        @media (max-width: 900px) {
-            body { padding: 10px; }
-            .main-flex { flex-direction: column; gap: 20px; }
-            .container { max-width: 100%; min-width: 0; padding: 18px; }
-            .image-row { gap: 16px !important; }
-            .letsplay-row { gap: 8px !important; }
-            .letsplay-row img { width: 40px !important; height: 40px !important; }
-            .letsplay-row h1 { font-size: 1.1rem !important; }
-        }
-        @media (max-width: 430px) {
-            h2 { font-size: 1.2rem; }
-            .result { font-size: 1rem; }
-            button, input, textarea { font-size: 0.95rem; }
-            .image-row img { width: 80px !important; height: 80px !important; }
-            .letsplay-row { flex-direction: column !important; gap: 2px !important; }
-            .letsplay-row img { width: 32px !important; height: 32px !important; }
-            .letsplay-row h1 { font-size: 0.95rem !important; }
-        }
-        /* Disabled select style */
-        select:disabled {
-            background: #f3f3f3;
-            color: #aaa;
-            border-color: #ddd;
-            cursor: not-allowed;
+        body { font-family: Inter, Roboto, Arial, sans-serif; background: #fff; color: #222; }
+        .container { max-width: 900px; margin: 0 auto; padding-top: 2.5rem; }
+        .letsplay-row img { width: 60px; height: 60px; object-fit: cover; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.13); margin-bottom: 4px; }
+        .letsplay-row h1 { font-size: 1.5rem; color: #183153; letter-spacing: 0.5px; margin: 0; font-weight: 700; }
+        .noUi-target { background: #e0e0e0; border-radius: 8px; border: none; height: 8px; margin-top: 18px; }
+        .noUi-connect { background: #183153; border-radius: 8px; }
+        .noUi-horizontal .noUi-handle { width: 18px; height: 18px; border-radius: 50%; background: #183153; border: 2px solid #fff; top: -5px; cursor: pointer; }
+        .noUi-tooltip { background: #fff; color: #183153; border-radius: 6px; border: 1px solid #183153; font-size: 0.95em; padding: 2px 8px; }
+        select:disabled { background: #f3f3f3; color: #aaa; border-color: #ddd; cursor: not-allowed; }
+        .row.g-4 { gap: 1.5rem 0; flex-direction: column; }
+        .card { min-height: 100%; background: #fff; border: 1px solid #e0e0e0; box-shadow: 0 2px 16px rgba(16,26,43,0.07); border-radius: 14px; padding: 1.2rem 1.2rem 1.2rem 1.2rem; display: flex; flex-direction: column; justify-content: stretch; margin-bottom: 1.5rem; }
+        .card-header-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1.1rem; margin-bottom: 0.7rem; }
+        .card-title { font-family: Inter, Roboto, Arial, sans-serif; font-size: 1.1rem; font-weight: 600; color: #183153; letter-spacing: 0.01em; text-align: left; margin-bottom: 0; line-height: 1.1; text-transform: none; white-space: nowrap; }
+        .card-section-vertical { display: flex; flex-direction: column; gap: 0.7rem; }
+        .chart-area { background: #fff; border-radius: 12px; padding: 0.7rem 0.7rem 0.7rem 0.7rem; min-width: 320px; width: 100%; max-width: 700px; height: 260px; aspect-ratio: unset; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0 auto; }
+        #d3-stock-chart, #d3-stability-chart { width: 100%; height: 100%; min-height: 0; min-width: 0; max-width: 100%; margin: 0 auto; overflow-x: auto; background: transparent; }
+        .market-controls, .explore-controls, .poetry-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; margin-bottom: 0; }
+        .market-controls .form-label, .form-label { color: #222; font-weight: 500; font-size: 1rem; margin-bottom: 0; white-space: nowrap; }
+        .btn-dark-bbg { background: #183153; color: #fff; font-weight: 500; border: none; font-size: 1rem; padding: 0.38rem 1.1rem; }
+        .btn-dark-bbg:hover { background: #27457c; color: #fff; }
+        .btn-outline-secondary { border-color: #183153; color: #183153; background: transparent; font-size: 1rem; padding: 0.38rem 1.1rem; }
+        .btn-outline-secondary:hover { background: #183153; color: #fff; }
+        .form-select, .form-control { background: #fff; color: #222; border: 1px solid #ccc; font-size: 1rem; }
+        .form-select:focus, .form-control:focus { border-color: #183153; box-shadow: 0 0 0 2px #18315333; }
+        .mb-2, .mb-3, .mb-4 { margin-bottom: 1.1rem !important; }
+        .mb-4 { margin-bottom: 1.5rem !important; }
+        .d-flex.align-items-end.gap-2 { gap: 0.5rem; }
+        .row.g-4 > [class^='col-'] { display: flex; flex-direction: column; }
+        .card-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+        .divider { display: none; }
+        @media (max-width: 991px) {
+            .container { padding: 1rem; }
+            .card-header-row, .market-controls, .explore-controls, .poetry-controls { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+            .chart-area { min-width: 0; max-width: 100%; width: 100%; height: 220px; }
         }
     </style>
 </head>
 <body>
-    <div class="letsplay-row" style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:30px;flex-wrap:wrap;">
-        <div style="text-align:center;min-width:60px;">
-            <img src="static/img/cute.png" alt="Cute" style="width:60px;height:60px;object-fit:cover;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.13);margin-bottom:4px;">
-        </div>
-        <div style="flex:0 1 auto;text-align:center;min-width:180px;">
-            <h1 style="font-size:2.2rem;color:#ff69b4;letter-spacing:1px;margin:0;">Let's PLAY &gt;w&lt;</h1>
-        </div>
-        <div style="text-align:center;min-width:60px;">
-            <img src="static/img/handsome.png" alt="Handsome" style="width:60px;height:60px;object-fit:cover;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.13);margin-bottom:4px;">
-        </div>
-    </div>
-    <div class="main-flex" id="main-sections">
-        <div class="container">
-            <h2>Stock Price Trends</h2>
-            <div style="margin-bottom:10px;font-size:0.95rem;">
-                <label for="stock-select" style="font-size:0.95rem;">Select companies:</label>
-                <select id="stock-select" multiple size="5" style="width:100%;margin-top:5px;font-size:0.95rem;padding:6px;">
-                    <option value="AAPL">Apple (AAPL)</option>
-                    <option value="MSFT">Microsoft (MSFT)</option>
-                    <option value="GOOGL">Google (GOOGL)</option>
-                    <option value="AMZN">Amazon (AMZN)</option>
-                    <option value="META">Meta (META)</option>
-                    <option value="NVDA">Nvidia (NVDA)</option>
-                    <option value="TSLA">Tesla (TSLA)</option>
-                    <option value="NFLX">Netflix (NFLX)</option>
-                    <option value="AMD">AMD (AMD)</option>
-                    <option value="INTC">Intel (INTC)</option>
-                    <option value="BRK-B">Berkshire Hathaway (BRK-B)</option>
-                    <option value="JNJ">Johnson & Johnson (JNJ)</option>
-                    <option value="V">Visa (V)</option>
-                    <option value="JPM">JPMorgan Chase (JPM)</option>
-                    <option value="WMT">Walmart (WMT)</option>
-                    <option value="PG">Procter & Gamble (PG)</option>
-                    <option value="KO">Coca-Cola (KO)</option>
-                    <option value="XOM">Exxon Mobil (XOM)</option>
-                    <option value="SPY">S&P 500 ETF (SPY)</option>
-                    <option value="QQQ">Nasdaq 100 ETF (QQQ)</option>
-                    <option value="VOO">S&P 500 ETF (VOO)</option>
-                    <option value="ARKK">ARK Innovation ETF (ARKK)</option>
-                    <option value="EEM">Emerging Markets ETF (EEM)</option>
-                    <option value="XLF">Financial Select Sector SPDR (XLF)</option>
-                    <option value="ES=F">S&P 500 E-mini (ES=F)</option>
-                    <option value="NQ=F">Nasdaq 100 E-mini (NQ=F)</option>
-                    <option value="YM=F">Dow Jones E-mini (YM=F)</option>
-                    <option value="RTY=F">Russell 2000 E-mini (RTY=F)</option>
-                    <option value="MES=F">Micro E-mini S&P 500 (MES=F)</option>
-                    <option value="MNQ=F">Micro E-mini Nasdaq 100 (MNQ=F)</option>
-                    <option value="MYM=F">Micro E-mini Dow (MYM=F)</option>
-                    <option value="M2K=F">Micro E-mini Russell 2000 (M2K=F)</option>
-                    <option value="GC=F">Gold (GC=F)</option>
-                    <option value="SI=F">Silver (SI=F)</option>
-                    <option value="CL=F">Crude Oil WTI (CL=F)</option>
-                    <option value="BZ=F">Brent Oil (BZ=F)</option>
-                    <option value="NG=F">Natural Gas (NG=F)</option>
-                    <option value="HG=F">Copper (HG=F)</option>
-                    <option value="ZC=F">Corn (ZC=F)</option>
-                    <option value="ZS=F">Soybeans (ZS=F)</option>
-                    <option value="ZW=F">Wheat (ZW=F)</option>
-                    <option value="VX=F">VIX (VX=F)</option>
-                    <option value="BTC=F">Bitcoin Futures (BTC=F)</option>
-                    <option value="ETH=F">Ethereum Futures (ETH=F)</option>
-                </select>
-                <div style="margin-top:8px;">
-                    <label for="scale-select" style="font-size:0.95rem;">Y-Axis Scale:</label>
-                    <select id="scale-select" style="margin-left:8px;font-size:0.95rem;padding:4px;">
-                        <option value="linear">Linear</option>
-                        <option value="logarithmic">Log</option>
-                    </select>
-                </div>
+    <div class="container py-4">
+        <div class="letsplay-row d-flex align-items-center justify-content-center gap-3 mb-4 flex-wrap">
+            <div class="text-center">
+                <img src="static/img/cute.png" alt="Cute">
             </div>
-            
-            <div style="display:flex;gap:8px;margin-bottom:10px;">
-                <button onclick="fetchStockTrends()" style="background:#ff69b4;color:#fff;border:none;padding:4px 16px;border-radius:5px;font-size:0.97rem;height:32px;">Apply</button>
-                <button onclick="resetStockTrendsSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:4px 16px;border-radius:5px;height:32px;">Reset</button>
+            <div class="flex-grow-1 text-center">
+                <h1>Let's PLAY &gt;w&lt;</h1>
             </div>
-            <div id="stock-trends-result" style="margin-top:16px;font-size:0.97rem;"></div>
-            <div style="width:100%;max-width:350px;margin:0 auto;">
-                <canvas id="stockChartMulti" width="350" height="350" style="display:none;background:#fff;border-radius:12px;"></canvas>
-            </div>
-            <!-- Prediction Button and Result -->
-            <div style="margin-top:10px;text-align:center;">
-                <button onclick="predictStockMove()" style="background:#2196f3;color:#fff;border:none;padding:8px 16px;border-radius:5px;font-size:0.97rem;">Predict Tomorrow's Move</button>
-                <div style="margin-top:8px;">
-                    <label for="predict-days" style="font-size:0.97rem;">Days Ahead:</label>
-                    <input id="predict-days" type="number" min="1" max="30" value="1" style="width:60px;margin-left:8px;">
-                </div>
-                <div style="margin-top:8px;">
-                    <label for="predict-factor" style="font-size:0.97rem;">Manual Factor:</label>
-                    <select id="predict-factor" style="width:280px;margin-left:8px;">
-                        <option value="">None</option>
-                        <option value="covid">COVID-19 Pandemic</option>
-                        <option value="ukraine_war">Russia-Ukraine War</option>
-                        <option value="us_china_trade">US-China Trade War</option>
-                        <option value="tech_layoffs">Major Tech Layoffs</option>
-                        <option value="rate_hike">US Interest Rate Hike</option>
-                        <option value="bank_crisis">Banking Crisis (SVB, etc.)</option>
-                        <option value="ai_boom">AI Boom</option>
-                        <option value="debt_ceiling">US Debt Ceiling Crisis</option>
-                        <option value="inflation">Inflation Surge</option>
-                        <option value="supply_chain">Supply Chain Crisis</option>
-                        <option value="rate_cut">Fed Rate Cut</option>
-                        <option value="stimulus">Major Stimulus Package</option>
-                        <option value="med_breakthrough">Breakthrough Medical News</option>
-                        <option value="peace_treaty">Peace Treaty Signed</option>
-                        <option value="tech_breakthrough">Tech Breakthrough</option>
-                        <option value="jobs_report">Strong Jobs Report</option>
-                        <option value="record_earnings">Record Corporate Earnings</option>
-                        <option value="trade_deal">Trade Deal Signed</option>
-                        <option value="inflation_drop">Inflation Drops Sharply</option>
-                        <option value="tax_cut">Major Tax Cut</option>
-                        <option value="recovery">Global Economic Recovery</option>
-                        <option value="confidence_surge">Consumer Confidence Surge</option>
-                    </select>
-                </div>
-                <div id="stock-move-prediction" style="margin-top:8px;font-size:1.05rem;color:#333;"></div>
-            </div>
-            
-            <!-- Time Range Slider -->
-            <div style="margin-top:15px;margin-bottom:15px;font-size:0.95rem;">
-                <label style="display:block;margin-bottom:5px;">Time Range (max 3 years):</label>
-                <div id="time-range-slider"></div>
-                <div style="display:flex;justify-content:space-between;margin-top:5px;">
-                    <span id="time-range-start">Start: -</span>
-                    <span id="time-range-end">End: -</span>
-                </div>
+            <div class="text-center">
+                <img src="static/img/handsome.png" alt="Handsome">
             </div>
         </div>
-        <div class="container">
-            <h2>Largest Stock Price Change</h2>
-            <div style="margin-bottom:10px;font-size:0.95rem;">
-                <label for="maxchange-stock-select" style="font-size:0.95rem;">Select companies:</label>
-                <select id="maxchange-stock-select" multiple size="5" style="width:100%;margin-top:5px;font-size:0.95rem;padding:6px;">
-                    <option value="AAPL">Apple (AAPL)</option>
-                    <option value="MSFT">Microsoft (MSFT)</option>
-                    <option value="GOOGL">Google (GOOGL)</option>
-                    <option value="AMZN">Amazon (AMZN)</option>
-                    <option value="META">Meta (META)</option>
-                    <option value="NVDA">Nvidia (NVDA)</option>
-                    <option value="TSLA">Tesla (TSLA)</option>
-                    <option value="NFLX">Netflix (NFLX)</option>
-                    <option value="AMD">AMD (AMD)</option>
-                    <option value="INTC">Intel (INTC)</option>
-                    <option value="BRK-B">Berkshire Hathaway (BRK-B)</option>
-                    <option value="JNJ">Johnson & Johnson (JNJ)</option>
-                    <option value="V">Visa (V)</option>
-                    <option value="JPM">JPMorgan Chase (JPM)</option>
-                    <option value="WMT">Walmart (WMT)</option>
-                    <option value="PG">Procter & Gamble (PG)</option>
-                    <option value="KO">Coca-Cola (KO)</option>
-                    <option value="XOM">Exxon Mobil (XOM)</option>
-                    <option value="SPY">S&P 500 ETF (SPY)</option>
-                    <option value="QQQ">Nasdaq 100 ETF (QQQ)</option>
-                    <option value="VOO">S&P 500 ETF (VOO)</option>
-                    <option value="ARKK">ARK Innovation ETF (ARKK)</option>
-                    <option value="EEM">Emerging Markets ETF (EEM)</option>
-                    <option value="XLF">Financial Select Sector SPDR (XLF)</option>
-                    <option value="ES=F">S&P 500 E-mini (ES=F)</option>
-                    <option value="NQ=F">Nasdaq 100 E-mini (NQ=F)</option>
-                    <option value="YM=F">Dow Jones E-mini (YM=F)</option>
-                    <option value="RTY=F">Russell 2000 E-mini (RTY=F)</option>
-                    <option value="MES=F">Micro E-mini S&P 500 (MES=F)</option>
-                    <option value="MNQ=F">Micro E-mini Nasdaq 100 (MNQ=F)</option>
-                    <option value="MYM=F">Micro E-mini Dow (MYM=F)</option>
-                    <option value="M2K=F">Micro E-mini Russell 2000 (M2K=F)</option>
-                    <option value="GC=F">Gold (GC=F)</option>
-                    <option value="SI=F">Silver (SI=F)</option>
-                    <option value="CL=F">Crude Oil WTI (CL=F)</option>
-                    <option value="BZ=F">Brent Oil (BZ=F)</option>
-                    <option value="NG=F">Natural Gas (NG=F)</option>
-                    <option value="HG=F">Copper (HG=F)</option>
-                    <option value="ZC=F">Corn (ZC=F)</option>
-                    <option value="ZS=F">Soybeans (ZS=F)</option>
-                    <option value="ZW=F">Wheat (ZW=F)</option>
-                    <option value="VX=F">VIX (VX=F)</option>
-                    <option value="BTC=F">Bitcoin Futures (BTC=F)</option>
-                    <option value="ETH=F">Ethereum Futures (ETH=F)</option>
-                </select>
-            </div>
-            
-            <!-- Time Range Slider -->
-            <div style="margin-bottom:15px;font-size:0.95rem;">
-                <label style="display:block;margin-bottom:5px;">Time Range (max 3 years):</label>
-                <div id="maxchange-time-range-slider"></div>
-                <div style="display:flex;justify-content:space-between;margin-top:5px;">
-                    <span id="maxchange-time-range-start">Start: -</span>
-                    <span id="maxchange-time-range-end">End: -</span>
-                </div>
-            </div>
-            
-            <div style="display:flex;gap:8px;margin-bottom:10px;">
-                <button onclick="fetchMaxChange()" style="background:#ff69b4;color:#fff;border:none;padding:4px 16px;border-radius:5px;font-size:0.97rem;height:32px;">Apply</button>
-                <button onclick="resetMaxChangeSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:4px 16px;border-radius:5px;height:32px;">Reset</button>
-            </div>
-            <div id="maxchange-result" style="margin-top:16px;font-size:0.97rem;"></div>
-        </div>
-        <div class="container">
-            <h2>Stock Problems Playground</h2>
-            <div style="margin-bottom:10px;font-size:0.95rem;">
-                <label for="lc-problem" style="font-size:0.95rem;">Select Problem:</label>
-                <select id="lc-problem" style="width:100%;margin-top:5px;font-size:0.95rem;padding:6px;" onchange="updateLcInputs()">
-                    <option value="121">121. Best Time to Buy and Sell Stock (One transaction)</option>
-                    <option value="122">122. Best Time to Buy and Sell Stock II (Unlimited transactions)</option>
-                    <option value="123">123. Best Time to Buy and Sell Stock III (At most two transactions)</option>
-                    <option value="188">188. Best Time to Buy and Sell Stock IV (At most k transactions)</option>
-                    <option value="309">309. Best Time to Buy and Sell Stock with Cooldown</option>
-                    <option value="714">714. Best Time to Buy and Sell Stock with Transaction Fee</option>
-                </select>
-            </div>
-            <div style="margin-bottom:10px;font-size:0.95rem;">
-                <label for="lc-prices" style="font-size:0.95rem;">Prices (comma-separated):</label>
-                <input id="lc-prices" type="text" style="width:100%;font-size:0.95rem;padding:6px;" placeholder="e.g. 7,1,5,3,6,4">
-            </div>
-            <div id="lc-k-div" style="margin-bottom:10px;display:none;font-size:0.95rem;">
-                <label for="lc-k" style="font-size:0.95rem;">k (number of transactions):</label>
-                <input id="lc-k" type="number" min="1" max="10" value="2" style="width:100px;font-size:0.95rem;padding:6px;">
-            </div>
-            <div id="lc-fee-div" style="margin-bottom:10px;display:none;font-size:0.95rem;">
-                <label for="lc-fee" style="font-size:0.95rem;">Transaction Fee:</label>
-                <input id="lc-fee" type="number" min="0" value="0" style="width:100px;font-size:0.95rem;padding:6px;">
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:10px;">
-                <button onclick="solveLcStock()" style="background:#ff69b4;color:#fff;border:none;padding:4px 16px;border-radius:5px;font-size:0.97rem;height:32px;">Apply</button>
-                <button onclick="resetLcStockSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:4px 16px;border-radius:5px;height:32px;">Reset</button>
-            </div>
-            <div style="margin-top:10px;text-align:center;">
-                <div id="lc-code-toggle" style="display:inline-block;background:#f7f7f7;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-bottom:8px;">
-                    <button id="btn-py" onclick="setLcCodeLang('py')" style="border:none;background:#ff69b4;color:#fff;padding:6px 18px;font-size:1rem;cursor:pointer;outline:none;">Python</button>
-                    <button id="btn-cpp" onclick="setLcCodeLang('cpp')" style="border:none;background:#eee;color:#333;padding:6px 18px;font-size:1rem;cursor:pointer;outline:none;">C++</button>
-                </div>
-            </div>
-            <div id="lc-result" style="margin-top:8px;font-size:0.97rem;"></div>
-        </div>
-        <div class="container">
-            <h2>Find the Most Stable Stock</h2>
-            <div style="margin-bottom:10px;font-size:0.97rem;color:#444;background:#f7f7fa;padding:10px 14px 10px 14px;border-radius:7px;margin-bottom:18px;line-height:1.6;">
-                <b>How to use:</b> <br>
-                1. Choose a <b>Stability Metric</b>, <b>Time Range</b>, and <b>Window Size</b>.<br>
-                2. Click <b>Find Most Stable Stocks</b> to see the top results.<br>
-                3. Use the <b>slider</b> in each result card to analyze different windows and see their scores.<br>
-                <span style="color:#888;font-size:0.95em;">Tip: You can compare different metrics, time ranges, and window sizes for deeper insights.</span>
-            </div>
-            <div style="margin-bottom:10px;font-size:0.95rem;">
-                <label style="font-size:0.95rem;">Stability Metric:</label>
-                <select id="stable-metric" style="margin-left:8px;font-size:0.95rem;padding:4px;">
-                    <option value="std">Lowest Standard Deviation (Most Stable)</option>
-                    <option value="meanabs">Lowest Mean Absolute Change (Most Stable)</option>
-                    <option value="maxstd">Highest Standard Deviation (Most Unstable)</option>
-                    <option value="maxmeanabs">Highest Mean Absolute Change (Most Unstable)</option>
-                </select>
-                <label style="margin-left:18px;font-size:0.95rem;">Time Range:</label>
-                <select id="stable-range" style="margin-left:8px;font-size:0.95rem;padding:4px;">
-                    <option value="90">3 months</option>
-                    <option value="180">6 months</option>
-                    <option value="365">1 year</option>
-                    <option value="730">2 years</option>
-                    <option value="1095" selected>3 years</option>
-                </select>
-                <label style="margin-left:18px;font-size:0.95rem;">Window Size:</label>
-                <select id="stable-window" style="margin-left:8px;font-size:0.95rem;padding:4px;">
-                    <option value="5">5 days</option>
-                    <option value="10">10 days</option>
-                    <option value="20" selected>20 days</option>
-                    <option value="30">30 days</option>
-                    <option value="60">60 days</option>
-                </select>
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:10px;">
-                <button onclick="fetchStableChange()" style="background:#ff69b4;color:#fff;border:none;padding:4px 16px;border-radius:5px;font-size:0.97rem;height:32px;">Apply</button>
-                <button onclick="resetStableSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:4px 16px;border-radius:5px;height:32px;">Reset</button>
-            </div>
-            <div id="stable-cards" style="margin-top:16px;"></div>
-        </div>
-        <div class="container">
-            <h2>Stock Stability Explorer</h2>
-            <div style="margin-bottom:10px;font-size:0.95rem;">
-                <label for="explore-stock" style="font-size:0.95rem;">Select a Stock:</label>
-                <select id="explore-stock" style="margin-left:8px;font-size:0.95rem;padding:4px;min-width:160px;">
-                    <option value="">-- Select --</option>
-                </select>
-                <label style="margin-left:18px;font-size:0.95rem;">Stability Metric:</label>
-                <select id="explore-metric" style="margin-left:8px;font-size:0.95rem;padding:4px;" disabled>
-                    <option value="std">Lowest Standard Deviation</option>
-                    <option value="meanabs">Lowest Mean Absolute Change</option>
-                    <option value="maxstd">Highest Standard Deviation (Most Unstable)</option>
-                    <option value="maxmeanabs">Highest Mean Absolute Change (Most Unstable)</option>
-                </select>
-                <label style="margin-left:18px;font-size:0.95rem;">Time Range:</label>
-                <select id="explore-range" style="margin-left:8px;font-size:0.95rem;padding:4px;">
-                    <option value="90">3 months</option>
-                    <option value="180">6 months</option>
-                    <option value="365">1 year</option>
-                    <option value="730">2 years</option>
-                    <option value="1095" selected>3 years</option>
-                </select>
-                <label style="margin-left:18px;font-size:0.95rem;">Window Size:</label>
-                <select id="explore-window" style="margin-left:8px;font-size:0.95rem;padding:4px;">
-                    <option value="5">5 days</option>
-                    <option value="10">10 days</option>
-                    <option value="20" selected>20 days</option>
-                    <option value="30">30 days</option>
-                    <option value="60">60 days</option>
-                </select>
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:10px;">
-                <button onclick="fetchAndShowExploreCard()" style="background:#2196f3;color:#fff;border:none;padding:4px 16px;border-radius:5px;font-size:0.97rem;height:32px;">Apply</button>
-                <button onclick="resetExplorerSection()" style="background:#eee;color:#333;border:1px solid #ccc;padding:4px 16px;border-radius:5px;height:32px;">Reset</button>
-            </div>
-            <div id="explore-card" style="margin-top:16px;"></div>
-            <div id="auto-stability-explanation" style="margin-top:24px;font-size:1.07rem;color:#444;"></div>
-        </div>
-        <div class="container">
-            <h2>Mood Analyzer</h2>
-            <div style="margin-bottom:10px;font-size:0.97rem;color:#444;background:#f7f7fa;padding:10px 14px 10px 14px;border-radius:7px;margin-bottom:18px;line-height:1.6;">
-                <b>Track Your Daily Mood:</b> <br>
-                1. Record your daily mood (1-10) and notes.<br>
-                2. View trends in your mood over time.<br>
-                3. Analyze patterns to improve your well-being.<br>
-                <span style="color:#888;font-size:0.95em;">Tip: Regular mood tracking can help identify factors that affect your emotional state.</span>
-            </div>
-            
-            <!-- Mood Entry Form -->
-            <div style="margin-bottom:20px;padding:15px;background:#f5f5f5;border-radius:8px;">
-                <h3 style="margin-top:0;margin-bottom:12px;font-size:1.1rem;">Record Today's Mood</h3>
-                <div style="margin-bottom:15px;">
-                    <label for="mood-date" style="display:block;margin-bottom:5px;font-size:0.95rem;">Date:</label>
-                    <input type="date" id="mood-date" style="width:100%;padding:8px;border-radius:4px;border:1px solid #ccc;">
-                </div>
-                <div style="margin-bottom:15px;">
-                    <label style="display:block;margin-bottom:5px;font-size:0.95rem;">Mood Score (1-10):</label>
-                    <div style="display:flex;align-items:center;">
-                        <input type="range" id="mood-score" min="1" max="10" value="5" style="flex-grow:1;margin-right:10px;">
-                        <span id="mood-score-display" style="font-size:1.1rem;font-weight:bold;min-width:30px;text-align:center;">5</span>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;margin-top:3px;">
-                        <span style="font-size:0.8rem;color:#888;">Poor</span>
-                        <span style="font-size:0.8rem;color:#888;">Excellent</span>
+        <div class="row g-4 justify-content-center align-items-stretch">
+            <!-- Market Overtime -->
+            <div class="col-12 d-flex">
+                <div class="card shadow-sm flex-fill d-flex flex-column">
+                    <div class="card-body d-flex flex-column">
+                        <div class="card-header-row flex-column align-items-stretch" style="gap:0.5rem;">
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <label for="stock-select" class="form-label">Select companies:</label>
+                                <select id="stock-select" class="form-select" multiple>
+                                    <option value="AAPL">Apple (AAPL)</option>
+                                    <option value="MSFT">Microsoft (MSFT)</option>
+                                    <option value="GOOGL">Google (GOOGL)</option>
+                                    <option value="AMZN">Amazon (AMZN)</option>
+                                    <option value="META">Meta (META)</option>
+                                    <option value="NVDA">Nvidia (NVDA)</option>
+                                    <option value="TSLA">Tesla (TSLA)</option>
+                                    <option value="NFLX">Netflix (NFLX)</option>
+                                    <option value="AMD">AMD (AMD)</option>
+                                    <option value="INTC">Intel (INTC)</option>
+                                    <option value="BRK-B">Berkshire Hathaway (BRK-B)</option>
+                                    <option value="JNJ">Johnson & Johnson (JNJ)</option>
+                                    <option value="V">Visa (V)</option>
+                                    <option value="JPM">JPMorgan Chase (JPM)</option>
+                                    <option value="WMT">Walmart (WMT)</option>
+                                    <option value="PG">Procter & Gamble (PG)</option>
+                                    <option value="KO">Coca-Cola (KO)</option>
+                                    <option value="XOM">Exxon Mobil (XOM)</option>
+                                    <option value="SPY">S&P 500 ETF (SPY)</option>
+                                    <option value="QQQ">Nasdaq 100 ETF (QQQ)</option>
+                                    <option value="VOO">S&P 500 ETF (VOO)</option>
+                                    <option value="ARKK">ARK Innovation ETF (ARKK)</option>
+                                    <option value="EEM">Emerging Markets ETF (EEM)</option>
+                                    <option value="XLF">Financial Select Sector SPDR (XLF)</option>
+                                    <option value="ES=F">S&P 500 E-mini (ES=F)</option>
+                                    <option value="NQ=F">Nasdaq 100 E-mini (NQ=F)</option>
+                                    <option value="YM=F">Dow Jones E-mini (YM=F)</option>
+                                    <option value="RTY=F">Russell 2000 E-mini (RTY=F)</option>
+                                    <option value="MES=F">Micro E-mini S&P 500 (MES=F)</option>
+                                    <option value="MNQ=F">Micro E-mini Nasdaq 100 (MNQ=F)</option>
+                                    <option value="MYM=F">Micro E-mini Dow (MYM=F)</option>
+                                    <option value="M2K=F">Micro E-mini Russell 2000 (M2K=F)</option>
+                                    <option value="GC=F">Gold (GC=F)</option>
+                                    <option value="SI=F">Silver (SI=F)</option>
+                                    <option value="CL=F">Crude Oil WTI (CL=F)</option>
+                                    <option value="BZ=F">Brent Oil (BZ=F)</option>
+                                    <option value="NG=F">Natural Gas (NG=F)</option>
+                                    <option value="HG=F">Copper (HG=F)</option>
+                                    <option value="ZC=F">Corn (ZC=F)</option>
+                                    <option value="ZS=F">Soybeans (ZS=F)</option>
+                                    <option value="ZW=F">Wheat (ZW=F)</option>
+                                    <option value="VX=F">VIX (VX=F)</option>
+                                    <option value="BTC=F">Bitcoin Futures (BTC=F)</option>
+                                    <option value="ETH=F">Ethereum Futures (ETH=F)</option>
+                                </select>
+                            </div>
+                            <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+                                <!-- Remove Metric, Range, Window controls, Apply, Reset -->
+                            </div>
+                            <div id="market-legend" class="mb-2" style="font-size:1rem;color:#183153;font-weight:500;"></div>
+                        </div>
+                        <div class="card-section-vertical">
+                            <div id="stock-trends-result" class="mb-2"></div>
+                            <div id="market-slider" class="mb-2"></div>
+                            <div class="chart-area"><div id="d3-stock-chart"></div></div>
+                        </div>
                     </div>
                 </div>
-                <div style="margin-bottom:15px;">
-                    <label for="mood-note" style="display:block;margin-bottom:5px;font-size:0.95rem;">Notes:</label>
-                    <textarea id="mood-note" placeholder="How do you feel today? What factors affected your mood?" style="width:100%;padding:8px;border-radius:4px;border:1px solid #ccc;min-height:80px;"></textarea>
-                </div>
-                <div style="margin-bottom:15px;">
-                    <label for="mood-tags" style="display:block;margin-bottom:5px;font-size:0.95rem;">Tags (comma-separated):</label>
-                    <input type="text" id="mood-tags" placeholder="e.g., work, exercise, family" style="width:100%;padding:8px;border-radius:4px;border:1px solid #ccc;">
-                </div>
-                <button onclick="saveMoodEntry()" style="background:#ff69b4;color:#fff;border:none;padding:8px 16px;border-radius:5px;font-size:0.97rem;width:100%;">Save Mood Entry</button>
             </div>
-            
-            <!-- Mood Analysis Section -->
-            <div>
-                <h3 style="margin-top:0;margin-bottom:12px;font-size:1.1rem;">Mood Analysis</h3>
-                
-                <!-- Date Range Selection -->
-                <div style="margin-bottom:15px;font-size:0.95rem;">
-                    <label style="display:block;margin-bottom:5px;">Analyze Time Period:</label>
-                    <div id="mood-time-range-slider"></div>
-                    <div style="display:flex;justify-content:space-between;margin-top:5px;">
-                        <span id="mood-time-range-start">Start: -</span>
-                        <span id="mood-time-range-end">End: -</span>
+            <!-- AI Poetry Generator -->
+            <div class="col-12 d-flex">
+                <div class="card shadow-sm flex-fill d-flex flex-column">
+                    <div class="card-body d-flex flex-column">
+                        <div class="card-header-row">
+                            <span class="card-title">AI Poetry Generator <span class="fs-6 text-muted" style="color:#183153 !important; font-size:1rem; font-weight:400;">(Powered by HuggingFace GPT-2)</span></span>
+                            <form class="poetry-controls d-flex flex-wrap align-items-center gap-2">
+                                <label for="poetry-term" class="form-label mb-0">Word or phrase:</label>
+                                <input type="text" id="poetry-term" class="form-control w-auto" placeholder="e.g., sunrise, hope, AI revolution">
+                                <button type="button" onclick="generatePoem()" class="btn btn-dark-bbg">Generate Poem</button>
+                            </form>
+                        </div>
+                        <div class="card-section-vertical">
+                            <div class="chart-area"><div id="poetry-result" class="p-3 rounded mb-2" style="min-height:60px;font-size:1.08rem;color:#183153;background:transparent;"></div></div>
+                            <div id="poetry-attribution" class="text-muted" style="font-size:0.93rem;color:#183153 !important;"></div>
+                        </div>
                     </div>
                 </div>
-                
-                <button onclick="analyzeMood()" style="background:#2196f3;color:#fff;border:none;padding:8px 16px;border-radius:5px;font-size:0.97rem;width:100%;margin-bottom:15px;">Analyze Mood Data</button>
-                
-                <!-- Mood Chart -->
-                <div style="width:100%;max-width:350px;margin:0 auto 20px auto;">
-                    <canvas id="moodChart" width="350" height="250" style="display:none;background:#fff;border-radius:12px;"></canvas>
-                </div>
-                
-                <!-- Mood Statistics -->
-                <div id="mood-stats" style="margin-bottom:20px;"></div>
-                
-                <!-- Mood Entries List -->
-                <div id="mood-entries" style="margin-top:20px;"></div>
             </div>
-        </div>
-        <div class="container" id="poetry-section">
-            <h2>AI Poetry Generator <span style="font-size:1rem;color:#888;">(Powered by HuggingFace GPT-2)</span></h2>
-            <div style="margin-bottom:12px;">
-                <label for="poetry-term" style="font-size:0.97rem;">Enter a word or phrase:</label>
-                <input type="text" id="poetry-term" placeholder="e.g., sunrise, hope, AI revolution" style="width:260px;padding:7px 10px;margin-left:8px;border-radius:4px;border:1px solid #ccc;font-size:1rem;">
-                <button onclick="generatePoem()" style="background:#7e57c2;color:#fff;border:none;padding:7px 18px;border-radius:5px;font-size:0.97rem;margin-left:8px;">Generate Poem</button>
-            </div>
-            <div id="poetry-result" style="background:#f7f7fa;padding:15px 18px;border-radius:8px;min-height:60px;font-size:1.08rem;color:#333;"></div>
-            <div id="poetry-attribution" style="margin-top:8px;font-size:0.93rem;color:#888;"></div>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <script src="static/main.js"></script>
 </body>
 </html> 
