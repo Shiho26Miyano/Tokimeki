@@ -1,6 +1,7 @@
 # Tokimeki
 
-Tokimeki is a web app hosting interactive stock analysis tools! This project is a playground for experimenting with stock data, price trends, and volatility analysis.
+Tokimeki is a modern, interactive dashboard for exploring stock trends, volatility, and human sentiment analysis using real financial and social data.
+An ongoing project exploring emerging technologies, open-source APIs, and modern frameworks to integrate AI/ML into real-world software development.
 
 ## Live Demo
 

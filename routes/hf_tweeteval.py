@@ -74,7 +74,7 @@ def analyze_tweet():
     q = Queue()
     p = Process(target=blocking_inference, args=(text, q))
     p.start()
-    p.join(30)  # Timeout after 30 seconds
+    p.join(2000)  # Timeout after 2000 seconds
     if p.is_alive():
         p.terminate()
         return jsonify({"error": "Processing timed out."}), 500
