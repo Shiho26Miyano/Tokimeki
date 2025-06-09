@@ -559,9 +559,22 @@ function renderVolatilityCorrelationChart(data) {
                     .attr('stroke-width', 2.5)
                     .attr('opacity', 0.95)
                     .attr('d', highlightLine);
-                // Persistent label for the highlight window
-                highlightLabelX = x(highlightDates[highlightDates.length - 1]) + 18;
-                highlightLabelY = yLeft(highlightVols[highlightVols.length - 1]) - 25;
+                // Find the horizontal center and highest point of the highlight segment
+                let minY = highlightVols[0];
+                let maxY = highlightVols[0];
+                for (let i = 1; i < highlightVols.length; i++) {
+                    if (highlightVols[i] < minY) minY = highlightVols[i];
+                    if (highlightVols[i] > maxY) maxY = highlightVols[i];
+                }
+                // Center X between start and end of highlight segment
+                let centerIdx = Math.floor((highlightDates.length - 1) / 2);
+                let labelX = x(highlightDates[centerIdx]);
+                let labelY = yLeft(maxY) - 40; // 40px above the highest point of the orange line
+                labelX = Math.max(labelX, 60); // Clamp to left
+                labelX = Math.min(labelX, width - 100); // Clamp to right
+                labelY = Math.max(labelY, 20); // Clamp to top
+                highlightLabelX = labelX;
+                highlightLabelY = labelY;
                 highlightLabelText = 'Lowest Volatility';
                 // Draw background rectangle for label
                 const textPadding = 4;
