@@ -285,6 +285,63 @@ function renderD3StockHistoryChart(data, startIdx, endIdx) {
             .style('fill', color(series.symbol))
             .text(series.symbol);
     });
+    // --- Tooltip logic for Market Overtime ---
+    const tooltip = d3.select('#d3-stock-chart')
+        .append('div')
+        .attr('class', 'd3-tooltip')
+        .style('position', 'absolute')
+        .style('background', '#fff')
+        .style('border', '1px solid #183153')
+        .style('border-radius', '8px')
+        .style('padding', '10px 14px')
+        .style('pointer-events', 'none')
+        .style('font-size', '1rem')
+        .style('color', '#183153')
+        .style('box-shadow', '0 2px 8px rgba(24,49,83,0.13)')
+        .style('display', 'none');
+    svg.append('rect')
+        .attr('x', margin.left)
+        .attr('y', margin.top)
+        .attr('width', width)
+        .attr('height', height)
+        .attr('fill', 'none')
+        .attr('pointer-events', 'all')
+        .on('mousemove', function(event) {
+            const [mx] = d3.pointer(event, this);
+            const x0 = x.invert(mx - margin.left);
+            // Find closest point across all series
+            let closest = null, minDist = Infinity;
+            allSeries.forEach(series => {
+                series.values.forEach(d => {
+                    const dist = Math.abs(d.date - x0);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closest = { ...d, symbol: series.symbol };
+                    }
+                });
+            });
+            if (!closest) return;
+            g.selectAll('.hover-dot').remove();
+            g.append('circle')
+                .attr('class', 'hover-dot')
+                .attr('cx', x(closest.date))
+                .attr('cy', y(closest.close))
+                .attr('r', 6)
+                .attr('fill', color(closest.symbol))
+                .attr('stroke', '#183153')
+                .attr('stroke-width', 2);
+            let html = `<b>${d3.timeFormat('%Y-%m-%d')(closest.date)}</b><br>`;
+            html += `Symbol: <b>${closest.symbol}</b><br>`;
+            html += `Price: <b>${closest.close.toFixed(2)}</b>`;
+            tooltip.html(html)
+                .style('left', (event.offsetX + 30) + 'px')
+                .style('top', (event.offsetY - 30) + 'px')
+                .style('display', 'block');
+        })
+        .on('mouseleave', function() {
+            tooltip.style('display', 'none');
+            g.selectAll('.hover-dot').remove();
+        });
 }
 
 function setupMarketOvertimeSlider(dates, onChange) {
@@ -617,9 +674,6 @@ function renderVolatilityCorrelationChart(data) {
                     html += `<li>${title}</li>`;
                 });
                 html += '</ul>';
-            } else {
-                html += '<hr style="margin:4px 0;">';
-                html += '<span style="color:#888">No news headlines for this date.</span>';
             }
             tooltip.html(html)
                 .style('left', (event.offsetX + 30) + 'px')
@@ -634,26 +688,120 @@ function renderVolatilityCorrelationChart(data) {
 
 window.fetchTweetVolatilityAnalysis = function() {
     const resultDiv = document.getElementById('tweet-volatility-result');
-    resultDiv.innerHTML = 'Running analysis...';
-    fetch('/tweet_volatility_analysis')
+    resultDiv.innerHTML = 'Loading HuggingFace tweet_eval sample...';
+    fetch('/hf_tweeteval_sample')
         .then(res => res.json())
         .then(data => {
-            if (data.error) {
-                resultDiv.innerHTML = `<span style='color:#c00;'>${data.error}</span>`;
-                return;
-            }
-            let html = `<b>Accuracy:</b> ${(data.accuracy * 100).toFixed(2)}%<br>`;
-            html += `<b>F1 Score:</b> ${data.f1_score.toFixed(2)}<br>`;
-            html += `<b>Feature Importances:</b><ul style='margin:0 0 0 1em;'>`;
-            html += `<li>Mean Sentiment: ${(data.feature_importances.mean_sentiment * 100).toFixed(1)}%</li>`;
-            html += `<li>Mean Retweets: ${(data.feature_importances.mean_retweets * 100).toFixed(1)}%</li>`;
-            html += `</ul>`;
-            html += `<b>Days Analyzed:</b> ${data.n_days}<br>`;
-            html += `<b>Summary:</b> <span style='color:#183153;'>${data.summary}</span>`;
-            resultDiv.innerHTML = html;
+            resultDiv.innerHTML = `<pre style='font-size:1.05rem;color:#183153;background:#f7f7fa;padding:0.7em;border-radius:8px;'>${JSON.stringify(data, null, 2)}</pre>`;
         })
         .catch(err => {
             resultDiv.innerHTML = `<span style='color:#c00;'>Error: ${err}</span>`;
         });
 };
+
+// --- React Tweet Sentiment Component ---
+(function() {
+  const e = React.createElement;
+
+  function TweetSentiment() {
+    const [text, setText] = React.useState("");
+    const [result, setResult] = React.useState(null);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState(null);
+
+    const placeholderText = "Today I watch a movie called Whiplash. Love the quote There are no two words in the English language more harmful than 'good job.'";
+
+    const handleSubmit = async (ev, customText) => {
+      if (ev) ev.preventDefault();
+      setLoading(true);
+      setError(null);
+      setResult(null);
+      try {
+        let toAnalyze = typeof customText === 'string' ? customText : text;
+        const usedPlaceholder = !toAnalyze || !toAnalyze.trim();
+        if (usedPlaceholder) {
+          toAnalyze = placeholderText;
+        }
+        const resp = await fetch("/analyze_tweet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: toAnalyze })
+        });
+        if (!resp.ok) throw new Error("API error");
+        const data = await resp.json();
+        setResult(data);
+        if (!usedPlaceholder) {
+          setText(toAnalyze);
+        }
+      } catch (err) {
+        setError("Could not analyze tweet. Try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return e('div', { className: 'card shadow-sm p-4', style: { maxWidth: 500, margin: '0 auto' } },
+      e('h3', { className: 'card-title mb-3', style: { color: '#183153' } }, 'Human Sentiment Explorer'),
+      e('div', { style: { color: '#888', fontSize: '0.97em', marginBottom: '0.7em' } }, 'Model: DistilBERT (distilbert-base-uncased-finetuned-sst-2-english)'),
+      e('form', { onSubmit: handleSubmit },
+        e('div', { className: 'mb-3' },
+          e('label', { htmlFor: 'tweet-input', className: 'form-label' }, 'Enter your sentence:'),
+          e('textarea', {
+            id: 'tweet-input',
+            className: 'form-control',
+            rows: 2,
+            value: text,
+            onChange: ev => setText(ev.target.value),
+            placeholder: placeholderText
+          })
+        ),
+        e('button', { type: 'submit', className: 'btn btn-dark-bbg', disabled: loading }, loading ? 'Analyzing...' : 'Analyze')
+      ),
+      error && e('div', { className: 'alert alert-danger mt-3' }, error),
+      result && e('div', { className: 'alert alert-info mt-3' },
+        e('div', null, e('b', null, 'Sentiment: '), result.label),
+        e('div', null, e('b', null, 'Confidence: '), (result.confidence * 100).toFixed(1) + '%'),
+        (() => {
+          const match = result.explanation && result.explanation.match(/Top contributing words: (.*)\./);
+          if (match && match[1]) {
+            const stopwords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'if', 'in', 'on', 'at', 'to', 'of', 'for', 'with', 'is', 'it', 'this', 'that', 'these', 'those', 'as', 'by', 'from', 'be', 'are', 'was', 'were', 'word', 'words', 'i', 'you', 'he', 'she', 'they', 'we', 'me', 'my', 'your', 'his', 'her', 'their', 'our', 'so', 'do', 'does', 'did', 'not', 'no', 'yes', 'can', 'will', 'just', 'have', 'has', 'had', 'been', 'being', 'am', 'up', 'down', 'out', 'about', 'into', 'over', 'after', 'before', 'more', 'most', 'some', 'such', 'only', 'own', 'same', 'other', 'than', 'too', 'very', 's', 't', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', 'couldn', 'didn', 'doesn', 'hadn', 'hasn', 'haven', 'isn', 'ma', 'mightn', 'mustn', 'needn', 'shan', 'shouldn', 'wasn', 'weren', 'won', 'wouldn']);
+            const words = match[1].replace(/'/g, '').split(',').map(w => w.trim()).filter(w => w && w !== '[CLS]' && !stopwords.has(w.toLowerCase()));
+            if (words.length > 0) {
+              const sentiment = result.label.toLowerCase();
+              let reason = '';
+              if (sentiment === 'positive') {
+                reason = `The model thinks this is positive because it sees ${words.join(', ')} as happy or enjoyable words.`;
+              } else if (sentiment === 'negative') {
+                reason = `The model thinks this is negative because it sees ${words.join(', ')} as unhappy or problematic words.`;
+              } else {
+                reason = `The model thinks this is neutral because it sees ${words.join(', ')} as neither strongly positive nor negative.`;
+              }
+              return e('div', { className: 'mt-2', style: { color: '#183153', fontStyle: 'italic', fontSize: '0.98em' } }, reason);
+            }
+          }
+          return null;
+        })(),
+        result.similar_example && (() => {
+          // Check overlap between user input and example
+          const userWords = new Set(text.toLowerCase().split(/\s+/));
+          const exampleWords = new Set(result.similar_example.text.toLowerCase().split(/\s+/));
+          const overlap = Array.from(userWords).filter(w => exampleWords.has(w)).length;
+          if (overlap > 0) {
+            return e('div', { className: 'mt-3', style: { background: '#f7f7fa', borderRadius: '8px', padding: '0.7em', border: '1px solid #e0e0e0' } },
+              e('div', { style: { fontWeight: 600, color: '#183153' } }, 'Similar example from dataset:'),
+              e('div', { style: { color: '#222', marginTop: '0.2em' } }, `"${result.similar_example.text}"`),
+              e('div', { style: { color: '#888', fontSize: '0.97em', marginTop: '0.1em' } }, `Label: ${result.similar_example.label}`)
+            );
+          }
+          return null;
+        })()
+      )
+    );
+  }
+
+  const root = document.getElementById('react-tweet-sentiment');
+  if (root && window.React && window.ReactDOM) {
+    ReactDOM.createRoot(root).render(React.createElement(TweetSentiment));
+  }
+})();
   

@@ -25,6 +25,10 @@ def fetch_tweets(query, max_results=100):
         "tweet.fields": "created_at,public_metrics"
     }
     response = requests.get(url, headers=headers, params=params)
+    print("Twitter API status:", response.status_code)
+    print("Twitter API response:", response.text)
+    if response.status_code == 429:
+        return 'RATE_LIMIT'
     tweets = []
     if response.status_code == 200:
         for tweet in response.json().get("data", []):
@@ -45,6 +49,8 @@ def clean_tweet(text):
 @tweet_bp.route('/tweet_volatility_analysis', methods=['GET'])
 def tweet_volatility_analysis():
     tweets = fetch_tweets("Tesla", 100)
+    if tweets == 'RATE_LIMIT':
+        return jsonify({'error': 'Twitter API rate limit exceeded. Please wait and try again later.'}), 429
     if not tweets:
         return jsonify({'error': 'No tweets found.'}), 400
     for t in tweets:
