@@ -199,52 +199,9 @@ def volatility_event_correlation():
                 min_vol_date = valid_dates[min_idx]
     except Exception as e:
         return jsonify({'error': f'Error fetching stock data: {str(e)}'}), 500
-    # Step 2: Fetch Yahoo Finance news articles using BeautifulSoup
-    try:
-        articles = fetch_yahoo_news(symbol)
-        logger.info(f"[DEBUG] Yahoo News: Total fetched for {symbol}: {len(articles)}")
-    except Exception as e:
-        return jsonify({'error': f'Error fetching Yahoo Finance news: {str(e)}'}), 500
-    # Step 3: Analyze event sentiment (DistilBERT)
-    try:
-        nlp = pipeline('sentiment-analysis', model='distilbert-base-uncased-finetuned-sst-2-english')
-        texts = [event['title'] for event in articles]
-        sentiments = []
-        if texts:
-            results = nlp(texts)
-            for event, result in zip(articles, results):
-                event['sentiment'] = result['score'] * (1 if result['label'] == 'POSITIVE' else -1)
-        else:
-            for event in articles:
-                event['sentiment'] = 0
-    except Exception as e:
-        return jsonify({'error': f'Error running sentiment model: {str(e)}'}), 500
-    # Step 4: Align volatility and sentiment by date
-    date_to_events = {}
-    date_to_titles = {}
-    for event in articles:
-        d = event['date']
-        if d not in date_to_events:
-            date_to_events[d] = []
-            date_to_titles[d] = []
-        date_to_events[d].append(event['sentiment'])
-        if event['title']:
-            date_to_titles[d].append(event['title'])
-    avg_sentiment = []
-    event_count = []
-    event_titles = []
-    for d in dates:
-        sents = date_to_events.get(d, [])
-        titles = date_to_titles.get(d, [])
-        if sents:
-            avg_sentiment.append(float(np.mean(sents)))
-            event_count.append(len(sents))
-            event_titles.append(titles)
-        else:
-            avg_sentiment.append(None)
-            event_count.append(0)
-            event_titles.append([])
-    # At the end, add min_vol and min_vol_date to the response
+    # Remove event/news/sentiment fetching and alignment
+    event_count = [0 for _ in dates]
+    event_titles = [[] for _ in dates]
     return jsonify({
         'dates': dates,
         'volatility': rolling_vol,
@@ -253,26 +210,6 @@ def volatility_event_correlation():
         'min_vol': min_vol,
         'min_vol_date': min_vol_date
     })
-
-def fetch_yahoo_news(ticker, max_articles=20):
-    url = f'https://finance.yahoo.com/quote/{ticker}/news?p={ticker}'
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    resp = requests.get(url, headers=headers)
-    soup = BeautifulSoup(resp.text, 'html.parser')
-    articles = []
-    for item in soup.select('li[data-test-locator=\"mega\"]'):
-        title_tag = item.find('h3')
-        link_tag = item.find('a')
-        time_tag = item.find('time')
-        if title_tag and link_tag and time_tag:
-            title = title_tag.text.strip()
-            url = 'https://finance.yahoo.com' + link_tag['href']
-            date_str = time_tag['datetime']
-            date = datetime.fromisoformat(date_str.replace('Z', '+00:00')).strftime('%Y-%m-%d')
-            articles.append({'date': date, 'title': title, 'url': url})
-        if len(articles) >= max_articles:
-            break
-    return articles
 
 # Add any additional helpers or mock data generators as needed
 
