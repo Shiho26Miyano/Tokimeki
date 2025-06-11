@@ -5,6 +5,7 @@ from transformers import AutoTokenizer, pipeline
 from transformers_interpret import SequenceClassificationExplainer
 import numpy as np
 from multiprocessing import Process, Queue
+import time
 
 hf_tweeteval_bp = Blueprint('hf_tweeteval', __name__)
 
@@ -13,9 +14,25 @@ classifier = pipeline("sentiment-analysis", model="distilbert-base-uncased-finet
 tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
 dataset = load_dataset("tweet_eval", "sentiment", split="train")
 
-# Move blocking_inference to top level
-def blocking_inference(text, q):
+# Model cache for dynamic selection
+MODEL_CACHE = {}
+
+# Helper to get or load a model pipeline
+def get_classifier(model_name):
+    if model_name not in MODEL_CACHE:
+        MODEL_CACHE[model_name] = pipeline("sentiment-analysis", model=model_name)
+    return MODEL_CACHE[model_name]
+
+ALLOWED_MODELS = [
+    "distilbert-base-uncased-finetuned-sst-2-english",
+    "nreimers/TinyBERT_L-4_H-312_A-12-SST2",
+    "cardiffnlp/twitter-roberta-base-sentiment-latest"
+]
+
+def blocking_inference(text, model_name, q):
     try:
+        start_time = time.time()
+        classifier = get_classifier(model_name)
         result = classifier(text)[0]
         label = result["label"]
         confidence = result["score"]
@@ -40,12 +57,15 @@ def blocking_inference(text, q):
                 "text": best_match["text"],
                 "label": label_map.get(best_match["label"], str(best_match["label"]))
             }
+        elapsed = time.time() - start_time
         q.put({
             "text": text,
             "label": label,
             "confidence": confidence,
             "explanation": explanation,
-            "similar_example": similar_example
+            "similar_example": similar_example,
+            "inference_time": elapsed,
+            "model": model_name
         })
     except Exception as e:
         logging.exception("Error in analyze_tweet blocking_inference")
@@ -69,10 +89,13 @@ def hf_tweeteval_sample():
 def analyze_tweet():
     data = request.get_json()
     text = data.get("text", "")
+    model_name = data.get("model", "distilbert-base-uncased-finetuned-sst-2-english")
+    if model_name not in ALLOWED_MODELS:
+        return jsonify({"error": "Invalid model name."}), 400
     if not text:
         return jsonify({"error": "No text provided."}), 400
     q = Queue()
-    p = Process(target=blocking_inference, args=(text, q))
+    p = Process(target=blocking_inference, args=(text, model_name, q))
     p.start()
     p.join(2000)  # Timeout after 2000 seconds
     if p.is_alive():

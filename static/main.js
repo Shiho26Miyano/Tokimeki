@@ -721,6 +721,12 @@ window.fetchTweetVolatilityAnalysis = function() {
     const [result, setResult] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
+    const [model, setModel] = React.useState("distilbert-base-uncased-finetuned-sst-2-english");
+    const modelExplanations = {
+      "distilbert-base-uncased-finetuned-sst-2-english": "DistilBERT is a lightweight, fast transformer model fine-tuned on SST-2 for general English sentiment analysis.",
+      "nreimers/TinyBERT_L-4_H-312_A-12-SST2": "TinyBERT (NReimers) is a compact transformer model fine-tuned on SST-2 for efficient English sentiment analysis.",
+      "cardiffnlp/twitter-roberta-base-sentiment-latest": "Twitter-RoBERTa is a RoBERTa model specifically trained for sentiment analysis on tweets and social media text."
+    };
 
     const placeholderText = "Today I watch a movie called Whiplash. Love the quote There are no two words in the English language more harmful than 'good job.'";
 
@@ -757,6 +763,21 @@ window.fetchTweetVolatilityAnalysis = function() {
       e('h3', { className: 'card-title mb-3', style: { color: '#183153' } }, 'Human Sentiment Explorer'),
       e('div', { style: { color: '#888', fontSize: '0.97em', marginBottom: '0.7em' } }, 'Model: DistilBERT (distilbert-base-uncased-finetuned-sst-2-english)'),
       e('form', { onSubmit: handleSubmit },
+        e('div', { className: 'mb-3' },
+          e('label', { htmlFor: 'model-select', className: 'form-label', style: { fontWeight: 500 } }, 'Choose model:'),
+          e('select', {
+            id: 'model-select',
+            className: 'form-select',
+            value: model,
+            onChange: ev => setModel(ev.target.value),
+            style: { maxWidth: 350, marginBottom: 8 }
+          },
+            e('option', { value: 'distilbert-base-uncased-finetuned-sst-2-english' }, 'DistilBERT (default)'),
+            e('option', { value: 'nreimers/TinyBERT_L-4_H-312_A-12-SST2' }, 'TinyBERT (NReimers, SST-2)'),
+            e('option', { value: 'cardiffnlp/twitter-roberta-base-sentiment-latest' }, 'Twitter-RoBERTa (CardiffNLP)')
+          ),
+          e('div', { style: { color: '#888', fontSize: '0.97em', marginTop: 2, minHeight: 24 } }, modelExplanations[model])
+        ),
         e('div', { className: 'mb-3' },
           e('label', { htmlFor: 'tweet-input', className: 'form-label' }, 'Enter your sentence:'),
           e('textarea', {
