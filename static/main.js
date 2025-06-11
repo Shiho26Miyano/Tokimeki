@@ -838,4 +838,105 @@ window.fetchTweetVolatilityAnalysis = function() {
     ReactDOM.createRoot(root).render(React.createElement(TweetSentiment));
   }
 })();
+
+(function() {
+  const e = React.createElement;
+
+  function PaymentForm() {
+    const [amount, setAmount] = React.useState(10.00);
+    const [method, setMethod] = React.useState('mock');
+    const [card, setCard] = React.useState({number: '', expiry: '', cvc: ''});
+    const [loading, setLoading] = React.useState(false);
+    const [result, setResult] = React.useState(null);
+    const [error, setError] = React.useState(null);
+
+    const handleSubmit = async (ev) => {
+      ev.preventDefault();
+      setLoading(true);
+      setResult(null);
+      setError(null);
+      try {
+        const resp = await fetch('/pay', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ amount, method, card })
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.error) throw new Error(data.error || 'Payment failed');
+        setResult(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return e('div', { className: 'card shadow-sm p-4 mt-4', style: { maxWidth: 500, margin: '0 auto' } },
+      e('h3', { className: 'card-title mb-3', style: { color: '#183153' } }, 'Payment Demo'),
+      e('form', { onSubmit: handleSubmit },
+        e('div', { className: 'mb-3' },
+          e('label', { htmlFor: 'amount-input', className: 'form-label' }, 'Amount ($):'),
+          e('input', {
+            id: 'amount-input',
+            className: 'form-control',
+            type: 'number',
+            min: 0.5,
+            step: 0.01,
+            value: amount,
+            onChange: ev => setAmount(ev.target.value)
+          })
+        ),
+        e('div', { className: 'mb-3' },
+          e('label', { className: 'form-label' }, 'Payment Method:'),
+          e('select', {
+            className: 'form-select',
+            value: method,
+            onChange: ev => setMethod(ev.target.value)
+          },
+            e('option', { value: 'mock' }, 'Demo/Mock'),
+            e('option', { value: 'card' }, 'Credit Card (future)'),
+            e('option', { value: 'paypal' }, 'PayPal (future)')
+          )
+        ),
+        method === 'card' && e('div', { className: 'mb-3' },
+          e('label', { className: 'form-label' }, 'Card Details:'),
+          e('input', {
+            className: 'form-control mb-2',
+            type: 'text',
+            placeholder: 'Card Number',
+            value: card.number,
+            onChange: ev => setCard({ ...card, number: ev.target.value })
+          }),
+          e('div', { className: 'd-flex gap-2' },
+            e('input', {
+              className: 'form-control',
+              type: 'text',
+              placeholder: 'MM/YY',
+              value: card.expiry,
+              onChange: ev => setCard({ ...card, expiry: ev.target.value })
+            }),
+            e('input', {
+              className: 'form-control',
+              type: 'text',
+              placeholder: 'CVC',
+              value: card.cvc,
+              onChange: ev => setCard({ ...card, cvc: ev.target.value })
+            })
+          )
+        ),
+        e('button', { type: 'submit', className: 'btn btn-dark-bbg', disabled: loading }, loading ? 'Processing...' : 'Pay Now')
+      ),
+      error && e('div', { className: 'alert alert-danger mt-3' }, error),
+      result && e('div', { className: 'alert alert-success mt-3' },
+        e('div', null, e('b', null, 'Payment Status: '), result.status),
+        result.txn_id && e('div', null, e('b', null, 'Transaction ID: '), result.txn_id)
+      )
+    );
+  }
+
+  const root = document.getElementById('react-payment-form');
+  if (root && window.React && window.ReactDOM) {
+    ReactDOM.createRoot(root).render(React.createElement(PaymentForm));
+  }
+})();
   
