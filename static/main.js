@@ -873,6 +873,8 @@ window.fetchTweetVolatilityAnalysis = function() {
 
     return e('div', { className: 'card shadow-sm p-4 mt-4', style: { maxWidth: 500, margin: '0 auto' } },
       e('h3', { className: 'card-title mb-3', style: { color: '#183153' } }, 'Payment Demo'),
+      e('div', { style: { color: '#b85c00', fontSize: '0.98em', marginBottom: '0.3em', fontStyle: 'italic' } }, 'Fraud is everywhere, watch out your $$$'),
+      e('div', { style: { color: '#c00', fontSize: '0.97em', marginBottom: '0.7em', fontStyle: 'italic' } }, 'This site is a playground demo. Do not enter real payment information.'),
       e('form', { onSubmit: handleSubmit },
         e('div', { className: 'mb-3' },
           e('label', { htmlFor: 'amount-input', className: 'form-label' }, 'Amount ($):'),
@@ -929,7 +931,19 @@ window.fetchTweetVolatilityAnalysis = function() {
       error && e('div', { className: 'alert alert-danger mt-3' }, error),
       result && e('div', { className: 'alert alert-success mt-3' },
         e('div', null, e('b', null, 'Payment Status: '), result.status),
-        result.txn_id && e('div', null, e('b', null, 'Transaction ID: '), result.txn_id)
+        result.txn_id && e('div', null, e('b', null, 'Transaction ID: '), result.txn_id),
+        result.offer && e('div', { className: 'mt-3 p-3', style: { background: '#f7f7fa', borderRadius: 8, border: '1px solid #e0e0e0' } },
+          e('div', { style: { fontWeight: 600, color: '#183153', fontSize: '1.08em' } }, result.offer.title),
+          e('div', { style: { color: '#444', marginTop: 2 } }, result.offer.desc)
+        ),
+        result.is_anomaly && e('div', { className: 'alert alert-warning mt-3' },
+          'This payment is unusually large compared to your history.'
+        ),
+        result.stats && e('div', { className: 'mt-3', style: { color: '#183153', fontSize: '0.98em', background: '#f7f7fa', borderRadius: 8, padding: '0.7em', border: '1px solid #e0e0e0' } },
+          e('div', null, e('b', null, 'Total payments: '), result.stats.total_payments),
+          e('div', null, e('b', null, 'Average amount: $'), result.stats.avg_amount.toFixed(2)),
+          e('div', null, e('b', null, 'Most common method: '), result.stats.most_common_method)
+        )
       )
     );
   }
