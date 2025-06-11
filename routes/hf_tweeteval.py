@@ -6,6 +6,7 @@ from transformers_interpret import SequenceClassificationExplainer
 import numpy as np
 from multiprocessing import Process, Queue
 import time
+import uuid
 
 hf_tweeteval_bp = Blueprint('hf_tweeteval', __name__)
 
@@ -107,4 +108,21 @@ def analyze_tweet():
             return jsonify(result), 500
         return jsonify(result)
     else:
-        return jsonify({"error": "No result returned from process."}), 500 
+        return jsonify({"error": "No result returned from process."}), 500
+
+pay_bp = Blueprint('pay', __name__)
+
+@pay_bp.route('/pay', methods=['POST'])
+def pay():
+    data = request.get_json()
+    amount = data.get('amount')
+    method = data.get('method')
+    if method == 'mock':
+        return jsonify({
+            'status': 'success',
+            'txn_id': str(uuid.uuid4()),
+            'amount': amount,
+            'method': method
+        })
+    else:
+        return jsonify({'status': 'error', 'error': 'Only mock payments are supported in demo.'}), 400 
