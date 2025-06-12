@@ -839,30 +839,89 @@ window.fetchTweetVolatilityAnalysis = function() {
   }
 })();
 
+// ... existing code ...
 (function() {
   const e = React.createElement;
 
-  function PaymentForm() {
-    const [amount, setAmount] = React.useState(10.00);
-    const [method, setMethod] = React.useState('mock');
-    const [card, setCard] = React.useState({number: '', expiry: '', cvc: ''});
-    const [loading, setLoading] = React.useState(false);
-    const [result, setResult] = React.useState(null);
+  function SpeechRecorder() {
+    const models = [
+      { value: 'HuggingFaceH4/zephyr-7b-beta', label: 'Zephyr-7B (HF4)' },
+      { value: 'google/gemma-7b-it', label: 'Gemma-7B (Google)' },
+      { value: 'bigscience/bloomz-7b1', label: 'Bloomz-7B1 (BigScience)' }
+    ];
+    const [model, setModel] = React.useState(models[0].value);
+    const [recording, setRecording] = React.useState(false);
+    const [transcript, setTranscript] = React.useState("");
     const [error, setError] = React.useState(null);
+    const [result, setResult] = React.useState(null);
+    const [loading, setLoading] = React.useState(false);
+    const [timer, setTimer] = React.useState(0);
+    const recognitionRef = React.useRef(null);
+    const timerRef = React.useRef(null);
 
-    const handleSubmit = async (ev) => {
-      ev.preventDefault();
-      setLoading(true);
-      setResult(null);
+    React.useEffect(() => {
+      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        setError('Speech recognition is not supported in this browser.');
+        return;
+      }
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = true;
+      recognition.continuous = false;
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          interimTranscript += event.results[i][0].transcript;
+        }
+        setTranscript(interimTranscript);
+      };
+      recognition.onerror = (event) => {
+        setError('Speech recognition error: ' + event.error);
+        setRecording(false);
+        clearInterval(timerRef.current);
+        setTimer(0);
+      };
+      recognition.onend = () => {
+        setRecording(false);
+        clearInterval(timerRef.current);
+        setTimer(0);
+      };
+      recognitionRef.current = recognition;
+    }, []);
+
+    const handleAsk = () => {
       setError(null);
+      setTranscript("");
+      setResult(null);
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+        setRecording(true);
+        setTimer(60);
+        timerRef.current = setInterval(() => {
+          setTimer(t => {
+            if (t <= 1) {
+              if (recognitionRef.current) recognitionRef.current.stop();
+              clearInterval(timerRef.current);
+              return 0;
+            }
+            return t - 1;
+          });
+        }, 1000);
+      }
+    };
+    const handleSend = async () => {
+      setError(null);
+      setResult(null);
+      setLoading(true);
       try {
-        const resp = await fetch('/pay', {
+        const resp = await fetch('/analyze_speech_request', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ amount, method, card })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: transcript, model })
         });
         const data = await resp.json();
-        if (!resp.ok || data.error) throw new Error(data.error || 'Payment failed');
+        if (!resp.ok || data.error) throw new Error(data.error || 'Analysis failed');
         setResult(data);
       } catch (err) {
         setError(err.message);
@@ -871,86 +930,50 @@ window.fetchTweetVolatilityAnalysis = function() {
       }
     };
 
-    return e('div', { className: 'card shadow-sm p-4 mt-4', style: { maxWidth: 500, margin: '0 auto' } },
-      e('h3', { className: 'card-title mb-3', style: { color: '#183153' } }, 'Payment Demo'),
-      e('div', { style: { color: '#b85c00', fontSize: '0.98em', marginBottom: '0.3em', fontStyle: 'italic' } }, 'Fraud is everywhere, watch out your $$$'),
-      e('div', { style: { color: '#c00', fontSize: '0.97em', marginBottom: '0.7em', fontStyle: 'italic' } }, 'This site is a playground demo. Do not enter real payment information.'),
-      e('form', { onSubmit: handleSubmit },
-        e('div', { className: 'mb-3' },
-          e('label', { htmlFor: 'amount-input', className: 'form-label' }, 'Amount ($):'),
-          e('input', {
-            id: 'amount-input',
-            className: 'form-control',
-            type: 'number',
-            min: 0.5,
-            step: 0.01,
-            value: amount,
-            onChange: ev => setAmount(ev.target.value)
-          })
-        ),
-        e('div', { className: 'mb-3' },
-          e('label', { className: 'form-label' }, 'Payment Method:'),
-          e('select', {
-            className: 'form-select',
-            value: method,
-            onChange: ev => setMethod(ev.target.value)
-          },
-            e('option', { value: 'mock' }, 'Demo/Mock'),
-            e('option', { value: 'card' }, 'Credit Card (future)'),
-            e('option', { value: 'paypal' }, 'PayPal (future)')
-          )
-        ),
-        method === 'card' && e('div', { className: 'mb-3' },
-          e('label', { className: 'form-label' }, 'Card Details:'),
-          e('input', {
-            className: 'form-control mb-2',
-            type: 'text',
-            placeholder: 'Card Number',
-            value: card.number,
-            onChange: ev => setCard({ ...card, number: ev.target.value })
-          }),
-          e('div', { className: 'd-flex gap-2' },
-            e('input', {
-              className: 'form-control',
-              type: 'text',
-              placeholder: 'MM/YY',
-              value: card.expiry,
-              onChange: ev => setCard({ ...card, expiry: ev.target.value })
-            }),
-            e('input', {
-              className: 'form-control',
-              type: 'text',
-              placeholder: 'CVC',
-              value: card.cvc,
-              onChange: ev => setCard({ ...card, cvc: ev.target.value })
-            })
-          )
-        ),
-        e('button', { type: 'submit', className: 'btn btn-dark-bbg', disabled: loading }, loading ? 'Processing...' : 'Pay Now')
-      ),
-      error && e('div', { className: 'alert alert-danger mt-3' }, error),
-      result && e('div', { className: 'alert alert-success mt-3' },
-        e('div', null, e('b', null, 'Payment Status: '), result.status),
-        result.txn_id && e('div', null, e('b', null, 'Transaction ID: '), result.txn_id),
-        result.offer && e('div', { className: 'mt-3 p-3', style: { background: '#f7f7fa', borderRadius: 8, border: '1px solid #e0e0e0' } },
-          e('div', { style: { fontWeight: 600, color: '#183153', fontSize: '1.08em' } }, result.offer.title),
-          e('div', { style: { color: '#444', marginTop: 2 } }, result.offer.desc)
-        ),
-        result.is_anomaly && e('div', { className: 'alert alert-warning mt-3' },
-          'This payment is unusually large compared to your history.'
-        ),
-        result.stats && e('div', { className: 'mt-3', style: { color: '#183153', fontSize: '0.98em', background: '#f7f7fa', borderRadius: 8, padding: '0.7em', border: '1px solid #e0e0e0' } },
-          e('div', null, e('b', null, 'Total payments: '), result.stats.total_payments),
-          e('div', null, e('b', null, 'Average amount: $'), result.stats.avg_amount.toFixed(2)),
-          e('div', null, e('b', null, 'Most common method: '), result.stats.most_common_method)
+    React.useEffect(() => {
+      return () => clearInterval(timerRef.current);
+    }, []);
+
+    return e('div', { className: 'card shadow-sm p-2 mb-2', style: { maxWidth: 340, margin: '0 auto', background: '#f7f7fa', border: '1px solid #e0e0e0', fontSize: '0.97em' } },
+      e('div', { className: 'mb-2', style: { fontWeight: 600, color: '#183153', fontSize: '1.01em' } }, 'Ask your question'),
+      e('div', { className: 'mb-2' },
+        e('label', { htmlFor: 'model-select', className: 'form-label', style: { fontWeight: 500, fontSize: '0.97em', color: '#183153', marginRight: 6 } }, 'Model:'),
+        e('select', {
+          id: 'model-select',
+          className: 'form-select',
+          value: model,
+          onChange: ev => setModel(ev.target.value),
+          style: { maxWidth: 200, display: 'inline-block', fontSize: '0.97em' }
+        },
+          models.map(m => e('option', { key: m.value, value: m.value }, m.label))
         )
-      )
+      ),
+      error && e('div', { className: 'alert alert-danger mb-2', style: { fontSize: '0.97em', padding: '0.4em 0.7em' } }, error),
+      e('div', { className: 'd-flex gap-2 mb-2' },
+        e('button', {
+          className: 'btn btn-dark-bbg',
+          onClick: handleAsk,
+          disabled: recording,
+          style: { fontSize: '0.97em', padding: '0.32em 0.9em' }
+        }, recording ? 'Listening...' : 'Ask your question'),
+        e('button', {
+          className: 'btn btn-outline-secondary',
+          onClick: handleSend,
+          disabled: !transcript || loading,
+          style: { fontSize: '0.97em', padding: '0.32em 0.9em' }
+        }, loading ? 'Analyzing...' : 'Send')
+      ),
+      (recording || transcript) && e('div', { className: 'mb-2', style: { color: '#183153', background: '#fff', borderRadius: 8, padding: '0.5em', border: '1px solid #e0e0e0', fontSize: '0.98em', minHeight: 32 } }, transcript || (recording ? 'Listening...' : '')),
+      result && e('div', { className: 'alert alert-info mt-2', style: { fontSize: '0.97em', padding: '0.4em 0.7em' } },
+        result.answer && e('div', null, e('b', null, 'Answer: '), result.answer)
+      ),
+      recording && e('div', { className: 'mb-1', style: { color: '#b85c00', fontSize: '0.97em' } }, `You have ${timer}s to speak...`)
     );
   }
 
-  const root = document.getElementById('react-payment-form');
+  const root = document.getElementById('react-speech-recorder');
   if (root && window.React && window.ReactDOM) {
-    ReactDOM.createRoot(root).render(React.createElement(PaymentForm));
+    ReactDOM.createRoot(root).render(React.createElement(SpeechRecorder));
   }
 })();
   
