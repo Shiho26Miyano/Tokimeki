@@ -23,6 +23,7 @@ COMPANY_TICKERS = {
     'netflix': 'NFLX',
     'amd': 'AMD',
     'intel': 'INTC',
+    'gamma': 'GAMMA.V',
 }
 
 @util_bp.route('/')
@@ -82,25 +83,49 @@ def analyze_speech_request():
                 avg_price = sum(closes) / len(closes)
                 trend = 'up' if end_price > start_price else 'down' if end_price < start_price else 'flat'
                 # If describe intent, use Hugging Face LLM
-                model = data.get('model', 'meta-llama/Llama-2-7b-chat-hf')
+                model = data.get('model', 'facebook/opt-350m')
                 if describe_match:
                     prompt = f"User question: {text}\nStock data summary for {company.title()} ({ticker}), last {days} days:\n- Start price: ${start_price:.2f}\n- End price: ${end_price:.2f}\n- Min: ${min_price:.2f} on {min_date}\n- Max: ${max_price:.2f} on {max_date}\n- Average: ${avg_price:.2f}\n- Trend: {trend}\n\nPlease describe the stock's performance in natural language."
                     # Hugging Face API call
                     HF_API_URL = f"https://api-inference.huggingface.co/models/{model}"
                     HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
-                    headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
-                    try:
-                        resp = requests.post(HF_API_URL, headers=headers, json={"inputs": prompt}, timeout=30)
-                        resp.raise_for_status()
-                        data = resp.json()
-                        if isinstance(data, list) and 'generated_text' in data[0]:
-                            answer = data[0]['generated_text']
-                        elif isinstance(data, dict) and 'generated_text' in data:
-                            answer = data['generated_text']
-                        else:
-                            answer = "[LLM] Could not generate a description."
-                    except Exception as e:
-                        answer = f"[LLM] Error generating description: {str(e)}"
+                    if not HF_API_TOKEN:
+                        answer = "[LLM] Error: Hugging Face API token not found. Please set the HF_API_TOKEN environment variable in Railway."
+                    else:
+                        headers = {
+                            "Authorization": f"Bearer {HF_API_TOKEN}",
+                            "Content-Type": "application/json"
+                        }
+                        try:
+                            # Add parameters for better model performance
+                            payload = {
+                                "inputs": prompt,
+                                "parameters": {
+                                    "max_new_tokens": 200,
+                                    "temperature": 0.7,
+                                    "top_p": 0.95,
+                                    "do_sample": True
+                                }
+                            }
+                            print(f"Using API token: {HF_API_TOKEN[:5]}...{HF_API_TOKEN[-5:]}")  # Log first/last 5 chars of token
+                            resp = requests.post(HF_API_URL, headers=headers, json=payload, timeout=30)
+                            if resp.status_code == 401:
+                                answer = "[LLM] Error: Invalid Hugging Face API token. Please check your token in Railway environment variables. Make sure it starts with 'hf_'."
+                            elif resp.status_code == 503:
+                                answer = "[LLM] Error: Model is currently loading. Please try again in a few seconds."
+                            else:
+                                resp.raise_for_status()
+                                data = resp.json()
+                                if isinstance(data, list) and 'generated_text' in data[0]:
+                                    answer = data[0]['generated_text']
+                                elif isinstance(data, dict) and 'generated_text' in data:
+                                    answer = data['generated_text']
+                                else:
+                                    answer = "[LLM] Could not generate a description."
+                        except requests.exceptions.HTTPError as e:
+                            answer = f"[LLM] Error generating description: {str(e)}"
+                        except Exception as e:
+                            answer = f"[LLM] Error generating description: {str(e)}"
                 elif avg_match:
                     answer = f"The average closing price of {company.title()} ({ticker}) over the past {days} days is ${avg_price:.2f}."
                 elif min_match:

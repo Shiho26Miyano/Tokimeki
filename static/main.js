@@ -846,8 +846,8 @@ window.fetchTweetVolatilityAnalysis = function() {
   function SpeechRecorder() {
     const models = [
       { value: 'HuggingFaceH4/zephyr-7b-beta', label: 'Zephyr-7B (HF4)' },
-      { value: 'google/gemma-7b-it', label: 'Gemma-7B (Google)' },
-      { value: 'bigscience/bloomz-7b1', label: 'Bloomz-7B1 (BigScience)' }
+      { value: 'mistralai/Mistral-7B-v0.1', label: 'Mistral-7B' },
+      { value: 'google/gemma-7b-it', label: 'Gemma-7B (Google)' }
     ];
     const [model, setModel] = React.useState(models[0].value);
     const [recording, setRecording] = React.useState(false);
