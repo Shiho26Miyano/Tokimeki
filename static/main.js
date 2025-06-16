@@ -936,6 +936,7 @@ window.fetchTweetVolatilityAnalysis = function() {
 
     return e('div', { className: 'card shadow-sm p-2 mb-2', style: { maxWidth: 340, margin: '0 auto', background: '#f7f7fa', border: '1px solid #e0e0e0', fontSize: '0.97em' } },
       e('div', { className: 'mb-2', style: { fontWeight: 600, color: '#183153', fontSize: '1.01em' } }, 'Ask your question'),
+      e('div', { style: { color: '#666', fontSize: '0.9em', marginBottom: '0.8em' } }, 'e.g. "summary of apple stock" or "what is the average price of tesla in the past week?"'),
       e('div', { className: 'mb-2' },
         e('label', { htmlFor: 'model-select', className: 'form-label', style: { fontWeight: 500, fontSize: '0.97em', color: '#183153', marginRight: 6 } }, 'Model:'),
         e('select', {
