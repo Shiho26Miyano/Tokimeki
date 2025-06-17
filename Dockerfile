@@ -37,8 +37,9 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install wheel setuptools build
 
-# Install Python dependencies
-RUN pip install --no-cache-dir numpy pandas && \
+# Install Python dependencies with specific versions
+RUN pip install --no-cache-dir numpy==1.24.3 && \
+    pip install --no-cache-dir pandas==2.0.3 && \
     pip install --no-cache-dir --no-build-isolation TA-Lib==0.4.28 && \
     pip install --no-cache-dir -r requirements.txt
 
