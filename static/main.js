@@ -1014,7 +1014,8 @@ window.fetchTweetVolatilityAnalysis = function() {
       setLoading(true);
       setError(null);
       try {
-        const resp = await fetch("/analyze", {
+        const baseUrl = window.location.origin;
+        const resp = await fetch(`${baseUrl}/analyze`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ symbol, strategy, period })
@@ -1024,6 +1025,7 @@ window.fetchTweetVolatilityAnalysis = function() {
         setResult(data);
       } catch (err) {
         setError("Could not analyze stock. Please try again.");
+        console.error("Error details:", err);
       } finally {
         setLoading(false);
       }
