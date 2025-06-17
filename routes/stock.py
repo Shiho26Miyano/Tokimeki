@@ -8,11 +8,72 @@ import requests
 import bs4
 import logging
 from bs4 import BeautifulSoup
+import time
+from requests.exceptions import RequestException
+import json
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 stock_bp = Blueprint('stock', __name__)
+
+# Cache configuration
+CACHE_DIR = 'cache'
+CACHE_DURATION = 3600  # 1 hour in seconds
+
+def ensure_cache_dir():
+    """Ensure cache directory exists"""
+    if not os.path.exists(CACHE_DIR):
+        os.makedirs(CACHE_DIR)
+
+def get_cache_path(symbol, start_date, end_date):
+    """Get cache file path for a symbol and date range"""
+    ensure_cache_dir()
+    cache_key = f"{symbol}_{start_date}_{end_date}.json"
+    return os.path.join(CACHE_DIR, cache_key)
+
+def get_cached_data(symbol, start_date, end_date):
+    """Get cached data if available and not expired"""
+    cache_path = get_cache_path(symbol, start_date, end_date)
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, 'r') as f:
+                cache_data = json.load(f)
+                cache_time = cache_data.get('timestamp', 0)
+                if time.time() - cache_time < CACHE_DURATION:
+                    return cache_data.get('data')
+        except Exception as e:
+            logger.warning(f"Error reading cache for {symbol}: {str(e)}")
+    return None
+
+def save_to_cache(symbol, start_date, end_date, data):
+    """Save data to cache"""
+    cache_path = get_cache_path(symbol, start_date, end_date)
+    try:
+        cache_data = {
+            'timestamp': time.time(),
+            'data': data
+        }
+        with open(cache_path, 'w') as f:
+            json.dump(cache_data, f)
+    except Exception as e:
+        logger.warning(f"Error saving cache for {symbol}: {str(e)}")
+
+def fetch_ticker_with_retry(symbol, max_retries=3, delay=1):
+    """Fetch ticker data with retry logic"""
+    for attempt in range(max_retries):
+        try:
+            ticker = yf.Ticker(symbol)
+            # Add a small delay between attempts
+            if attempt > 0:
+                time.sleep(delay)
+            return ticker
+        except Exception as e:
+            logger.warning(f"Attempt {attempt + 1} failed for {symbol}: {str(e)}")
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(delay * (attempt + 1))  # Exponential backoff
 
 @stock_bp.route('/stocks/history', methods=['GET'])
 def stocks_history():
@@ -63,18 +124,34 @@ def stocks_history():
     results = {}
     for name, symbol in tickers.items():
         try:
-            ticker = yf.Ticker(symbol)
+            # Try to get from cache first
+            cached_data = get_cached_data(symbol, start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'))
+            if cached_data:
+                results[name] = cached_data
+                continue
+
+            # If not in cache, fetch from yfinance
+            ticker = fetch_ticker_with_retry(symbol)
             hist = ticker.history(start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'))
             if not hist.empty:
-                results[name] = {
+                data = {
                     'symbol': symbol,
                     'dates': [d.strftime('%Y-%m-%d') for d in hist.index],
                     'closes': [float(c) for c in hist['Close']]
                 }
+                results[name] = data
+                # Save to cache
+                save_to_cache(symbol, start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'), data)
             else:
                 results[name] = {'symbol': symbol, 'error': 'No data'}
         except Exception as e:
-            results[name] = {'symbol': symbol, 'error': str(e)}
+            logger.error(f"Error fetching data for {symbol}: {str(e)}")
+            # Try to get from cache even if expired
+            cached_data = get_cached_data(symbol, start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'))
+            if cached_data:
+                results[name] = cached_data
+            else:
+                results[name] = {'symbol': symbol, 'error': str(e)}
     return jsonify(results)
 
 @stock_bp.route('/available_tickers')
@@ -94,15 +171,19 @@ def available_tickers():
         available = []
         for t in default_tickers:
             try:
-                hist = yf.Ticker(t).history(period=validation_period)
+                ticker = fetch_ticker_with_retry(t)
+                hist = ticker.history(period=validation_period)
                 if not hist.empty:
                     available.append(t)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Failed to validate ticker {t}: {str(e)}")
                 continue
         if not available:
+            logger.warning("No tickers validated, returning default list")
             return jsonify(default_tickers)
         return jsonify(available)
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error in available_tickers: {str(e)}")
         return jsonify(default_tickers)
 
 @stock_bp.route('/explain_stability')
