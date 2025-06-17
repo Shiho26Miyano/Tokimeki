@@ -15,6 +15,8 @@ from routes.tweet import tweet_bp
 app.register_blueprint(tweet_bp)
 from routes.hf_tweeteval import hf_tweeteval_bp
 app.register_blueprint(hf_tweeteval_bp)
+from routes.hf_signal_tool import hf_signal_bp
+app.register_blueprint(hf_signal_bp)
 from routes.pay import pay_bp
 app.register_blueprint(pay_bp)
 
