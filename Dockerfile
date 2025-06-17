@@ -1,9 +1,11 @@
-FROM python:3.12-slim
+FROM python:3.12
 
-# Install system dependencies including TA-Lib
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     wget \
+    gcc \
+    python3-dev \
     && wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz \
     && tar -xvzf ta-lib-0.4.0-src.tar.gz \
     && cd ta-lib/ \
@@ -19,6 +21,8 @@ RUN apt-get update && apt-get install -y \
 
 # Set environment variables for TA-Lib
 ENV LD_LIBRARY_PATH=/usr/lib:$LD_LIBRARY_PATH
+ENV C_INCLUDE_PATH=/usr/include:$C_INCLUDE_PATH
+ENV CPLUS_INCLUDE_PATH=/usr/include:$CPLUS_INCLUDE_PATH
 
 # Set working directory
 WORKDIR /app
@@ -26,8 +30,14 @@ WORKDIR /app
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 
+# Upgrade pip and install wheel
+RUN pip install --upgrade pip && \
+    pip install wheel setuptools
+
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir numpy pandas && \
+    pip install --no-cache-dir TA-Lib==0.4.28 && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
 COPY . .
