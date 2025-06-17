@@ -11,4 +11,4 @@ torch==2.2.1
 datasets==2.18.0
 transformers-interpret==0.10.0
 beautifulsoup4==4.12.3
-TA-Lib==0.4.28
+peewee==3.18.1
