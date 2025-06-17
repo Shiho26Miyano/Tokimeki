@@ -1,7 +1,12 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
 import os
 import numpy as np
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='static')
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"]}})
@@ -35,6 +40,16 @@ def index():
 def test():
     return 'Hello, world!'
 
+@app.errorhandler(500)
+def handle_500(e):
+    logger.error(f"Internal server error: {str(e)}")
+    return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
+@app.errorhandler(404)
+def handle_404(e):
+    return jsonify({"error": "Resource not found"}), 404
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
-    app.run(debug=True, host='0.0.0.0', port=port) 
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    app.run(debug=debug, host='0.0.0.0', port=port) 
