@@ -5,6 +5,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import talib
 import logging
+import time
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -24,16 +25,34 @@ class HedgeFundTool:
         }
 
     def fetch_stock_data(self, symbol, period='1y'):
-        """Fetch historical stock data"""
-        try:
-            stock = yf.Ticker(symbol)
-            df = stock.history(period=period)
-            if df.empty:
-                raise ValueError(f"No data found for {symbol}")
-            return df
-        except Exception as e:
-            logger.error(f"Error fetching data for {symbol}: {str(e)}")
-            raise
+        """Fetch historical stock data with retry logic"""
+        max_retries = 3
+        retry_delay = 2  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Attempt {attempt + 1} to fetch data for {symbol}")
+                stock = yf.Ticker(symbol)
+                df = stock.history(period=period)
+                
+                if df.empty:
+                    logger.warning(f"No data found for {symbol} on attempt {attempt + 1}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                        continue
+                    raise ValueError(f"No data found for {symbol} after {max_retries} attempts")
+                
+                logger.info(f"Successfully fetched data for {symbol}")
+                return df
+                
+            except Exception as e:
+                logger.error(f"Error fetching data for {symbol} on attempt {attempt + 1}: {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                    continue
+                raise Exception(f"Failed to fetch data for {symbol} after {max_retries} attempts: {str(e)}")
+        
+        raise Exception(f"Failed to fetch data for {symbol} after {max_retries} attempts")
 
     def calculate_ma(self, df, window=20):
         """Calculate Moving Average"""
