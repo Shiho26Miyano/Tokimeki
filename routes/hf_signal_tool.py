@@ -119,15 +119,19 @@ class HedgeFundTool:
 
 @hf_signal_bp.route('/analyze', methods=['POST'])
 def analyze_stock():
+    logger.info("Received request to /analyze endpoint")
     try:
         data = request.get_json()
+        logger.info(f"Request data: {data}")
         symbol = data.get('symbol')
         strategy = data.get('strategy', 'trend')
         period = data.get('period', '1y')
         
         if not symbol:
+            logger.warning("No symbol provided in request")
             return jsonify({'error': 'Symbol is required'}), 400
         
+        logger.info(f"Processing request for symbol: {symbol}, strategy: {strategy}, period: {period}")
         tool = HedgeFundTool()
         df = tool.fetch_stock_data(symbol, period)
         signals = tool.generate_signals(df, strategy)
@@ -151,6 +155,7 @@ def analyze_stock():
             }
         }
         
+        logger.info("Successfully processed request")
         return jsonify(response)
     
     except Exception as e:
