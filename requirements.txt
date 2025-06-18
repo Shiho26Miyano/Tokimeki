@@ -3,7 +3,11 @@ Flask-Cors==4.0.0
 vaderSentiment==3.3.2
 requests==2.31.0
 yfinance==0.2.63
+scikit-learn==1.4.2
 numpy==1.26.4
 pandas==2.2.1
+transformers==4.38.2
+datasets==2.18.0
 beautifulsoup4==4.12.3
+transformers-interpret==0.10.0
 gunicorn==21.2.0
