@@ -5,15 +5,35 @@ import re
 import yfinance as yf
 import numpy as np
 import pandas as pd
-from transformers import pipeline
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, f1_score
+
+# Optional imports - app will work without these
+try:
+    from transformers import pipeline
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+    print("Warning: transformers not available")
+
+try:
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.metrics import accuracy_score, f1_score
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    print("Warning: sklearn not available")
 
 # Define the blueprint
 tweet_bp = Blueprint('tweet', __name__)
 
-# Load sentiment model once at startup
-sentiment_model = pipeline('sentiment-analysis', model='distilbert-base-uncased-finetuned-sst-2-english')
+# Load sentiment model only if transformers is available
+if TRANSFORMERS_AVAILABLE:
+    try:
+        sentiment_model = pipeline('sentiment-analysis', model='distilbert-base-uncased-finetuned-sst-2-english')
+    except Exception as e:
+        print(f"Warning: Could not load sentiment model: {e}")
+        sentiment_model = None
+else:
+    sentiment_model = None
 
 def fetch_tweets(query, max_results=100):
     bearer_token = os.environ.get('TWITTER_BEARER_TOKEN')
@@ -48,11 +68,25 @@ def clean_tweet(text):
 
 @tweet_bp.route('/tweet_volatility_analysis', methods=['GET'])
 def tweet_volatility_analysis():
+    if not TRANSFORMERS_AVAILABLE or not SKLEARN_AVAILABLE:
+        return jsonify({
+            'error': 'ML features not available. Please install transformers and scikit-learn for full functionality.',
+            'accuracy': 0.0,
+            'f1_score': 0.0,
+            'feature_importances': {'mean_sentiment': 0.0, 'mean_retweets': 0.0},
+            'n_days': 0,
+            'summary': 'ML analysis not available due to missing dependencies.'
+        }), 503
+    
+    if not sentiment_model:
+        return jsonify({'error': 'Sentiment model not loaded'}), 503
+    
     tweets = fetch_tweets("Tesla", 100)
     if tweets == 'RATE_LIMIT':
         return jsonify({'error': 'Twitter API rate limit exceeded. Please wait and try again later.'}), 429
     if not tweets:
         return jsonify({'error': 'No tweets found.'}), 400
+    
     for t in tweets:
         t['clean'] = clean_tweet(t['text'])
     sentiments = sentiment_model([t['clean'] for t in tweets])
@@ -97,6 +131,9 @@ def tweet_volatility_analysis():
 
 @tweet_bp.route('/tweet_sentiment', methods=['GET'])
 def tweet_sentiment():
+    if not TRANSFORMERS_AVAILABLE or not sentiment_model:
+        return jsonify({'error': 'Sentiment analysis not available. Please install transformers for full functionality.'}), 503
+    
     query = request.args.get('query', 'stock market')
     max_results = int(request.args.get('max_results', 10))
     tweets = fetch_tweets(query, max_results)

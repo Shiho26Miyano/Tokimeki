@@ -2,8 +2,6 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 import yfinance as yf
 import numpy as np
-from sklearn.linear_model import LogisticRegression
-from transformers import pipeline
 import requests
 import bs4
 import logging
@@ -12,6 +10,21 @@ import time
 from requests.exceptions import RequestException
 import json
 import os
+
+# Optional imports - app will work without these
+try:
+    from sklearn.linear_model import LogisticRegression
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    print("Warning: sklearn not available")
+
+try:
+    from transformers import pipeline
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+    print("Warning: transformers not available")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
