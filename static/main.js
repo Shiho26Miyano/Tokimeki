@@ -898,16 +898,16 @@ window.fetchTweetVolatilityAnalysis = function() {
         recognitionRef.current.start();
         setRecording(true);
         setTimer(60);
+        const startTime = Date.now();
         timerRef.current = setInterval(() => {
-          setTimer(t => {
-            if (t <= 1) {
-              if (recognitionRef.current) recognitionRef.current.stop();
-              clearInterval(timerRef.current);
-              return 0;
-            }
-            return t - 1;
-          });
-        }, 1000);
+          const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+          const remainingSeconds = Math.max(0, 60 - elapsedSeconds);
+          setTimer(remainingSeconds);
+          if (remainingSeconds <= 0) {
+            if (recognitionRef.current) recognitionRef.current.stop();
+            clearInterval(timerRef.current);
+          }
+        }, 100); // Update more frequently for smoother countdown
       }
     };
     const handleSend = async () => {
@@ -936,7 +936,7 @@ window.fetchTweetVolatilityAnalysis = function() {
 
     return e('div', { className: 'card shadow-sm p-2 mb-2', style: { maxWidth: 340, margin: '0 auto', background: '#f7f7fa', border: '1px solid #e0e0e0', fontSize: '0.97em' } },
       e('div', { className: 'mb-2', style: { fontWeight: 600, color: '#183153', fontSize: '1.01em' } }, 'Ask your question'),
-      e('div', { style: { color: '#666', fontSize: '0.9em', marginBottom: '0.8em' } }, 'e.g. "summary of apple stock" or "what is the average price of tesla in the past week?"'),
+      e('div', { style: { color: '#666', fontSize: '0.9em', marginBottom: '0.8em' } }, 'e.g. "What is the current stock price of Apple (AAPL)?" or "Show me Tesla\'s (TSLA) stock performance over the last 7 days"'),
       e('div', { className: 'mb-2' },
         e('label', { htmlFor: 'model-select', className: 'form-label', style: { fontWeight: 500, fontSize: '0.97em', color: '#183153', marginRight: 6 } }, 'Model:'),
         e('select', {

@@ -43,14 +43,14 @@ def analyze_speech_request():
             company = name
             break
     # --- ML/NLP: Detect time range and statistic intent ---
-    days_match = re.search(r'(?:past|last)\s*(\d+)\s*days', text_lower)
+    days_match = re.search(r'(?:past|last)\s*(\d+)\s*(?:days?|day)', text_lower)
     week_match = re.search(r'(?:past|last)\s*week', text_lower)
     month_match = re.search(r'(?:past|last)\s*month', text_lower)
     avg_match = re.search(r'(average|mean)', text_lower)
     min_match = re.search(r'(minimum|min|lowest)', text_lower)
     max_match = re.search(r'(maximum|max|highest)', text_lower)
-    # NEW: fallback for just 'X days'
-    any_days_match = re.search(r'(\d+)\s*days', text_lower)
+    # NEW: fallback for just 'X days' or 'X-Day'
+    any_days_match = re.search(r'(\d+)\s*(?:days?|day)', text_lower)
     # Detect if user wants a description (performance, trend, summary)
     describe_match = re.search(r'(performance|trend|summary|describe)', text_lower)
     # Default to 1 day (today)
