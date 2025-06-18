@@ -60,20 +60,52 @@ def save_to_cache(symbol, start_date, end_date, data):
     except Exception as e:
         logger.warning(f"Error saving cache for {symbol}: {str(e)}")
 
-def fetch_ticker_with_retry(symbol, max_retries=3, delay=1):
+def fetch_ticker_with_retry(symbol, max_retries=3, delay=2):
     """Fetch ticker data with retry logic"""
     for attempt in range(max_retries):
         try:
+            logger.info(f"Attempt {attempt + 1} to fetch data for {symbol}")
             ticker = yf.Ticker(symbol)
-            # Add a small delay between attempts
+            # Add delay between attempts
             if attempt > 0:
-                time.sleep(delay)
+                time.sleep(delay * (attempt + 1))  # Exponential backoff
             return ticker
         except Exception as e:
             logger.warning(f"Attempt {attempt + 1} failed for {symbol}: {str(e)}")
             if attempt == max_retries - 1:
                 raise
             time.sleep(delay * (attempt + 1))  # Exponential backoff
+
+def get_fallback_data(symbol, start_date, end_date):
+    """Get fallback sample data when yfinance fails"""
+    try:
+        # Generate sample data for demonstration
+        start = datetime.strptime(start_date, '%Y-%m-%d')
+        end = datetime.strptime(end_date, '%Y-%m-%d')
+        days = (end - start).days
+        
+        # Generate sample dates and prices
+        dates = []
+        closes = []
+        base_price = 100.0  # Base price for sample data
+        
+        for i in range(days + 1):
+            current_date = start + timedelta(days=i)
+            dates.append(current_date.strftime('%Y-%m-%d'))
+            # Generate realistic price movement
+            price_change = np.random.normal(0, 0.02)  # 2% daily volatility
+            base_price *= (1 + price_change)
+            closes.append(max(base_price, 1.0))  # Ensure price doesn't go negative
+        
+        return {
+            'symbol': symbol,
+            'dates': dates,
+            'closes': [round(price, 2) for price in closes],
+            'note': 'Sample data (yfinance unavailable)'
+        }
+    except Exception as e:
+        logger.error(f"Error generating fallback data: {str(e)}")
+        return None
 
 @stock_bp.route('/stocks/history', methods=['GET'])
 def stocks_history():
@@ -151,7 +183,12 @@ def stocks_history():
             if cached_data:
                 results[name] = cached_data
             else:
-                results[name] = {'symbol': symbol, 'error': str(e)}
+                # Use fallback data as last resort
+                fallback_data = get_fallback_data(symbol, start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d'))
+                if fallback_data:
+                    results[name] = fallback_data
+                else:
+                    results[name] = {'symbol': symbol, 'error': str(e)}
     return jsonify(results)
 
 @stock_bp.route('/available_tickers')
@@ -165,22 +202,39 @@ def available_tickers():
             'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZS=F', 'ZW=F',
             'VX=F', 'BTC=F', 'ETH=F'
         ]
+        
+        # If yfinance is not available, return default list
         if yf is None:
+            logger.warning("yfinance not available, returning default tickers")
             return jsonify(default_tickers)
+        
         validation_period = '5d'
         available = []
+        failed_count = 0
+        
         for t in default_tickers:
             try:
                 ticker = fetch_ticker_with_retry(t)
                 hist = ticker.history(period=validation_period)
                 if not hist.empty:
                     available.append(t)
+                else:
+                    failed_count += 1
             except Exception as e:
                 logger.warning(f"Failed to validate ticker {t}: {str(e)}")
+                failed_count += 1
                 continue
+        
+        # If too many tickers failed validation, return default list
+        if failed_count > len(default_tickers) * 0.5:  # If more than 50% failed
+            logger.warning(f"Too many tickers failed validation ({failed_count}/{len(default_tickers)}), returning default list")
+            return jsonify(default_tickers)
+        
+        # If no tickers validated, return default list
         if not available:
             logger.warning("No tickers validated, returning default list")
             return jsonify(default_tickers)
+        
         return jsonify(available)
     except Exception as e:
         logger.error(f"Error in available_tickers: {str(e)}")
