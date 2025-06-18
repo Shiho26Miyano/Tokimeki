@@ -18,4 +18,11 @@ coverage.xml
 *.cover
 *.log
 .pytest_cache/
-.DS_Store 
+.DS_Store
+allfileshas.txt
+mood_tracker.db
+.git/
+.gitignore
+README.md
+DEPLOYMENT.md
+*.md 
