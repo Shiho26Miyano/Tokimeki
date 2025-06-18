@@ -28,8 +28,6 @@
     <!-- Main Content -->
     <div class="container mt-4">
         <h1 class="mb-4">Tokimeki</h1>
-        <!-- Hedge Fund Tool Mount Point -->
-        <div id="react-hedge-fund-tool"></div>
         <div class="row">
             <!-- Ask your question component (left) -->
             <div class="col-md-6 mb-4">
@@ -54,8 +52,8 @@
         // Debug function to check if elements exist
         function checkElements() {
             const elements = {
-                'react-speech-recorder': document.getElementById('react-speech-recorder'),
-                'react-hedge-fund-tool': document.getElementById('react-hedge-fund-tool')
+                'react-tweet-sentiment': document.getElementById('react-tweet-sentiment'),
+                'react-speech-recorder': document.getElementById('react-speech-recorder')
             };
             console.log('Checking mount points:', elements);
             return elements;

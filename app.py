@@ -25,8 +25,6 @@ from routes.tweet import tweet_bp
 app.register_blueprint(tweet_bp)
 from routes.hf_tweeteval import hf_tweeteval_bp
 app.register_blueprint(hf_tweeteval_bp)
-from routes.hf_signal_tool import hf_signal_bp
-app.register_blueprint(hf_signal_bp)
 from routes.pay import pay_bp
 app.register_blueprint(pay_bp)
 
@@ -54,8 +52,16 @@ def handle_500(e):
 def handle_404(e):
     return jsonify({"error": "Resource not found"}), 404
 
-
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5001))
-    app.run(debug=True, host='0.0.0.0', port=port) 
+    port = int(os.environ.get('PORT', 8080))
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    
+    # For local development with HTTPS (needed for microphone access)
+    if debug and os.environ.get('USE_HTTPS') == 'true':
+        import ssl
+        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        context.load_cert_chain('cert.pem', 'key.pem')
+        app.run(debug=debug, host='0.0.0.0', port=port, ssl_context=context)
+    else:
+        app.run(debug=debug, host='0.0.0.0', port=port) 
     
