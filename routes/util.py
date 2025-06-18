@@ -52,7 +52,7 @@ def analyze_speech_request():
     # NEW: fallback for just 'X days' or 'X-Day'
     any_days_match = re.search(r'(\d+)\s*(?:days?|day)', text_lower)
     # Detect if user wants a description (performance, trend, summary)
-    describe_match = re.search(r'(performance|trend|summary|describe)', text_lower)
+    describe_match = re.search(r'(performance|trend|summary|describe|how did|how is|how was)', text_lower)
     # Default to 1 day (today)
     days = 1
     if days_match:
@@ -82,10 +82,25 @@ def analyze_speech_request():
                 max_date = dates[closes.index(max_price)]
                 avg_price = sum(closes) / len(closes)
                 trend = 'up' if end_price > start_price else 'down' if end_price < start_price else 'flat'
+                price_change = end_price - start_price
+                percent_change = (price_change / start_price) * 100
                 # If describe intent, use Hugging Face LLM
-                model = data.get('model', 'facebook/opt-350m')
+                model = data.get('model', 'mistralai/Mistral-7B-v0.1')
                 if describe_match:
-                    prompt = f"User question: {text}\nStock data summary for {company.title()} ({ticker}), last {days} days:\n- Start price: ${start_price:.2f}\n- End price: ${end_price:.2f}\n- Min: ${min_price:.2f} on {min_date}\n- Max: ${max_price:.2f} on {max_date}\n- Average: ${avg_price:.2f}\n- Trend: {trend}\n\nPlease describe the stock's performance in natural language."
+                    prompt = f"""Based on the following stock data, provide a natural language summary of the performance:
+
+Stock: {company.title()} ({ticker})
+Time Period: Last {days} days
+Price Data:
+- Starting at ${start_price:.2f}
+- Ending at ${end_price:.2f}
+- Total change: ${price_change:.2f} ({percent_change:.1f}%)
+- Lowest: ${min_price:.2f} on {min_date}
+- Highest: ${max_price:.2f} on {max_date}
+- Average: ${avg_price:.2f}
+- Overall trend: {trend}
+
+Please summarize the stock's performance."""
                     # Hugging Face API call
                     HF_API_URL = f"https://api-inference.huggingface.co/models/{model}"
                     HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
