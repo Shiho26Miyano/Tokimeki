@@ -143,9 +143,16 @@ class HedgeFundTool:
 
         # Calculate risk metrics
         portfolio['Drawdown'] = (portfolio['Total'] - portfolio['Total'].cummax()) / portfolio['Total'].cummax()
-        sharpe_ratio = np.sqrt(252) * portfolio['Returns'].mean() / portfolio['Returns'].std()
-        max_drawdown = portfolio['Drawdown'].min()
-        var_95 = np.percentile(portfolio['Returns'], 5)
+        
+        # Use np.nanmean and np.nanstd to handle potential NaN values in returns
+        mean_return = np.nanmean(portfolio['Returns'])
+        std_return = np.nanstd(portfolio['Returns'])
+        
+        sharpe_ratio = np.sqrt(252) * mean_return / std_return if std_return != 0 else 0
+        max_drawdown = np.nanmin(portfolio['Drawdown'])
+        
+        # Use np.nanpercentile for VaR to ignore NaN values
+        var_95 = np.nanpercentile(portfolio['Returns'].dropna(), 5)
 
         return {
             'total_return': (portfolio['Total'].iloc[-1] / initial_capital - 1) * 100,
@@ -173,6 +180,10 @@ def analyze_stock():
         tool = HedgeFundTool()
         df = tool.fetch_stock_data(symbol, period)
         signals = tool.generate_signals(df, strategy)
+        
+        # Fill NaNs in signals to avoid issues in metric calculations
+        signals.fillna(0, inplace=True)
+
         metrics = tool.calculate_portfolio_metrics(df, signals)
 
         # Prepare response data
@@ -200,16 +211,16 @@ def analyze_stock():
         logger.error(f"Error in analyze_stock: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@hf_signal_bp.route('/indicators', methods=['GET'])
-def get_indicators():
-    """Get available technical indicators"""
-    return jsonify({
-        'indicators': list(HedgeFundTool().indicators.keys())
-    })
+# @hf_signal_bp.route('/indicators', methods=['GET'])
+# def get_indicators():
+#     """Get available technical indicators"""
+#     return jsonify({
+#         'indicators': list(HedgeFundTool().indicators.keys())
+#     })
 
-@hf_signal_bp.route('/strategies', methods=['GET'])
-def get_strategies():
-    """Get available trading strategies"""
-    return jsonify({
-        'strategies': ['trend', 'mean_reversion', 'momentum']
-    }) 
+# @hf_signal_bp.route('/strategies', methods=['GET'])
+# def get_strategies():
+#     """Get available trading strategies"""
+#     return jsonify({
+#         'strategies': ['trend', 'mean_reversion', 'momentum']
+#     }) 

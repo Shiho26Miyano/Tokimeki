@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import requests
 import os
 
-util_bp = Blueprint('util', __name__)
+speech_analysis_bp = Blueprint('speech_analysis', __name__)
 
 # Load sentiment model once
 sentiment_model = pipeline('sentiment-analysis', model='distilbert-base-uncased-finetuned-sst-2-english')
@@ -26,11 +26,11 @@ COMPANY_TICKERS = {
     'gamma': 'GAMMA.V',
 }
 
-@util_bp.route('/')
+@speech_analysis_bp.route('/')
 def index():
     return send_from_directory('static', 'index.html')
 
-@util_bp.route('/analyze_speech_request', methods=['POST'])
+@speech_analysis_bp.route('/analyze_speech_request', methods=['POST'])
 def analyze_speech_request():
     data = request.get_json()
     text = data.get('text', '')
