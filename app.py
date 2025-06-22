@@ -27,6 +27,8 @@ from routes.trading_strategy_analyzer import hf_signal_bp as trading_strategy_an
 app.register_blueprint(trading_strategy_analyzer_bp)
 from routes.investment_playbooks import investment_playbooks_bp
 app.register_blueprint(investment_playbooks_bp)
+from routes.volatility_regime_strategy import volatility_regime_bp
+app.register_blueprint(volatility_regime_bp)
 
 @app.after_request
 def after_request(response):
