@@ -204,6 +204,20 @@ def stocks_history():
                     results[name] = {'symbol': symbol, 'error': str(e)}
     return jsonify(results)
 
+@stock_bp.route('/available_companies')
+def available_companies():
+    companies = {
+        'Google': 'GOOGL', 'Nvidia': 'NVDA', 'Apple': 'AAPL', 'Microsoft': 'MSFT',
+        'Amazon': 'AMZN', 'Meta': 'META', 'Tesla': 'TSLA', 'Netflix': 'NFLX',
+        'AMD': 'AMD', 'Intel': 'INTC', 'Alibaba': 'BABA', 'S&P 500 ETF': 'SPY',
+        'Nasdaq 100 ETF': 'QQQ', 'S&P 500 ETF (VOO)': 'VOO',
+        'Good Times Restaurants': 'GTIM', 'ARK Innovation ETF': 'ARKK',
+        'Emerging Markets ETF': 'EEM', 'Financial Select Sector SPDR': 'XLF'
+    }
+    # Convert to list of dicts
+    company_list = [{"name": name, "symbol": symbol} for name, symbol in companies.items()]
+    return jsonify(company_list)
+
 @stock_bp.route('/available_tickers')
 def available_tickers():
     try:

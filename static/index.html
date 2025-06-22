@@ -124,6 +124,38 @@
         .tab-content > .active {
             display: block;
         }
+
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+            border-bottom: 1px dotted #000;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            width: 280px;
+            background-color: #183153;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -140px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -151,6 +183,9 @@
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">Trading Strategy Analyzer</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="investment-playbooks-tab" data-bs-toggle="pill" data-bs-target="#investment-playbooks-content" role="tab" aria-controls="investment-playbooks-content" aria-selected="false">Investment Playbooks</a>
                     </li>
                 </ul>
             </div>
@@ -263,6 +298,9 @@
                     </div>
                     <div class="tab-pane fade" id="hf-signal-tool-content" role="tabpanel" aria-labelledby="hf-signal-tool-tab">
                         <div class="container py-4"><div id="react-hedge-fund-tool"></div></div>
+                    </div>
+                    <div class="tab-pane fade" id="investment-playbooks-content" role="tabpanel" aria-labelledby="investment-playbooks-tab">
+                        <div class="container py-4"><div id="react-investment-playbooks-tool"></div></div>
                     </div>
                 </div>
             </div>
