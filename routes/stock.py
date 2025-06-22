@@ -253,58 +253,6 @@ def available_tickers():
         logger.error(f"Error in available_tickers: {str(e)}")
         return jsonify(default_tickers)
 
-@stock_bp.route('/explain_stability')
-def explain_stability():
-    try:
-        if request.method == 'POST':
-            data = request.json
-            stock = data.get('stock')
-            start_date_str = data.get('start_date')
-            end_date_str = data.get('end_date')
-        else:
-            stock = request.args.get('stock', 'NVDA')
-            start_date_str = request.args.get('start_date')
-            end_date_str = request.args.get('end_date')
-        if not stock:
-            return jsonify({'explanation': 'Missing required parameter: stock.'})
-        try:
-            end = datetime.now() if not end_date_str else datetime.strptime(end_date_str, '%Y-%m-%d')
-            if start_date_str:
-                start = datetime.strptime(start_date_str, '%Y-%m-%d')
-            else:
-                year = datetime.now().year
-                start = datetime.strptime(f"{year}-01-01", '%Y-%m-%d')
-            max_range = timedelta(days=1095)
-            if end - start > max_range:
-                start = end - max_range
-        except ValueError as e:
-            return jsonify({'explanation': f"Invalid date format: {str(e)}"})
-        ticker = yf.Ticker(stock)
-        hist = ticker.history(start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'))
-        if hist.empty:
-            return jsonify({'explanation': f"No data available for {stock} in the selected date range."})
-        closes = hist['Close'].tolist()
-        dates = [d.strftime('%Y-%m-%d') for d in hist.index]
-        daily_changes = []
-        for i in range(1, len(closes)):
-            pct_change = ((closes[i] - closes[i-1]) / closes[i-1]) * 100
-            daily_changes.append({
-                'date': dates[i],
-                'change': pct_change
-            })
-        top_events = sorted(daily_changes, key=lambda x: abs(x['change']), reverse=True)[:3]
-        date_range_str = f"from {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}"
-        explanation = f"Biggest price movement events for {stock} {date_range_str}:\n\n"
-        if not top_events:
-            explanation += "No significant price movements detected in this period."
-        else:
-            for event in top_events:
-                direction = 'up' if event['change'] > 0 else 'down'
-                explanation += f"• {event['date']}: {direction} {abs(event['change']):.2f}%\n"
-        return jsonify({'explanation': explanation})
-    except Exception as e:
-        return jsonify({'explanation': f"Error analyzing {stock}: {str(e)}"})
-
 @stock_bp.route('/volatility_event_correlation', methods=['GET'])
 def volatility_event_correlation():
     symbol = request.args.get('symbol', 'AAPL')

@@ -19,14 +19,14 @@ CORS(app, resources={r"/*": {
 # Import and register blueprints
 from routes.stock import stock_bp
 app.register_blueprint(stock_bp)
-from routes.util import util_bp
-app.register_blueprint(util_bp)
+from routes.speech_analysis import speech_analysis_bp
+app.register_blueprint(speech_analysis_bp)
 from routes.tweet import tweet_bp
 app.register_blueprint(tweet_bp)
 from routes.hf_tweeteval import hf_tweeteval_bp
 app.register_blueprint(hf_tweeteval_bp)
-from routes.pay import pay_bp
-app.register_blueprint(pay_bp)
+from routes.hf_signal_tool import hf_signal_bp
+app.register_blueprint(hf_signal_bp)
 
 @app.after_request
 def after_request(response):

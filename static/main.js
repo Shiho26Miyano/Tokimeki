@@ -978,4 +978,182 @@ window.fetchTweetVolatilityAnalysis = function() {
     ReactDOM.createRoot(root).render(React.createElement(SpeechRecorder));
   }
 })();
+
+// Hedge Fund Signal Tool Component
+(function() {
+  const e = React.createElement;
+
+  function HedgeFundTool() {
+    const [symbol, setSymbol] = React.useState('AAPL');
+    const [strategy, setStrategy] = React.useState('trend');
+    const [period, setPeriod] = React.useState('1y');
+    const [loading, setLoading] = React.useState(false);
+    const [result, setResult] = React.useState(null);
+    const [error, setError] = React.useState(null);
+
+    // Initial analysis on load
+    React.useEffect(() => {
+      handleAnalyze(null, { symbol: 'AAPL', strategy: 'trend', period: '1y' });
+    }, []);
+
+    const strategies = [
+      { value: 'trend', label: 'Trend Following' },
+      { value: 'mean_reversion', label: 'Mean Reversion' },
+      { value: 'momentum', label: 'Momentum' }
+    ];
+
+    const periods = [
+      { value: '3mo', label: '3M' },
+      { value: '6mo', label: '6M' },
+      { value: '1y', label: '1Y' },
+      { value: '2y', label: '2Y' },
+      { value: '5y', label: '5Y' }
+    ];
+    
+    const popularSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META'];
+
+    const handleAnalyze = async (ev, manualParams) => {
+      if (ev) ev.preventDefault();
+      const params = manualParams || { symbol: symbol.toUpperCase(), strategy, period };
+      if (!params.symbol) return;
+
+      setLoading(true);
+      setError(null);
+      setResult(null);
+
+      try {
+        const resp = await fetch('/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
+        });
+        
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Analysis failed');
+        setResult(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const getSignalClass = (signal) => {
+      if (signal === 1) return 'signal-buy';
+      if (signal === -1) return 'signal-sell';
+      return 'signal-hold';
+    };
+
+    const getSignalText = (signal) => {
+      if (signal === 1) return 'BUY';
+      if (signal === -1) return 'SELL';
+      return 'HOLD';
+    };
+
+    const Metric = ({ title, value, isPercentage = false }) => {
+      const numValue = parseFloat(value);
+      const colorClass = isNaN(numValue) ? '' : (numValue >= 0 ? 'text-success' : 'text-danger');
+      return e('div', { className: 'metric' },
+        e('div', { className: 'metric-title' }, title),
+        e('div', { className: `metric-value ${colorClass}` }, `${value}${isPercentage ? '%' : ''}`)
+      );
+    };
+
+    return e('div', { className: 'hedge-fund-tool' },
+      e('style', null, `
+        .hedge-fund-tool { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .hf-header { margin-bottom: 20px; }
+        .hf-header h2 { font-size: 22px; font-weight: 600; color: #1a202c; }
+        .hf-header p { font-size: 15px; color: #718096; }
+        .hf-controls { display: flex; gap: 16px; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap; }
+        .hf-control-group { flex: 1; min-width: 120px; }
+        .hf-control-group label { font-weight: 500; font-size: 14px; margin-bottom: 6px; color: #4a5568; }
+        .hf-control-group .form-control, .hf-control-group .form-select { font-size: 15px; }
+        .hf-symbol-pills { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+        .hf-symbol-pills span { background: #edf2f7; color: #4a5568; font-size: 12px; padding: 4px 8px; border-radius: 12px; cursor: pointer; transition: all 0.2s; }
+        .hf-symbol-pills span:hover { background: #e2e8f0; }
+        .hf-analyze-btn { font-weight: 500; padding: 10px 20px; font-size: 15px; }
+        
+        .hf-results { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; align-items: start; }
+        .hf-signal-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: center; }
+        .hf-signal-card .signal-title { font-size: 14px; font-weight: 500; color: #718096; margin-bottom: 12px; }
+        .signal-badge { font-size: 24px; font-weight: 700; padding: 8px 24px; border-radius: 8px; color: #fff; }
+        .signal-buy { background: #2f855a; box-shadow: 0 4px 14px rgba(47, 133, 90, 0.3); }
+        .signal-sell { background: #c53030; box-shadow: 0 4px 14px rgba(197, 48, 48, 0.3); }
+        .signal-hold { background: #718096; box-shadow: 0 4px 14px rgba(113, 128, 150, 0.3); }
+        .signal-price { font-size: 18px; font-weight: 500; color: #2d3748; margin-top: 12px; }
+        .signal-date { font-size: 13px; color: #a0aec0; margin-top: 4px; }
+
+        .hf-metrics-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; }
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .metric { text-align: center; }
+        .metric-title { font-size: 14px; color: #718096; margin-bottom: 4px; }
+        .metric-value { font-size: 20px; font-weight: 600; }
+        .hf-summary { margin-top: 20px; font-size: 14px; background: #ebf8ff; color: #1c3d5a; border-radius: 8px; padding: 12px; }
+
+        @media (max-width: 768px) {
+          .hf-results { grid-template-columns: 1fr; }
+          .hf-controls { flex-direction: column; align-items: stretch; }
+        }
+      `),
+      
+      e('div', { className: 'hf-header' },
+        e('h2', null, 'Trading Strategy Backtester'),
+        e('p', null, 'Analyze stock performance using technical trading strategies.')
+      ),
+
+      e('form', { className: 'hf-controls', onSubmit: handleAnalyze },
+        e('div', { className: 'hf-control-group', style: { flex: '1.5' } },
+          e('label', { htmlFor: 'hf-symbol' }, 'Stock Symbol'),
+          e('input', { id: 'hf-symbol', type: 'text', className: 'form-control', value: symbol, onChange: ev => setSymbol(ev.target.value.toUpperCase()), placeholder: 'e.g. AAPL' }),
+          e('div', { className: 'hf-symbol-pills' }, 
+            popularSymbols.map(s => e('span', { key: s, onClick: () => setSymbol(s) }, s))
+          )
+        ),
+        e('div', { className: 'hf-control-group' },
+          e('label', { htmlFor: 'hf-strategy' }, 'Strategy'),
+          e('select', { id: 'hf-strategy', className: 'form-select', value: strategy, onChange: ev => setStrategy(ev.target.value) },
+            strategies.map(s => e('option', { key: s.value, value: s.value }, s.label))
+          )
+        ),
+        e('div', { className: 'hf-control-group' },
+          e('label', { htmlFor: 'hf-period' }, 'Period'),
+          e('select', { id: 'hf-period', className: 'form-select', value: period, onChange: ev => setPeriod(ev.target.value) },
+            periods.map(p => e('option', { key: p.value, value: p.value }, p.label))
+          )
+        ),
+        e('button', { type: 'submit', className: 'btn btn-primary hf-analyze-btn', disabled: loading || !symbol }, loading ? 'Analyzing...' : 'Analyze')
+      ),
+
+      error && e('div', { className: 'alert alert-danger' }, error),
+
+      loading && !result && e('div', { className: 'text-center p-5' }, e('div', { className: 'spinner-border', role: 'status' })),
+
+      result && e('div', { className: 'hf-results' },
+        e('div', { className: 'hf-signal-card' },
+          e('div', { className: 'signal-title' }, 'Latest Signal'),
+          e('div', { className: `signal-badge ${getSignalClass(result.latest_signals.signal)}` }, getSignalText(result.latest_signals.signal)),
+          e('div', { className: 'signal-price' }, `$${result.latest_signals.price.toFixed(2)}`),
+          e('div', { className: 'signal-date' }, `as of ${result.latest_signals.date}`)
+        ),
+        e('div', { className: 'hf-metrics-card' },
+          e('div', { className: 'metrics-grid' },
+            Metric({ title: 'Total Return', value: result.metrics.total_return, isPercentage: true }),
+            Metric({ title: 'Sharpe Ratio', value: result.metrics.sharpe_ratio }),
+            Metric({ title: 'Max Drawdown', value: result.metrics.max_drawdown, isPercentage: true }),
+            Metric({ title: 'Value at Risk (95%)', value: result.metrics.var_95, isPercentage: true })
+          ),
+          e('div', { className: 'hf-summary' },
+            `Backtest for `, e('strong', null, `${result.symbol}`), ` using a `, e('strong', null, `${strategy.replace('_', ' ')}`), ` strategy over the past `, e('strong', null, `${period}.`)
+          )
+        )
+      )
+    );
+  }
+
+  const root = document.getElementById('react-hedge-fund-tool');
+  if (root && window.React && window.ReactDOM) {
+    ReactDOM.createRoot(root).render(React.createElement(HedgeFundTool));
+  }
+})();
   
