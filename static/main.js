@@ -1338,4 +1338,172 @@ window.fetchTweetVolatilityAnalysis = function() {
     ReactDOM.createRoot(root).render(React.createElement(InvestmentPlaybooksTool));
   }
 })();
+
+// Volatility Regime Strategy Tool Component
+(function() {
+  const e = React.createElement;
+
+  function VolatilityRegimeStrategy() {
+    const [futures, setFutures] = React.useState([]);
+    const [selectedSymbol, setSelectedSymbol] = React.useState('ES=F');
+    const [lookbackDays, setLookbackDays] = React.useState(252);
+    const [volatilityThreshold, setVolatilityThreshold] = React.useState(0.75);
+    const [loading, setLoading] = React.useState(false);
+    const [result, setResult] = React.useState(null);
+    const [error, setError] = React.useState(null);
+
+    React.useEffect(() => {
+      fetch('/available_futures')
+        .then(res => {
+          if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          if (Array.isArray(data)) {
+            setFutures(data);
+            if (data.length > 0) setSelectedSymbol(data[0].symbol);
+          } else {
+            throw new Error('Received invalid futures data from server.');
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching futures:", err);
+          setError('Could not fetch futures contracts. Please ensure the server is running.');
+        });
+    }, []);
+
+    const handleAnalyze = async (ev) => {
+      if (ev) ev.preventDefault();
+      if (!selectedSymbol) return;
+
+      setLoading(true);
+      setError(null);
+      setResult(null);
+
+      try {
+        const resp = await fetch('/analyze_volatility_regime', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            symbol: selectedSymbol,
+            lookback_days: lookbackDays,
+            volatility_threshold: volatilityThreshold
+          })
+        });
+        
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Analysis failed');
+        setResult(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const Metric = ({ title, value, isPercentage = false, isDecimal = false }) => {
+      let displayValue = value;
+      if (isPercentage) {
+        displayValue = `${(value * 100).toFixed(2)}%`;
+      } else if (isDecimal) {
+        displayValue = value.toFixed(4);
+      } else {
+        displayValue = value.toFixed(2);
+      }
+      
+      return e('div', { className: 'col-md-3 mb-3' },
+        e('div', { className: 'card h-100' },
+          e('div', { className: 'card-body text-center' },
+            e('h6', { className: 'card-title text-muted' }, title),
+            e('h4', { className: 'card-text fw-bold' }, displayValue)
+          )
+        )
+      );
+    };
+
+    return e('div', { className: 'volatility-regime-tool', style: { maxWidth: '1000px', margin: '0 auto' } },
+      e('form', { className: 'row g-3 align-items-end mb-4', onSubmit: handleAnalyze },
+        e('div', { className: 'col-md-4' },
+          e('label', { htmlFor: 'futures-select', className: 'form-label' }, 'Select Futures Contract'),
+          e('select', { 
+            id: 'futures-select', 
+            className: 'form-select', 
+            value: selectedSymbol, 
+            onChange: ev => setSelectedSymbol(ev.target.value) 
+          },
+            futures.map(future => e('option', { key: future.symbol, value: future.symbol }, `${future.name} (${future.symbol})`))
+          )
+        ),
+        e('div', { className: 'col-md-2' },
+          e('label', { htmlFor: 'lookback-days', className: 'form-label' }, 'Lookback Days'),
+          e('input', { 
+            id: 'lookback-days', 
+            type: 'number', 
+            className: 'form-control', 
+            value: lookbackDays, 
+            onChange: ev => setLookbackDays(parseInt(ev.target.value)),
+            min: 100,
+            max: 500
+          })
+        ),
+        e('div', { className: 'col-md-2' },
+          e('label', { htmlFor: 'volatility-threshold', className: 'form-label' }, 'Volatility Threshold'),
+          e('input', { 
+            id: 'volatility-threshold', 
+            type: 'number', 
+            className: 'form-control', 
+            value: volatilityThreshold, 
+            onChange: ev => setVolatilityThreshold(parseFloat(ev.target.value)),
+            min: 0.5,
+            max: 0.95,
+            step: 0.05
+          })
+        ),
+        e('div', { className: 'col-md-4' },
+          e('button', { 
+            type: 'submit', 
+            className: 'btn btn-primary w-100', 
+            disabled: loading || !selectedSymbol 
+          }, loading ? 'Analyzing...' : 'Analyze Strategy')
+        )
+      ),
+
+      error && e('div', { className: 'alert alert-danger' }, error),
+
+      loading && e('div', { className: 'text-center p-5' }, e('div', { className: 'spinner-border', role: 'status' })),
+
+      result && e('div', { className: 'results-section' },
+        e('div', { className: 'card mb-4' },
+          e('div', { className: 'card-header' }, `Volatility Regime Strategy Analysis for ${result.symbol}`),
+          e('div', { className: 'card-body' },
+            e('div', { className: 'row' },
+              Metric({ title: 'Total Return', value: result.strategy_results.total_return, isPercentage: true }),
+              Metric({ title: 'Sharpe Ratio', value: result.strategy_results.sharpe_ratio, isDecimal: true }),
+              Metric({ title: 'Max Drawdown', value: result.strategy_results.max_drawdown, isPercentage: true }),
+              Metric({ title: 'Win Rate', value: result.strategy_results.win_rate, isPercentage: true })
+            ),
+            e('hr'),
+            e('div', { className: 'row' },
+              e('div', { className: 'col-md-6' },
+                e('h6', null, 'Regime Distribution'),
+                e('p', null, `Low Volatility Periods: ${result.regime_distribution.low_volatility}`),
+                e('p', null, `High Volatility Periods: ${result.regime_distribution.high_volatility}`)
+              ),
+              e('div', { className: 'col-md-6' },
+                e('h6', null, 'Model Performance'),
+                e('p', null, `Regime Prediction Accuracy: ${(result.regime_accuracy * 100).toFixed(2)}%`),
+                e('p', null, `Data Points Analyzed: ${result.data_points}`)
+              )
+            )
+          )
+        )
+      )
+    );
+  }
+
+  const root = document.getElementById('react-volatility-regime-tool');
+  if (root && window.React && window.ReactDOM) {
+    ReactDOM.createRoot(root).render(React.createElement(VolatilityRegimeStrategy));
+  }
+})();
   
