@@ -55,12 +55,12 @@ def get_stock_data(symbol):
     stock = yf.Ticker(symbol)
     info = stock.info
     return {
-        'pe_ratio': info.get('trailingPE'),
-        'roe': info.get('returnOnEquity'),
-        'debt_to_equity': info.get('debtToEquity'),
-        'eps_growth': info.get('earningsQuarterlyGrowth'),
-        'profit_margin': info.get('profitMargins'),
-        'operating_cash_flow': info.get('operatingCashflow'),
+        'pe_ratio': info.get('trailingPE', 0),
+        'roe': info.get('returnOnEquity', 0),
+        'debt_to_equity': info.get('debtToEquity', 0),
+        'eps_growth': info.get('earningsQuarterlyGrowth', 0),
+        'profit_margin': info.get('profitMargins', 0),
+        'operating_cash_flow': info.get('operatingCashflow', 0),
     }
 
 @investment_playbooks_bp.route('/analyze_playbook', methods=['POST'])
@@ -83,12 +83,15 @@ def analyze_playbook():
         reasons = ["General market conditions are neutral."]
 
         if playbook_name == "Warren Buffett Playbook":
-            if stock_data['roe'] and stock_data['roe'] > 0.15 and stock_data['pe_ratio'] and stock_data['pe_ratio'] < 20:
+            roe = stock_data['roe'] or 0
+            pe_ratio = stock_data['pe_ratio'] or 0
+            
+            if roe > 0.15 and pe_ratio < 20:
                 decision = "Buy"
-                reasons = [f"ROE is attractive ({stock_data['roe']:.2f} > 15%)", f"P/E ratio is reasonable ({stock_data['pe_ratio']:.2f} < 20)"]
+                reasons = [f"ROE is attractive ({roe:.2f} > 15%)", f"P/E ratio is reasonable ({pe_ratio:.2f} < 20)"]
             else:
                 decision = "Avoid"
-                reasons = [f"Does not meet ROE criteria ({stock_data['roe']:.2f}) or P/E criteria ({stock_data['pe_ratio']:.2f})"]
+                reasons = [f"Does not meet ROE criteria ({roe:.2f}) or P/E criteria ({pe_ratio:.2f})"]
 
         return jsonify({
             'playbook': playbook,
