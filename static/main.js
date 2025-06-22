@@ -1170,10 +1170,10 @@ window.fetchTweetVolatilityAnalysis = function() {
         ),
         e('div', { className: 'hf-metrics-card' },
           e('div', { className: 'metrics-grid' },
-            Metric({ title: 'Total Return', value: result.metrics.total_return, isPercentage: true }),
+            Metric({ title: 'Total Return', value: result.metrics.total_return }),
             Metric({ title: 'Sharpe Ratio', value: result.metrics.sharpe_ratio }),
-            Metric({ title: 'Max Drawdown', value: result.metrics.max_drawdown, isPercentage: true }),
-            Metric({ title: 'Value at Risk (95%)', value: result.metrics.var_95, isPercentage: true })
+            Metric({ title: 'Max Drawdown', value: result.metrics.max_drawdown }),
+            Metric({ title: 'Value at Risk (95%)', value: result.metrics.var_95 })
           ),
           e('div', { className: 'hf-summary' },
             `Backtest for `, e('strong', null, `${result.symbol}`), ` using a `, e('strong', null, `${strategy.replace('_', ' ')}`), ` strategy over the past `, e('strong', null, `${period}.`)
@@ -1277,13 +1277,6 @@ window.fetchTweetVolatilityAnalysis = function() {
     };
 
     return e('div', { className: 'investment-agent-tool', style: { maxWidth: '800px', margin: '0 auto' } },
-      e('h2', { className: 'mb-4' }, 'Investment Playbook Analysis'),
-      
-      e('div', { className: 'alert alert-info' }, 
-        e('h4', { className: 'alert-heading' }, 'How it works'),
-        e('p', null, 'Select an investment playbook, enter a stock symbol, and the analysis will run based on the playbook\'s unique philosophy and logic. This is a simplified simulation for educational purposes.')
-      ),
-
       e('form', { className: 'row g-3 align-items-end mb-4', onSubmit: handleAnalyze },
         e('div', { className: 'col-md-5' },
           e('label', { htmlFor: 'playbook-select', className: 'form-label' }, 'Select Playbook'),
