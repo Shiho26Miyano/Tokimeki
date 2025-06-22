@@ -21,12 +21,12 @@ from routes.stock_data_provider import stock_bp as stock_data_provider_bp
 app.register_blueprint(stock_data_provider_bp)
 from routes.speech_analysis import speech_analysis_bp
 app.register_blueprint(speech_analysis_bp)
-from routes.tweet import tweet_bp
-app.register_blueprint(tweet_bp)
 from routes.tweet_sentiment_analyzer import hf_tweeteval_bp as tweet_sentiment_analyzer_bp
 app.register_blueprint(tweet_sentiment_analyzer_bp)
 from routes.trading_strategy_analyzer import hf_signal_bp as trading_strategy_analyzer_bp
 app.register_blueprint(trading_strategy_analyzer_bp)
+from routes.investment_playbooks import investment_playbooks_bp
+app.register_blueprint(investment_playbooks_bp)
 
 @app.after_request
 def after_request(response):

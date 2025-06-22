@@ -984,17 +984,36 @@ window.fetchTweetVolatilityAnalysis = function() {
   const e = React.createElement;
 
   function HedgeFundTool() {
-    const [symbol, setSymbol] = React.useState('AAPL');
+    const [companies, setCompanies] = React.useState([]);
+    const [symbol, setSymbol] = React.useState('');
     const [strategy, setStrategy] = React.useState('trend');
     const [period, setPeriod] = React.useState('1y');
     const [loading, setLoading] = React.useState(false);
     const [result, setResult] = React.useState(null);
     const [error, setError] = React.useState(null);
 
-    // Initial analysis on load
+    // Fetch companies and run initial analysis
     React.useEffect(() => {
-      handleAnalyze(null, { symbol: 'AAPL', strategy: 'trend', period: '1y' });
-    }, []);
+      fetch('/available_companies')
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`Server responded with ${res.status}`);
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) {
+            setCompanies(data);
+            const initialSymbol = data.find(c => c.symbol === 'AAPL') ? 'AAPL' : data[0].symbol;
+            setSymbol(initialSymbol);
+            // Trigger analysis with the initial symbol
+            handleAnalyze(null, { symbol: initialSymbol, strategy: 'trend', period: '1y' });
+          } else {
+            setError('Could not fetch company list.');
+          }
+        })
+        .catch(() => setError('Could not fetch company list.'));
+    }, []); // Empty dependency array means this runs once on mount
 
     const strategies = [
       { value: 'trend', label: 'Trend Following' },
@@ -1102,10 +1121,23 @@ window.fetchTweetVolatilityAnalysis = function() {
         e('p', null, 'Analyze stock performance using technical trading strategies.')
       ),
 
+      e('div', {
+        className: 'alert alert-warning',
+        role: 'alert',
+        style: { fontSize: '14px', padding: '10px 15px', marginTop: '0', marginBottom: '20px' }
+      }, 'This project is for educational and research purposes only.'),
+
       e('form', { className: 'hf-controls', onSubmit: handleAnalyze },
         e('div', { className: 'hf-control-group', style: { flex: '1.5' } },
-          e('label', { htmlFor: 'hf-symbol' }, 'Stock Symbol'),
-          e('input', { id: 'hf-symbol', type: 'text', className: 'form-control', value: symbol, onChange: ev => setSymbol(ev.target.value.toUpperCase()), placeholder: 'e.g. AAPL' }),
+          e('label', { htmlFor: 'hf-symbol' }, 'Company'),
+          e('select', { 
+            id: 'hf-symbol', 
+            className: 'form-select', 
+            value: symbol, 
+            onChange: ev => setSymbol(ev.target.value) 
+          },
+            companies.map(company => e('option', { key: company.symbol, value: company.symbol }, `${company.name} (${company.symbol})`))
+          ),
           e('div', { className: 'hf-symbol-pills' }, 
             popularSymbols.map(s => e('span', { key: s, onClick: () => setSymbol(s) }, s))
           )
@@ -1154,6 +1186,163 @@ window.fetchTweetVolatilityAnalysis = function() {
   const root = document.getElementById('react-hedge-fund-tool');
   if (root && window.React && window.ReactDOM) {
     ReactDOM.createRoot(root).render(React.createElement(HedgeFundTool));
+  }
+})();
+
+// Investment Playbooks Tool Component
+(function() {
+  const e = React.createElement;
+
+  function InvestmentPlaybooksTool() {
+    const [playbooks, setPlaybooks] = React.useState([]);
+    const [companies, setCompanies] = React.useState([]);
+    const [selectedPlaybook, setSelectedPlaybook] = React.useState('');
+    const [symbol, setSymbol] = React.useState('');
+    const [loading, setLoading] = React.useState(false);
+    const [result, setResult] = React.useState(null);
+    const [error, setError] = React.useState(null);
+
+    React.useEffect(() => {
+      fetch('/playbooks')
+        .then(res => {
+          if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          if (Array.isArray(data)) {
+            setPlaybooks(data);
+            if (data.length > 0) setSelectedPlaybook(data[0].name);
+          } else {
+            throw new Error('Received invalid playbook data from server.');
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching playbooks:", err);
+          setError('Could not fetch playbooks. Please ensure the server is running and the route is available.');
+        });
+
+      fetch('/available_companies')
+        .then(res => {
+            if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+            return res.json();
+        })
+        .then(data => {
+            if (Array.isArray(data)) {
+                setCompanies(data);
+                if (data.length > 0) setSymbol(data[0].symbol);
+            } else {
+                throw new Error('Received invalid company data from server.');
+            }
+        })
+        .catch(err => {
+            console.error("Error fetching companies:", err);
+            setError(prev => prev ? `${prev} And could not fetch companies.` : 'Could not fetch companies.');
+        });
+    }, []);
+
+    const handleAnalyze = async (ev) => {
+      if (ev) ev.preventDefault();
+      if (!symbol || !selectedPlaybook) return;
+
+      setLoading(true);
+      setError(null);
+      setResult(null);
+
+      try {
+        const resp = await fetch('/analyze_playbook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: symbol.toUpperCase(), playbook_name: selectedPlaybook })
+        });
+        
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Analysis failed');
+        setResult(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const currentPlaybook = playbooks.find(p => p.name === selectedPlaybook);
+
+    const metricExplanations = {
+      "debt_to_equity": "Debt-to-Equity: This ratio compares a company's total liabilities to its shareholder equity. A high value can be a sign of high risk.",
+      "eps_growth": "EPS Growth: This is the quarter-over-quarter growth in the company's Earnings Per Share. A positive value shows that the company's profitability is growing.",
+      "operating_cash_flow": "Operating Cash Flow: This is the cash generated from the company's core business operations. A large, positive number is a strong sign of financial health.",
+      "pe_ratio": "P/E Ratio: The Price-to-Earnings ratio compares the company's stock price to its earnings per share. A high P/E suggests that investors have high expectations for future growth.",
+      "profit_margin": "Profit Margin: This shows how much profit the company makes for every dollar of revenue. A high profit margin indicates a very profitable business.",
+      "roe": "ROE (Return on Equity): This measures how effectively the company uses shareholder investments to generate profit. A high ROE signals efficient management."
+    };
+
+    return e('div', { className: 'investment-agent-tool', style: { maxWidth: '800px', margin: '0 auto' } },
+      e('h2', { className: 'mb-4' }, 'Investment Playbook Analysis'),
+      
+      e('div', { className: 'alert alert-info' }, 
+        e('h4', { className: 'alert-heading' }, 'How it works'),
+        e('p', null, 'Select an investment playbook, enter a stock symbol, and the analysis will run based on the playbook\'s unique philosophy and logic. This is a simplified simulation for educational purposes.')
+      ),
+
+      e('form', { className: 'row g-3 align-items-end mb-4', onSubmit: handleAnalyze },
+        e('div', { className: 'col-md-5' },
+          e('label', { htmlFor: 'playbook-select', className: 'form-label' }, 'Select Playbook'),
+          e('select', { id: 'playbook-select', className: 'form-select', value: selectedPlaybook, onChange: ev => setSelectedPlaybook(ev.target.value) },
+            playbooks.map(playbook => e('option', { key: playbook.name, value: playbook.name }, playbook.name))
+          )
+        ),
+        e('div', { className: 'col-md-4' },
+          e('label', { htmlFor: 'agent-symbol', className: 'form-label' }, 'Stock Symbol'),
+          e('select', { id: 'agent-symbol', className: 'form-select', value: symbol, onChange: ev => setSymbol(ev.target.value) },
+            companies.map(company => e('option', { key: company.symbol, value: company.symbol }, `${company.name} (${company.symbol})`))
+          )
+        ),
+        e('div', { className: 'col-md-3' },
+          e('button', { type: 'submit', className: 'btn btn-primary w-100', disabled: loading || !symbol || !selectedPlaybook }, loading ? 'Analyzing...' : 'Analyze')
+        )
+      ),
+
+      currentPlaybook && e('div', { className: 'card bg-light mb-4' },
+        e('div', { className: 'card-body' },
+          e('h5', { className: 'card-title' }, currentPlaybook.name),
+          e('h6', { className: 'card-subtitle mb-2 text-muted' }, currentPlaybook.role),
+          e('p', { className: 'card-text' }, e('strong', null, 'Philosophy: '), currentPlaybook.philosophy)
+        )
+      ),
+
+      error && e('div', { className: 'alert alert-danger' }, error),
+
+      loading && e('div', { className: 'text-center p-5' }, e('div', { className: 'spinner-border', role: 'status' })),
+
+      result && e('div', { className: 'card' },
+        e('div', { className: 'card-header' }, `Analysis for ${symbol} by ${result.playbook.name}`),
+        e('div', { className: 'card-body' },
+          e('h5', { className: 'card-title' }, `Decision: ${result.decision}`),
+          e('p', { className: 'card-text' }, e('strong', null, 'Reasons:')),
+          e('ul', { className: 'list-group list-group-flush' },
+            result.reasons.map((reason, i) => e('li', { key: i, className: 'list-group-item' }, reason))
+          ),
+          e('hr'),
+          e('p', { className: 'card-text mt-3' }, e('strong', null, 'Key Metrics:')),
+          e('ul', { className: 'list-group list-group-flush' },
+            Object.entries(result.stock_data).map(([key, value]) => 
+              e('li', { key: key, className: 'list-group-item' },
+                e('div', { className: 'tooltip-container' },
+                  `${key.replace(/_/g, ' ')}:`,
+                  e('span', { className: 'tooltip-text' }, metricExplanations[key])
+                ),
+                ` ${value !== null ? parseFloat(value).toFixed(2) : 'N/A'}`
+              )
+            )
+          )
+        )
+      )
+    );
+  }
+
+  const root = document.getElementById('react-investment-playbooks-tool');
+  if (root && window.React && window.ReactDOM) {
+    ReactDOM.createRoot(root).render(React.createElement(InvestmentPlaybooksTool));
   }
 })();
   
