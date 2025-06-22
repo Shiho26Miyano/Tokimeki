@@ -196,7 +196,12 @@
                         <div class="card shadow-sm flex-fill d-flex flex-column">
                             <div class="card-body d-flex flex-column">
                                 <div class="card-header-row flex-column align-items-stretch" style="gap:0.5rem;">
-                                    <div class="card-title" style="font-size:1.1rem;font-weight:600;color:#183153;">Market Overtime</div>
+                                    <div class="d-flex align-items-center">
+                                        <div class="card-title" style="font-size:1.1rem;font-weight:600;color:#183153;">Market Overtime</div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#marketOvertimeHelpModal">
+                                            How it works
+                                        </button>
+                                    </div>
                                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                                         <div id="react-stock-select"></div>
                                         <label for="stock-select" class="form-label">Select companies:</label>
@@ -265,7 +270,12 @@
                         <div class="card shadow-sm flex-fill d-flex flex-column">
                             <div class="card-body d-flex flex-column">
                                 <div class="card-header-row">
-                                    <span class="card-title">Volatility Explorer</span>
+                                    <div class="d-flex align-items-center">
+                                        <span class="card-title">Volatility Explorer</span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#volatilityExplorerHelpModal">
+                                            How it works
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="card-section-vertical">
                                     <div class="mb-2" style="color:#183153;font-size:1.04rem;">
@@ -291,22 +301,219 @@
                         </div>
                     </div>
                     <div class="tab-pane fade" id="tweet-sentiment-content" role="tabpanel" aria-labelledby="tweet-sentiment-tab">
-                        <div class="container py-4"><div id="react-tweet-sentiment"></div></div>
+                        <div class="card shadow-sm flex-fill d-flex flex-column">
+                            <div class="card-body d-flex flex-column">
+                                <div class="card-header-row">
+                                    <div class="d-flex align-items-center">
+                                        <span class="card-title">Tweet Sentiment</span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#tweetSentimentHelpModal">
+                                            How it works
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="container py-4"><div id="react-tweet-sentiment"></div></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="tab-pane fade" id="speech-analysis-content" role="tabpanel" aria-labelledby="speech-analysis-tab">
-                        <div class="container py-4"><div id="react-speech-recorder"></div></div>
+                        <div class="card shadow-sm flex-fill d-flex flex-column">
+                            <div class="card-body d-flex flex-column">
+                                <div class="card-header-row">
+                                    <div class="d-flex align-items-center">
+                                        <span class="card-title">Financial Q&A</span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#financialQAHelpModal">
+                                            How it works
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="container py-4"><div id="react-speech-recorder"></div></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="tab-pane fade" id="hf-signal-tool-content" role="tabpanel" aria-labelledby="hf-signal-tool-tab">
-                        <div class="container py-4"><div id="react-hedge-fund-tool"></div></div>
+                        <div class="card shadow-sm flex-fill d-flex flex-column">
+                            <div class="card-body d-flex flex-column">
+                                <div class="card-header-row">
+                                    <div class="d-flex align-items-center">
+                                        <span class="card-title">Trading Strategy Analyzer</span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#tradingStrategyHelpModal">
+                                            How it works
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="container py-4"><div id="react-hedge-fund-tool"></div></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="tab-pane fade" id="investment-playbooks-content" role="tabpanel" aria-labelledby="investment-playbooks-tab">
-                        <div class="container py-4"><div id="react-investment-playbooks-tool"></div></div>
+                        <div class="card shadow-sm flex-fill d-flex flex-column">
+                            <div class="card-body d-flex flex-column">
+                                <div class="card-header-row">
+                                    <div class="d-flex align-items-center">
+                                        <span class="card-title">Investment Playbooks</span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#investmentPlaybooksHelpModal">
+                                            How it works
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="container py-4"><div id="react-investment-playbooks-tool"></div></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     
+    <!-- Market Overtime Help Modal -->
+    <div class="modal fade" id="marketOvertimeHelpModal" tabindex="-1" aria-labelledby="marketOvertimeHelpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="marketOvertimeHelpModalLabel">How Market Overtime Works</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>This tool fetches and visualizes historical stock price data to help you analyze market trends over time.</p>
+                    <ol>
+                        <li><strong>Select Companies:</strong> Choose one or more companies from the dropdown menu. The chart will automatically update to show their stock price trends. You can select up to 10 companies to compare.</li>
+                        <li><strong>Interactive Chart:</strong> The main chart displays the closing stock prices for the selected companies over the last three years. You can hover your mouse over the lines to see the exact price for a specific date.</li>
+                        <li><strong>Zoom and Pan:</strong> Use the slider below the chart to zoom in on a specific time period. Drag the handles to adjust the start and end dates of your analysis.</li>
+                    </ol>
+                    <p class="text-muted small">All stock data is sourced from Yahoo Finance via yfinance.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Volatility Explorer Help Modal -->
+    <div class="modal fade" id="volatilityExplorerHelpModal" tabindex="-1" aria-labelledby="volatilityExplorerHelpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="volatilityExplorerHelpModalLabel">How Volatility Explorer Works</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>This tool analyzes stock price volatility to help you understand market risk and identify periods of high uncertainty.</p>
+                    <ol>
+                        <li><strong>Rolling Window:</strong> Set the number of days for calculating rolling volatility. A larger window (e.g., 30 days) shows longer-term trends, while a smaller window (e.g., 10 days) reveals short-term fluctuations.</li>
+                        <li><strong>Time Range:</strong> Choose how many years of historical data to analyze. More data provides better context for volatility patterns.</li>
+                        <li><strong>Interactive Visualization:</strong> The chart shows rolling volatility over time. Higher peaks indicate periods of increased price volatility and market uncertainty.</li>
+                        <li><strong>Zoom Control:</strong> Use the slider below the chart to focus on specific time periods and examine volatility patterns in detail.</li>
+                    </ol>
+                    <p class="text-muted small">Volatility is calculated using the standard deviation of daily returns over the specified rolling window.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tweet Sentiment Help Modal -->
+    <div class="modal fade" id="tweetSentimentHelpModal" tabindex="-1" aria-labelledby="tweetSentimentHelpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tweetSentimentHelpModalLabel">How Tweet Sentiment Works</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>This tool analyzes the sentiment of tweets to gauge public opinion about stocks, companies, or financial topics.</p>
+                    <ol>
+                        <li><strong>Enter Text:</strong> Type or paste the text you want to analyze. This could be a tweet, news headline, or any financial commentary.</li>
+                        <li><strong>Sentiment Analysis:</strong> The tool uses advanced natural language processing to determine whether the text expresses positive, negative, or neutral sentiment.</li>
+                        <li><strong>Results:</strong> You'll see a sentiment score and classification, along with confidence levels for the analysis.</li>
+                        <li><strong>Use Cases:</strong> Analyze social media sentiment about stocks, evaluate news headlines, or assess public opinion on financial topics.</li>
+                    </ol>
+                    <p class="text-muted small">The sentiment analysis is powered by a fine-tuned financial language model trained on Twitter data.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Q&A Help Modal -->
+    <div class="modal fade" id="financialQAHelpModal" tabindex="-1" aria-labelledby="financialQAHelpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="financialQAHelpModalLabel">How Financial Q&A Works</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>This tool provides AI-powered answers to your financial questions using advanced language models.</p>
+                    <ol>
+                        <li><strong>Ask Questions:</strong> Type any financial question you have, from basic concepts to complex market analysis.</li>
+                        <li><strong>Voice Input:</strong> Click the microphone button to ask your question using voice input for hands-free interaction.</li>
+                        <li><strong>AI Response:</strong> The tool uses a specialized financial language model to provide accurate, context-aware answers.</li>
+                        <li><strong>Conversation:</strong> You can ask follow-up questions to dive deeper into topics or clarify previous responses.</li>
+                    </ol>
+                    <p class="text-muted small">The AI model is trained on financial data and can help with investment strategies, market analysis, and financial education.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trading Strategy Analyzer Help Modal -->
+    <div class="modal fade" id="tradingStrategyHelpModal" tabindex="-1" aria-labelledby="tradingStrategyHelpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tradingStrategyHelpModalLabel">How Trading Strategy Analyzer Works</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>This tool backtests trading strategies using historical data to evaluate their performance and risk metrics.</p>
+                    <ol>
+                        <li><strong>Strategy Parameters:</strong> Configure your trading strategy by setting entry/exit conditions, position sizing, and risk management rules.</li>
+                        <li><strong>Historical Backtesting:</strong> The tool simulates your strategy on historical market data to see how it would have performed.</li>
+                        <li><strong>Performance Metrics:</strong> View key metrics including total return, Sharpe ratio, maximum drawdown, and win rate.</li>
+                        <li><strong>Risk Analysis:</strong> Understand the risk profile of your strategy with detailed risk metrics and performance breakdowns.</li>
+                    </ol>
+                    <p class="text-muted small">Backtesting results are based on historical data and may not predict future performance. Always consider market conditions and risk management.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Investment Playbooks Help Modal -->
+    <div class="modal fade" id="investmentPlaybooksHelpModal" tabindex="-1" aria-labelledby="investmentPlaybooksHelpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="investmentPlaybooksHelpModalLabel">How Investment Playbooks Works</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>This tool analyzes stocks using predefined investment strategies to help you make informed investment decisions.</p>
+                    <ol>
+                        <li><strong>Select Company:</strong> Choose a company from the dropdown menu to analyze. The tool will fetch current financial data for the selected stock.</li>
+                        <li><strong>Investment Playbooks:</strong> Each playbook represents a different investment strategy with specific criteria and rules for evaluating stocks.</li>
+                        <li><strong>Analysis Results:</strong> The tool evaluates the stock against each playbook's criteria and provides recommendations with confidence scores.</li>
+                        <li><strong>Financial Metrics:</strong> View key financial indicators including P/E ratio, market cap, dividend yield, and more to understand the stock's fundamentals.</li>
+                    </ol>
+                    <p class="text-muted small">All financial data is sourced from Yahoo Finance. Investment recommendations are for educational purposes and should not be considered as financial advice.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
@@ -316,5 +523,49 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="static/main.js"></script>
+    
+    <script>
+        // Handle hover-triggered modals for "How it works" buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            const howItWorksButtons = document.querySelectorAll('.how-it-works-btn');
+            
+            howItWorksButtons.forEach(button => {
+                let modal = null;
+                let timeoutId = null;
+                
+                button.addEventListener('mouseenter', function() {
+                    const targetId = this.getAttribute('data-bs-target');
+                    modal = new bootstrap.Modal(document.querySelector(targetId));
+                    modal.show();
+                });
+                
+                button.addEventListener('mouseleave', function() {
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+                    }
+                    timeoutId = setTimeout(() => {
+                        if (modal) {
+                            modal.hide();
+                        }
+                    }, 300); // Small delay to prevent immediate closing
+                });
+                
+                // Also close modal when mouse leaves the modal itself
+                const targetId = button.getAttribute('data-bs-target');
+                const modalElement = document.querySelector(targetId);
+                modalElement.addEventListener('mouseenter', function() {
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+                    }
+                });
+                
+                modalElement.addEventListener('mouseleave', function() {
+                    if (modal) {
+                        modal.hide();
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html> 
