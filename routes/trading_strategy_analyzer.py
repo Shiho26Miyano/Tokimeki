@@ -1,3 +1,4 @@
+# DISABLED: This script is not currently used/imported in the app.
 from flask import Blueprint, request, jsonify
 import yfinance as yf
 import pandas as pd
@@ -210,17 +211,3 @@ def analyze_stock():
     except Exception as e:
         logger.error(f"Error in analyze_stock: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
-# @hf_signal_bp.route('/indicators', methods=['GET'])
-# def get_indicators():
-#     """Get available technical indicators"""
-#     return jsonify({
-#         'indicators': list(HedgeFundTool().indicators.keys())
-#     })
-
-# @hf_signal_bp.route('/strategies', methods=['GET'])
-# def get_strategies():
-#     """Get available trading strategies"""
-#     return jsonify({
-#         'strategies': ['trend', 'mean_reversion', 'momentum']
-#     }) 

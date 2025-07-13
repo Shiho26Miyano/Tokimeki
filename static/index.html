@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body, .card-title, .form-label, .card-body, .card-section-vertical, .mb-2, .mb-3, .mb-4, .market-controls, .explore-controls, .poetry-controls, .d3-tooltip, .chart-area, .container, .row, .col-12, .d-flex, .text-center, .text-muted, .fs-6 {
             font-family: 'Inter', 'Roboto', Arial, sans-serif !important;
@@ -170,31 +171,173 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="market-overtime-tab" data-bs-toggle="pill" data-bs-target="#market-overtime-content" role="tab" aria-controls="market-overtime-content" aria-selected="true">Market Overtime</a>
+                        <a class="nav-link active" id="deepseek-chatbot-tab" data-bs-toggle="pill" data-bs-target="#deepseek-chatbot-content" role="tab" aria-controls="deepseek-chatbot-content" aria-selected="true">💬 Free AI Chatbot</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="volatility-explorer-tab" data-bs-toggle="pill" data-bs-target="#volatility-explorer-content" role="tab" aria-controls="volatility-explorer-content" aria-selected="false">Volatility Explorer</a>
+                        <a class="nav-link" id="ai-platform-comparables-tab" data-bs-toggle="pill" data-bs-target="#ai-platform-comparables-content" role="tab" aria-controls="ai-platform-comparables-content" aria-selected="false">🤖 AI Platform Comparables</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="tweet-sentiment-tab" data-bs-toggle="pill" data-bs-target="#tweet-sentiment-content" role="tab" aria-controls="tweet-sentiment-content" aria-selected="false">Tweet Sentiment</a>
+                        <a class="nav-link" id="market-overtime-tab" data-bs-toggle="pill" data-bs-target="#market-overtime-content" role="tab" aria-controls="market-overtime-content" aria-selected="false">📈 Market Overtime</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="speech-analysis-tab" data-bs-toggle="pill" data-bs-target="#speech-analysis-content" role="tab" aria-controls="speech-analysis-content" aria-selected="false">Financial Q&A</a>
+                        <a class="nav-link" id="volatility-explorer-tab" data-bs-toggle="pill" data-bs-target="#volatility-explorer-content" role="tab" aria-controls="volatility-explorer-content" aria-selected="false">🌪️ Volatility Explorer</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">Trading Strategy Analyzer</a>
+                        <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">📊 Trading Strategy Analyzer</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="investment-playbooks-tab" data-bs-toggle="pill" data-bs-target="#investment-playbooks-content" role="tab" aria-controls="investment-playbooks-content" aria-selected="false">Investment Playbooks</a>
+                        <a class="nav-link" id="investment-playbooks-tab" data-bs-toggle="pill" data-bs-target="#investment-playbooks-content" role="tab" aria-controls="investment-playbooks-content" aria-selected="false">📚 Investment Playbooks</a>
                     </li>
                 </ul>
             </div>
 
             <div class="col-md-10 py-4">
                 <div class="tab-content" id="main-tab-content">
-                    <div class="tab-pane fade show active" id="market-overtime-content" role="tabpanel" aria-labelledby="market-overtime-tab">
+                    <div class="tab-pane fade show active" id="deepseek-chatbot-content" role="tabpanel" aria-labelledby="deepseek-chatbot-tab">
                         <div class="card shadow-sm flex-fill d-flex flex-column">
                             <div class="card-body d-flex flex-column">
+                                <div class="card-header-row">
+                                    <div class="d-flex align-items-center">
+                                        <span class="card-title">Free AI Chatbot</span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#deepseekChatbotHelpModal">
+                                            How it works
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="container py-4"><div id="react-deepseek-chatbot"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="ai-platform-comparables-content" role="tabpanel" aria-labelledby="ai-platform-comparables-tab">
+                        <div class="card shadow-sm flex-fill d-flex flex-column" style="max-width: 1100px; margin: 0 auto; border-radius: 16px;">
+                            <div class="card-body d-flex flex-column" style="padding: 32px;">
+                                <div class="card-header-row mb-3">
+                                    <span class="card-title" style="font-size: 2rem; font-weight: 600; color: #183153;">🤖 AI Platform Comparables</span>
+                                </div>
+                                <div class="alert alert-info mb-4" style="background: #f1f5fa; color: #27457c; border: none; border-radius: 10px;">
+                                    <strong>What is this?</strong> This section compares leading AI/LLM platforms and toolkits that serve as alternatives or complements to <b>OpenRouter</b> for LLM access, orchestration, monitoring, and local inference.
+                                </div>
+                                <!-- Interactive Filters -->
+                                <div class="row mb-4">
+                                    <div class="col-md-4">
+                                        <label for="category-filter" class="form-label">Filter by Category:</label>
+                                        <select id="category-filter" class="form-select">
+                                            <option value="">All Categories</option>
+                                            <option value="llm-api">LLM API Providers</option>
+                                            <option value="orchestration">Orchestration & Routing</option>
+                                            <option value="monitoring">Monitoring & Analytics</option>
+                                            <option value="local">Local Inference</option>
+                                            <option value="enterprise">Enterprise Solutions</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="pricing-filter" class="form-label">Pricing Model:</label>
+                                        <select id="pricing-filter" class="form-select">
+                                            <option value="">All Pricing</option>
+                                            <option value="pay-per-token">Pay-per-Token</option>
+                                            <option value="subscription">Subscription</option>
+                                            <option value="open-source">Open Source</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="search-filter" class="form-label">Search:</label>
+                                        <input type="text" id="search-filter" class="form-control" placeholder="Search platforms...">
+                                    </div>
+                                </div>
+                                
+                                <!-- Comparison Table -->
+                                <div class="table-responsive">
+                                    <table class="table table-hover" id="comparison-table">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Category</th>
+                                                <th>Platform</th>
+                                                <th>Description</th>
+                                                <th>Key Features</th>
+                                                <th>Pricing</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr data-category="llm-api" data-pricing="pay-per-token">
+                                                <td>LLM API Providers</td>
+                                                <td><strong>OpenAI API</strong></td>
+                                                <td>Industry-leading LLM API with GPT-4, GPT-3.5, and DALL-E</td>
+                                                <td>GPT-4, GPT-3.5, DALL-E, Whisper, Fine-tuning</td>
+                                                <td>Pay-per-token</td>
+                                            </tr>
+                                            <tr data-category="llm-api" data-pricing="pay-per-token">
+                                                <td>LLM API Providers</td>
+                                                <td><strong>Anthropic Claude</strong></td>
+                                                <td>Advanced AI assistant with strong reasoning capabilities</td>
+                                                <td>Claude 3.5 Sonnet, Claude 3 Opus, Constitutional AI</td>
+                                                <td>Pay-per-token</td>
+                                            </tr>
+                                            <tr data-category="orchestration" data-pricing="subscription">
+                                                <td>Orchestration & Routing</td>
+                                                <td><strong>LangChain</strong></td>
+                                                <td>Framework for building LLM applications</td>
+                                                <td>Chains, Agents, Memory, Tools, Vector Stores</td>
+                                                <td>Open Source</td>
+                                            </tr>
+                                            <tr data-category="orchestration" data-pricing="subscription">
+                                                <td>Orchestration & Routing</td>
+                                                <td><strong>LlamaIndex</strong></td>
+                                                <td>Data framework for LLM applications</td>
+                                                <td>RAG, Data Connectors, Query Engines</td>
+                                                <td>Open Source</td>
+                                            </tr>
+                                            <tr data-category="monitoring" data-pricing="subscription">
+                                                <td>Monitoring & Analytics</td>
+                                                <td><strong>Weights & Biases</strong></td>
+                                                <td>ML experiment tracking and model monitoring</td>
+                                                <td>Experiment Tracking, Model Registry, Monitoring</td>
+                                                <td>Freemium + Paid</td>
+                                            </tr>
+                                            <tr data-category="local" data-pricing="open-source">
+                                                <td>Local Inference</td>
+                                                <td><strong>Ollama</strong></td>
+                                                <td>Local LLM inference and management</td>
+                                                <td>Local Models, API Server, Model Management</td>
+                                                <td>Open Source</td>
+                                            </tr>
+                                            <tr data-category="local" data-pricing="open-source">
+                                                <td>Local Inference</td>
+                                                <td><strong>LM Studio</strong></td>
+                                                <td>Desktop app for local LLM inference</td>
+                                                <td>GUI Interface, Model Downloads, Local API</td>
+                                                <td>Open Source</td>
+                                            </tr>
+                                            <tr data-category="enterprise" data-pricing="subscription">
+                                                <td>Enterprise Solutions</td>
+                                                <td><strong>Databricks</strong></td>
+                                                <td>Unified analytics platform with AI capabilities</td>
+                                                <td>MLflow, Unity Catalog, Model Serving</td>
+                                                <td>Enterprise Pricing</td>
+                                            </tr>
+                                            <tr data-category="enterprise" data-pricing="subscription">
+                                                <td>Enterprise Solutions</td>
+                                                <td><strong>Vertex AI</strong></td>
+                                                <td>Google's managed ML platform</td>
+                                                <td>AutoML, Custom Training, Model Serving</td>
+                                                <td>Pay-per-use</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div style="margin-top: 32px; color: #888; font-size: 0.98rem;">Want a visual diagram of these tools by category? Let us know!</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="market-overtime-content" role="tabpanel" aria-labelledby="market-overtime-tab">
+                        <div class="card shadow-sm flex-fill d-flex flex-column">
+                            
+                                <div class="mb-3" style="background:#f1f5fa;border-radius:10px;padding:18px 18px 10px 18px;">
+                                    <div style="font-size:1.15rem;font-weight:600;color:#183153;">Why use Market Overtime?</div>
+                                    <div style="font-size:1.01rem;color:#27457c;">📈 Track historical price trends, spot trading opportunities, and analyze long-term investment performance for your favorite stocks and ETFs. Perfect for both active traders and long-term investors!</div>
+                                    <div style="font-size:0.98rem;color:#888;margin-top:6px;">Tip: The chart below is interactive—zoom, pan, and hover for details.</div>
+                                    <button class="btn btn-outline-primary btn-sm mt-2" type="button" onclick="document.getElementById('marketOvertimeHelpModal').classList.add('show');document.getElementById('marketOvertimeHelpModal').style.display='block';">Learn how to use Market Overtime</button>
+                                </div>
+                                <div id="market-metrics-summary" class="mb-3" style="display:none;"></div>
                                 <div class="card-header-row flex-column align-items-stretch" style="gap:0.5rem;">
                                     <div class="d-flex align-items-center">
                                         <div class="card-title" style="font-size:1.1rem;font-weight:600;color:#183153;">Market Overtime</div>
@@ -247,7 +390,7 @@
                                             <option value="ZC=F">Corn (ZC=F)</option>
                                             <option value="ZS=F">Soybeans (ZS=F)</option>
                                             <option value="ZW=F">Wheat (ZW=F)</option>
-                                            <option value="VX=F">VIX (VX=F)</option>
+                                            <option value="^VIX">VIX (^VIX)</option>
                                             <option value="BTC=F">Bitcoin Futures (BTC=F)</option>
                                             <option value="ETH=F">Ethereum Futures (ETH=F)</option>
                                         </select>

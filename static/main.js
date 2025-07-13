@@ -1,6 +1,51 @@
 console.log('main.js loaded');
 // main.js - Clean, robust version for three features only
 
+// Shared company selection for Market Overtime and Volatility Explorer
+window._sharedCompanySelection = [];
+
+function syncCompanySelectors() {
+  const stockSelect = document.getElementById('stock-select');
+  const exploreStock = document.getElementById('explore-stock');
+  if (!stockSelect || !exploreStock) return;
+
+  // Helper to set selected options
+  function setSelectedOptions(select, values) {
+    Array.from(select.options).forEach(opt => {
+      opt.selected = values.includes(opt.value);
+    });
+    if (typeof Choices !== 'undefined' && select.classList.contains('choices-initialized')) {
+      // For Choices.js
+      const choicesInstance = select.choicesInstance || select.choices;
+      if (choicesInstance) {
+        choicesInstance.removeActiveItems();
+        values.forEach(val => choicesInstance.setChoiceByValue(val));
+      }
+    }
+  }
+
+  // Listen for changes in Market Overtime
+  stockSelect.addEventListener('change', function() {
+    const values = Array.from(stockSelect.selectedOptions).map(opt => opt.value);
+    window._sharedCompanySelection = values;
+    setSelectedOptions(exploreStock, values);
+    // Optionally trigger Volatility Explorer update here
+    if (typeof window.fetchVolatilityExplorer === 'function') window.fetchVolatilityExplorer();
+  });
+
+  // Listen for changes in Volatility Explorer
+  exploreStock.addEventListener('change', function() {
+    const values = Array.from(exploreStock.selectedOptions).map(opt => opt.value);
+    window._sharedCompanySelection = values;
+    setSelectedOptions(stockSelect, values);
+    window.fetchStockTrends();
+  });
+
+  // On load, sync both selectors to shared value
+  setSelectedOptions(stockSelect, window._sharedCompanySelection);
+  setSelectedOptions(exploreStock, window._sharedCompanySelection);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded, initializing components...');
     // --- Time Range Slider for Stock Price Trends ---
@@ -1338,4 +1383,42 @@ window.fetchTweetVolatilityAnalysis = function() {
     ReactDOM.createRoot(root).render(React.createElement(InvestmentPlaybooksTool));
   }
 })();
+
+// AI Platform Comparison Table Filtering
+document.addEventListener('DOMContentLoaded', function() {
+  const categoryFilter = document.getElementById('category-filter');
+  const pricingFilter = document.getElementById('pricing-filter');
+  const searchFilter = document.getElementById('search-filter');
+  const table = document.getElementById('comparison-table');
+  
+  if (!table) return;
+  
+  function filterTable() {
+    const category = categoryFilter ? categoryFilter.value : '';
+    const pricing = pricingFilter ? pricingFilter.value : '';
+    const search = searchFilter ? searchFilter.value.toLowerCase() : '';
+    
+    const rows = table.querySelectorAll('tbody tr');
+    
+    rows.forEach(row => {
+      const rowCategory = row.getAttribute('data-category') || '';
+      const rowPricing = row.getAttribute('data-pricing') || '';
+      const rowText = row.textContent.toLowerCase();
+      
+      const categoryMatch = !category || rowCategory === category;
+      const pricingMatch = !pricing || rowPricing === pricing;
+      const searchMatch = !search || rowText.includes(search);
+      
+      if (categoryMatch && pricingMatch && searchMatch) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+  
+  if (categoryFilter) categoryFilter.addEventListener('change', filterTable);
+  if (pricingFilter) pricingFilter.addEventListener('change', filterTable);
+  if (searchFilter) searchFilter.addEventListener('input', filterTable);
+});
   

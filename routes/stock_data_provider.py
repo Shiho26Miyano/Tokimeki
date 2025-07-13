@@ -227,7 +227,7 @@ def available_tickers():
             'SPY', 'QQQ', 'VOO', 'ARKK', 'EEM', 'XLF',
             'ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'MES=F', 'MNQ=F', 'MYM=F', 'M2K=F',
             'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZS=F', 'ZW=F',
-            'VX=F', 'BTC=F', 'ETH=F'
+            '^VIX', 'BTC=F', 'ETH=F'
         ]
         
         # If yfinance is not available, return default list
