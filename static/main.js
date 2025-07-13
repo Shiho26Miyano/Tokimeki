@@ -102,6 +102,11 @@ document.addEventListener('DOMContentLoaded', function() {
             window.fetchStockTrends();
         });
     }
+
+    // Initialize chat functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        // ... existing code ...
+    });
 });
 
 // Store last fetched data and chart state
@@ -721,7 +726,7 @@ window.fetchTweetVolatilityAnalysis = function() {
     const [result, setResult] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
-    const [model, setModel] = React.useState("distilbert-base-uncased-finetuned-sst-2-english");
+    const [model, setModel] = React.useState("mistral-small");
     const modelExplanations = {
       "distilbert-base-uncased-finetuned-sst-2-english": "DistilBERT is a lightweight, fast transformer model fine-tuned on SST-2 for general English sentiment analysis.",
       "nreimers/TinyBERT_L-4_H-312_A-12-SST2": "TinyBERT (NReimers) is a compact transformer model fine-tuned on SST-2 for efficient English sentiment analysis.",
@@ -836,146 +841,6 @@ window.fetchTweetVolatilityAnalysis = function() {
   const root = document.getElementById('react-tweet-sentiment');
   if (root && window.React && window.ReactDOM) {
     ReactDOM.createRoot(root).render(React.createElement(TweetSentiment));
-  }
-})();
-
-// ... existing code ...
-(function() {
-  const e = React.createElement;
-
-  function SpeechRecorder() {
-    const models = [
-      { value: 'HuggingFaceH4/zephyr-7b-beta', label: 'Zephyr-7B (HF4)' },
-      { value: 'mistralai/Mistral-7B-v0.1', label: 'Mistral-7B' },
-      { value: 'google/gemma-7b-it', label: 'Gemma-7B (Google)' }
-    ];
-    const [model, setModel] = React.useState(models[0].value);
-    const [recording, setRecording] = React.useState(false);
-    const [transcript, setTranscript] = React.useState("");
-    const [error, setError] = React.useState(null);
-    const [result, setResult] = React.useState(null);
-    const [loading, setLoading] = React.useState(false);
-    const [timer, setTimer] = React.useState(0);
-    const recognitionRef = React.useRef(null);
-    const timerRef = React.useRef(null);
-
-    React.useEffect(() => {
-      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-        setError('Speech recognition is not supported in this browser.');
-        return;
-      }
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'en-US';
-      recognition.interimResults = true;
-      recognition.continuous = false;
-      recognition.onresult = (event) => {
-        let interimTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          interimTranscript += event.results[i][0].transcript;
-        }
-        setTranscript(interimTranscript);
-      };
-      recognition.onerror = (event) => {
-        setError('Speech recognition error: ' + event.error);
-        setRecording(false);
-        clearInterval(timerRef.current);
-        setTimer(0);
-      };
-      recognition.onend = () => {
-        setRecording(false);
-        clearInterval(timerRef.current);
-        setTimer(0);
-      };
-      recognitionRef.current = recognition;
-    }, []);
-
-    const handleAsk = () => {
-      setError(null);
-      setTranscript("");
-      setResult(null);
-      if (recognitionRef.current) {
-        recognitionRef.current.start();
-        setRecording(true);
-        setTimer(60);
-        const startTime = Date.now();
-        timerRef.current = setInterval(() => {
-          const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-          const remainingSeconds = Math.max(0, 60 - elapsedSeconds);
-          setTimer(remainingSeconds);
-          if (remainingSeconds <= 0) {
-            if (recognitionRef.current) recognitionRef.current.stop();
-            clearInterval(timerRef.current);
-          }
-        }, 100); // Update more frequently for smoother countdown
-      }
-    };
-    const handleSend = async () => {
-      setError(null);
-      setResult(null);
-      setLoading(true);
-      try {
-        const resp = await fetch('/analyze_speech_request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: transcript, model })
-        });
-        const data = await resp.json();
-        if (!resp.ok || data.error) throw new Error(data.error || 'Analysis failed');
-        setResult(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    React.useEffect(() => {
-      return () => clearInterval(timerRef.current);
-    }, []);
-
-    return e('div', { className: 'card shadow-sm p-2 mb-2', style: { maxWidth: 340, margin: '0 auto', background: '#f7f7fa', border: '1px solid #e0e0e0', fontSize: '0.97em' } },
-      e('div', { className: 'mb-2', style: { fontWeight: 600, color: '#183153', fontSize: '1.01em' } }, 'Ask your question'),
-      e('div', { style: { color: '#666', fontSize: '0.9em', marginBottom: '0.8em' } }, 'e.g. "What is the current stock price of Apple (AAPL)?" or "Show me Tesla\'s (TSLA) stock performance over the last 7 days"'),
-
-      e('div', { className: 'mb-2' },
-        e('label', { htmlFor: 'model-select', className: 'form-label', style: { fontWeight: 500, fontSize: '0.97em', color: '#183153', marginRight: 6 } }, 'Model:'),
-        e('select', {
-          id: 'model-select',
-          className: 'form-select',
-          value: model,
-          onChange: ev => setModel(ev.target.value),
-          style: { maxWidth: 200, display: 'inline-block', fontSize: '0.97em' }
-        },
-          models.map(m => e('option', { key: m.value, value: m.value }, m.label))
-        )
-      ),
-      error && e('div', { className: 'alert alert-danger mb-2', style: { fontSize: '0.97em', padding: '0.4em 0.7em' } }, error),
-      e('div', { className: 'd-flex gap-2 mb-2' },
-        e('button', {
-          className: 'btn btn-dark-bbg',
-          onClick: handleAsk,
-          disabled: recording,
-          style: { fontSize: '0.97em', padding: '0.32em 0.9em' }
-        }, recording ? 'Listening...' : 'Ask your question'),
-        e('button', {
-          className: 'btn btn-outline-secondary',
-          onClick: handleSend,
-          disabled: !transcript || loading,
-          style: { fontSize: '0.97em', padding: '0.32em 0.9em' }
-        }, loading ? 'Analyzing...' : 'Send')
-      ),
-      (recording || transcript) && e('div', { className: 'mb-2', style: { color: '#183153', background: '#fff', borderRadius: 8, padding: '0.5em', border: '1px solid #e0e0e0', fontSize: '0.98em', minHeight: 32 } }, transcript || (recording ? 'Listening...' : '')),
-      result && e('div', { className: 'alert alert-info mt-2', style: { fontSize: '0.97em', padding: '0.4em 0.7em' } },
-        result.answer && e('div', null, e('b', null, 'Answer: '), result.answer)
-      ),
-      recording && e('div', { className: 'mb-1', style: { color: '#b85c00', fontSize: '0.97em' } }, `You have ${timer}s to speak...`)
-    );
-  }
-
-  const root = document.getElementById('react-speech-recorder');
-  if (root && window.React && window.ReactDOM) {
-    ReactDOM.createRoot(root).render(React.createElement(SpeechRecorder));
   }
 })();
 
@@ -1336,6 +1201,229 @@ window.fetchTweetVolatilityAnalysis = function() {
   const root = document.getElementById('react-investment-playbooks-tool');
   if (root && window.React && window.ReactDOM) {
     ReactDOM.createRoot(root).render(React.createElement(InvestmentPlaybooksTool));
+  }
+})();
+
+// DeepSeek Chatbot Component
+(function() {
+  const e = React.createElement;
+
+  function DeepSeekChatbot() {
+    const [message, setMessage] = React.useState("");
+    const [conversation, setConversation] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState(null);
+    const [model, setModel] = React.useState("mistral-small");
+    const [temperature, setTemperature] = React.useState(0.7);
+    const [maxTokens, setMaxTokens] = React.useState(1000);
+    const [apiStatus, setApiStatus] = React.useState(null);
+
+    const models = [
+      { value: "mistral-small", label: "Mistral Small", description: "General conversation and analysis" },
+      { value: "deepseek-r1", label: "DeepSeek R1", description: "Specialized for coding and programming" },
+      { value: "qwen3-8b", label: "Qwen 3 8B", description: "Optimized for mathematical problems" },
+      { value: "gemma-3n", label: "Gemma 3N", description: "Google's efficient model" },
+      { value: "kimi-k2", label: "Kimi K2", description: "Moonshot's conversational model" }
+    ];
+
+    // Check API status on component mount
+    React.useEffect(() => {
+      fetch('/health')
+        .then(res => res.json())
+        .then(data => {
+          setApiStatus(data.api_configured);
+        })
+        .catch(() => {
+          setApiStatus(false);
+        });
+    }, []);
+
+    const handleSubmit = async (ev) => {
+      ev.preventDefault();
+      if (!message.trim() || loading) return;
+
+      const userMessage = message.trim();
+      setMessage("");
+      setLoading(true);
+      setError(null);
+
+      // Add user message to conversation
+      const newConversation = [...conversation, { role: "user", content: userMessage }];
+      setConversation(newConversation);
+
+      try {
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: userMessage,
+            model: model,
+            temperature: temperature,
+            max_tokens: maxTokens,
+            history: newConversation
+          })
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get response');
+        }
+
+        // Add AI response to conversation
+        setConversation(prev => [...prev, { role: "assistant", content: data.response }]);
+      } catch (err) {
+        setError(err.message);
+        // Remove the user message if there was an error
+        setConversation(prev => prev.slice(0, -1));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const clearConversation = () => {
+      setConversation([]);
+      setError(null);
+    };
+
+    const formatMessage = (content) => {
+      // Simple markdown-like formatting
+      return content
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+    };
+
+    return e('div', { className: 'deepseek-chatbot', style: { maxWidth: '800px', margin: '0 auto' } },
+      e('style', null, `
+        .deepseek-chatbot { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .chat-header { margin-bottom: 20px; }
+        .chat-header h2 { font-size: 22px; font-weight: 600; color: #1a202c; margin-bottom: 8px; }
+        .chat-header p { font-size: 15px; color: #718096; }
+        .chat-controls { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .control-group { flex: 1; min-width: 150px; }
+        .control-group label { font-weight: 500; font-size: 14px; margin-bottom: 6px; color: #4a5568; display: block; }
+        .control-group .form-control, .control-group .form-select { font-size: 15px; }
+        .chat-messages { height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #f8fafc; }
+        .message { margin-bottom: 16px; padding: 12px; border-radius: 8px; }
+        .message.user { background: #183153; color: white; margin-left: 20px; }
+        .message.assistant { background: white; border: 1px solid #e2e8f0; margin-right: 20px; }
+        .message-content { line-height: 1.5; }
+        .message-content code { background: #f1f5f9; padding: 2px 4px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        .chat-input { display: flex; gap: 12px; }
+        .chat-input textarea { flex: 1; resize: vertical; min-height: 60px; }
+        .api-status { padding: 8px 12px; border-radius: 6px; font-size: 14px; margin-bottom: 16px; }
+        .api-status.success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        .api-status.error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .api-status.warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+      `),
+
+      // Header
+      e('div', { className: 'chat-header' },
+        e('h2', null, '🤖 DeepSeek Chatbot'),
+        e('p', null, 'Powered by DeepSeek AI models via OpenRouter API')
+      ),
+
+      // API Status
+      apiStatus === true && e('div', { className: 'api-status success' }, '✅ API Connected'),
+      apiStatus === false && e('div', { className: 'api-status error' }, '❌ API Not Configured - Please set OPENROUTER_API_KEY'),
+      apiStatus === null && e('div', { className: 'api-status warning' }, '⏳ Checking API Status...'),
+
+      // Controls
+      e('div', { className: 'chat-controls' },
+        e('div', { className: 'control-group' },
+          e('label', null, 'Model:'),
+          e('select', {
+            className: 'form-select',
+            value: model,
+            onChange: ev => setModel(ev.target.value)
+          }, models.map(m => e('option', { key: m.value, value: m.value }, m.label)))
+        ),
+        e('div', { className: 'control-group' },
+          e('label', null, 'Temperature:'),
+          e('input', {
+            type: 'range',
+            className: 'form-control',
+            min: '0',
+            max: '2',
+            step: '0.1',
+            value: temperature,
+            onChange: ev => setTemperature(parseFloat(ev.target.value))
+          })
+        ),
+        e('div', { className: 'control-group' },
+          e('label', null, 'Max Tokens:'),
+          e('input', {
+            type: 'number',
+            className: 'form-control',
+            min: '100',
+            max: '4000',
+            value: maxTokens,
+            onChange: ev => setMaxTokens(parseInt(ev.target.value))
+          })
+        )
+      ),
+
+      // Parameter display
+      e('div', { style: { fontSize: '14px', color: '#666', marginBottom: '16px' } },
+        `Temperature: ${temperature} | Max Tokens: ${maxTokens}`
+      ),
+
+      // Messages
+      e('div', { className: 'chat-messages' },
+        conversation.length === 0 ? 
+          e('div', { style: { textAlign: 'center', color: '#666', marginTop: '100px' } },
+            'Start a conversation with DeepSeek!'
+          ) :
+          conversation.map((msg, index) => 
+            e('div', { 
+              key: index, 
+              className: `message ${msg.role}`,
+              style: { textAlign: msg.role === 'user' ? 'right' : 'left' }
+            },
+              e('div', { 
+                className: 'message-content',
+                dangerouslySetInnerHTML: { __html: formatMessage(msg.content) }
+              })
+            )
+          ),
+        loading && e('div', { className: 'message assistant', style: { textAlign: 'left' } },
+          e('div', { className: 'message-content' }, '🤔 Thinking...')
+        )
+      ),
+
+      // Error display
+      error && e('div', { className: 'alert alert-danger mb-3' }, error),
+
+      // Input and buttons
+      e('div', { className: 'chat-input' },
+        e('textarea', {
+          className: 'form-control',
+          placeholder: 'Type your message here...',
+          value: message,
+          onChange: ev => setMessage(ev.target.value),
+          onKeyPress: ev => ev.key === 'Enter' && !ev.shiftKey && handleSubmit(ev)
+        }),
+        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+          e('button', {
+            className: 'btn btn-dark-bbg',
+            onClick: handleSubmit,
+            disabled: loading || !message.trim() || apiStatus === false
+          }, loading ? 'Sending...' : 'Send'),
+          e('button', {
+            className: 'btn btn-outline-secondary',
+            onClick: clearConversation,
+            disabled: conversation.length === 0
+          }, 'Clear Chat')
+        )
+      )
+    );
+  }
+
+  const root = document.getElementById('react-deepseek-chatbot');
+  if (root && window.React && window.ReactDOM) {
+    ReactDOM.createRoot(root).render(React.createElement(DeepSeekChatbot));
   }
 })();
   
