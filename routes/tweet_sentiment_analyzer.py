@@ -1,3 +1,5 @@
+# NOTE: This module is currently NOT USED in the frontend
+# Kept for potential future use or API-only access
 from flask import Blueprint, jsonify, request
 import logging
 from datasets import load_dataset
@@ -6,7 +8,7 @@ from transformers_interpret import SequenceClassificationExplainer
 import numpy as np
 from multiprocessing import Process, Queue
 import time
-import uuid
+
 
 hf_tweeteval_bp = Blueprint('hf_tweeteval', __name__)
 
@@ -72,19 +74,7 @@ def blocking_inference(text, model_name, q):
         logging.exception("Error in analyze_tweet blocking_inference")
         q.put({"error": f"Internal error: {str(e)}"})
 
-@hf_tweeteval_bp.route('/hf_tweeteval_sample', methods=['GET'])
-def hf_tweeteval_sample():
-    # Step 1: Load dataset
-    dataset = load_dataset("tweet_eval", "sentiment")
-    # Step 2: Preprocess/tokenize
-    tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
-    def tokenize(example):
-        return tokenizer(example["text"], truncation=True, padding="max_length")
-    tokenized = dataset.map(tokenize, batched=True)
-    # Step 3: Log and return a sample
-    sample = tokenized["train"][0]
-    logging.info(f"[HF_TWEETEVAL] Tokenized Sample: {sample}")
-    return jsonify(sample)
+
 
 @hf_tweeteval_bp.route('/analyze_tweet', methods=['POST'])
 def analyze_tweet():
@@ -110,19 +100,4 @@ def analyze_tweet():
     else:
         return jsonify({"error": "No result returned from process."}), 500
 
-pay_bp = Blueprint('pay', __name__)
-
-@pay_bp.route('/pay', methods=['POST'])
-def pay():
-    data = request.get_json()
-    amount = data.get('amount')
-    method = data.get('method')
-    if method == 'mock':
-        return jsonify({
-            'status': 'success',
-            'txn_id': str(uuid.uuid4()),
-            'amount': amount,
-            'method': method
-        })
-    else:
-        return jsonify({'status': 'error', 'error': 'Only mock payments are supported in demo.'}), 400 
+ 

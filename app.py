@@ -41,9 +41,7 @@ def after_request(response):
 def index():
     return send_from_directory('static', 'index.html')
 
-@app.route('/test')
-def test():
-    return 'Hello, world!'
+
 
 @app.errorhandler(500)
 def handle_500(e):
