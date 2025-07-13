@@ -1,6 +1,4 @@
-# NOTE: This module is currently NOT USED in the frontend
-# Kept for potential future use or API-only access
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, send_from_directory, request, jsonify
 import re
 import yfinance as yf
 from transformers import pipeline
@@ -13,32 +11,24 @@ speech_analysis_bp = Blueprint('speech_analysis', __name__)
 # Load sentiment model once
 sentiment_model = pipeline('sentiment-analysis', model='distilbert-base-uncased-finetuned-sst-2-english')
 
-# Dynamic company name to ticker mapping using yfinance
-def get_company_ticker(company_name):
-    """Dynamically find ticker symbol for company name"""
-    try:
-        # Common company name variations
-        search_terms = [
-            company_name,
-            company_name.replace(' ', ''),
-            company_name.lower(),
-            company_name.title()
-        ]
-        
-        for term in search_terms:
-            # Use yfinance search functionality
-            import yfinance as yf
-            search_results = yf.Tickers(term)
-            if search_results and len(search_results.tickers) > 0:
-                # Return first valid ticker
-                for ticker in search_results.tickers:
-                    if ticker.info and ticker.info.get('symbol'):
-                        return ticker.info['symbol']
-        return None
-    except Exception:
-        return None
+# Simple mapping for company names to tickers
+COMPANY_TICKERS = {
+    'google': 'GOOGL',
+    'apple': 'AAPL',
+    'microsoft': 'MSFT',
+    'amazon': 'AMZN',
+    'meta': 'META',
+    'tesla': 'TSLA',
+    'nvidia': 'NVDA',
+    'netflix': 'NFLX',
+    'amd': 'AMD',
+    'intel': 'INTC',
+    'gamma': 'GAMMA.V',
+}
 
-
+@speech_analysis_bp.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
 
 @speech_analysis_bp.route('/analyze_speech_request', methods=['POST'])
 def analyze_speech_request():
@@ -48,26 +38,9 @@ def analyze_speech_request():
         return jsonify({'error': 'No text provided.'}), 400
     text_lower = text.lower()
     company = None
-    
-
-    # Look for common company name patterns
-    company_patterns = [
-        r'\b(google|alphabet)\b',
-        r'\b(apple|iphone|ipad|mac)\b', 
-        r'\b(microsoft|msft|windows)\b',
-        r'\b(amazon|aws)\b',
-        r'\b(meta|facebook)\b',
-        r'\b(tesla|tsla)\b',
-        r'\b(nvidia|nvda)\b',
-        r'\b(netflix|nflx)\b',
-        r'\b(amd)\b',
-        r'\b(intel)\b'
-    ]
-    
-    for pattern in company_patterns:
-        match = re.search(pattern, text_lower)
-        if match:
-            company = match.group(1)
+    for name in COMPANY_TICKERS:
+        if name in text_lower:
+            company = name
             break
     # --- ML/NLP: Detect time range and statistic intent ---
     days_match = re.search(r'(?:past|last)\s*(\d+)\s*(?:days?|day)', text_lower)
@@ -92,9 +65,7 @@ def analyze_speech_request():
         days = int(any_days_match.group(1))
     # Only answer if company and 'price' or stat intent is present, or if describe intent
     if company and (describe_match or 'price' in text_lower or avg_match or min_match or max_match):
-        ticker = get_company_ticker(company)
-        if not ticker:
-            return jsonify({'answer': f"Sorry, I couldn't find the ticker symbol for {company}."})
+        ticker = COMPANY_TICKERS[company]
         try:
             end = datetime.now()
             start = end - timedelta(days=days)
