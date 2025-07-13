@@ -1321,8 +1321,8 @@ window.fetchTweetVolatilityAnalysis = function() {
 
       // Header
       e('div', { className: 'chat-header' },
-        e('h2', null, '🤖 DeepSeek Chatbot'),
-        e('p', null, 'Powered by DeepSeek AI models via OpenRouter API')
+        e('h2', null, '🤖 Model Evaluation'),
+        e('p', null, 'Powered by AI models via OpenRouter API')
       ),
 
       // API Status

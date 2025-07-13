@@ -249,32 +249,35 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="market-overtime-tab" data-bs-toggle="pill" data-bs-target="#market-overtime-content" role="tab" aria-controls="market-overtime-content" aria-selected="true">Market Overtime</a>
+                        <a class="nav-link active" id="deepseek-chatbot-tab" data-bs-toggle="pill" data-bs-target="#deepseek-chatbot-content" role="tab" aria-controls="deepseek-chatbot-content" aria-selected="true">🤖 Model Evaluation</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="volatility-explorer-tab" data-bs-toggle="pill" data-bs-target="#volatility-explorer-content" role="tab" aria-controls="volatility-explorer-content" aria-selected="false">Volatility Explorer</a>
+                        <a class="nav-link" id="market-overtime-tab" data-bs-toggle="pill" data-bs-target="#market-overtime-content" role="tab" aria-controls="market-overtime-content" aria-selected="false">📈 Market Overtime</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="tweet-sentiment-tab" data-bs-toggle="pill" data-bs-target="#tweet-sentiment-content" role="tab" aria-controls="tweet-sentiment-content" aria-selected="false">Tweet Sentiment</a>
+                        <a class="nav-link" id="volatility-explorer-tab" data-bs-toggle="pill" data-bs-target="#volatility-explorer-content" role="tab" aria-controls="volatility-explorer-content" aria-selected="false">📊 Volatility Explorer</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="speech-analysis-tab" data-bs-toggle="pill" data-bs-target="#speech-analysis-content" role="tab" aria-controls="speech-analysis-content" aria-selected="false">Financial Q&A</a>
+                        <a class="nav-link" id="tweet-sentiment-tab" data-bs-toggle="pill" data-bs-target="#tweet-sentiment-content" role="tab" aria-controls="tweet-sentiment-content" aria-selected="false">🐦 Tweet Sentiment</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">Trading Strategy Analyzer</a>
+                        <a class="nav-link" id="speech-analysis-tab" data-bs-toggle="pill" data-bs-target="#speech-analysis-content" role="tab" aria-controls="speech-analysis-content" aria-selected="false">🎤 Financial Q&A</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="investment-playbooks-tab" data-bs-toggle="pill" data-bs-target="#investment-playbooks-content" role="tab" aria-controls="investment-playbooks-content" aria-selected="false">Investment Playbooks</a>
+                        <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">⚡ Trading Strategy Analyzer</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="deepseek-chatbot-tab" data-bs-toggle="pill" data-bs-target="#deepseek-chatbot-content" role="tab" aria-controls="deepseek-chatbot-content" aria-selected="false">AI Assistant</a>
+                        <a class="nav-link" id="investment-playbooks-tab" data-bs-toggle="pill" data-bs-target="#investment-playbooks-content" role="tab" aria-controls="investment-playbooks-content" aria-selected="false">📚 Investment Playbooks</a>
                     </li>
                 </ul>
             </div>
 
             <div class="col-md-10 py-4">
                 <div class="tab-content" id="main-tab-content">
-                    <div class="tab-pane fade show active" id="market-overtime-content" role="tabpanel" aria-labelledby="market-overtime-tab">
+                    <div class="tab-pane fade show active" id="deepseek-chatbot-content" role="tabpanel" aria-labelledby="deepseek-chatbot-tab">
+                        <div id="react-deepseek-chatbot"></div>
+                    </div>
+                    <div class="tab-pane fade" id="market-overtime-content" role="tabpanel" aria-labelledby="market-overtime-tab">
                         <div class="card shadow-sm flex-fill d-flex flex-column">
                             <div class="card-body d-flex flex-column">
                                 <div class="card-header-row flex-column align-items-stretch" style="gap:0.5rem;">
@@ -441,9 +444,6 @@
                                 <div class="container py-4"><div id="react-investment-playbooks-tool"></div></div>
                             </div>
                         </div>
-                    </div>
-                    <div class="tab-pane fade" id="deepseek-chatbot-content" role="tabpanel" aria-labelledby="deepseek-chatbot-tab">
-                        <div id="react-deepseek-chatbot"></div>
                     </div>
                 </div>
             </div>
