@@ -5,6 +5,8 @@ import os
 import logging
 from datetime import datetime, timedelta
 import yfinance as yf
+import time
+import concurrent.futures
 
 deepseek_chatbot_bp = Blueprint('deepseek_chatbot', __name__)
 
@@ -39,6 +41,42 @@ def format_chat_message(role, content):
         "content": content
     }
 
+def calculate_performance_metrics(hist):
+    """Calculate performance metrics from historical data"""
+    if hist.empty or len(hist) < 2:
+        return None
+    
+    # Calculate daily returns
+    daily_returns = hist['Close'].pct_change().dropna()
+    
+    # Cumulative return
+    cumulative_return = ((hist['Close'].iloc[-1] / hist['Close'].iloc[0]) - 1) * 100
+    
+    # Sharpe Ratio (assuming risk-free rate of 0 for simplicity)
+    if daily_returns.std() > 0:
+        sharpe_ratio = (daily_returns.mean() / daily_returns.std()) * (252 ** 0.5)  # Annualized
+    else:
+        sharpe_ratio = 0
+    
+    # Max Drawdown
+    cumulative_returns = (1 + daily_returns).cumprod()
+    running_max = cumulative_returns.expanding().max()
+    drawdown = (cumulative_returns - running_max) / running_max
+    max_drawdown = drawdown.min() * 100
+    
+    # Win rate and trade count (simplified - treating each day as a "trade")
+    winning_days = (daily_returns > 0).sum()
+    total_days = len(daily_returns)
+    win_rate = (winning_days / total_days) * 100 if total_days > 0 else 0
+    
+    return {
+        'cumulative_return': round(cumulative_return, 2),
+        'sharpe_ratio': round(sharpe_ratio, 2),
+        'max_drawdown': round(max_drawdown, 2),
+        'win_rate': round(win_rate, 1),
+        'trade_count': total_days
+    }
+
 def get_stock_data(symbol, days=7):
     """Fetch comprehensive stock data using yfinance"""
     try:
@@ -62,6 +100,9 @@ def get_stock_data(symbol, days=7):
         low_price = hist['Low'].min()
         avg_volume = hist['Volume'].mean()
         volatility = hist['Close'].pct_change().std() * 100
+        
+        # Calculate performance metrics
+        performance_metrics = calculate_performance_metrics(hist)
         
         # Get daily data for the period
         daily_data = []
@@ -97,7 +138,8 @@ def get_stock_data(symbol, days=7):
             'market_cap': market_cap,
             'pe_ratio': round(pe_ratio, 2) if pe_ratio else 0,
             'daily_data': daily_data,
-            'period_days': days
+            'period_days': days,
+            'performance_metrics': performance_metrics
         }
         
     except Exception as e:
@@ -180,6 +222,55 @@ def create_stock_analysis_response(stock_data, message):
     if not stock_data:
         return "Sorry, I couldn't fetch stock data for that symbol. Please check the symbol and try again."
     
+    # Get performance metrics
+    metrics = stock_data.get('performance_metrics', {})
+    
+    # Create performance metrics explanation paragraph
+    def get_performance_explanation(metrics):
+        if not metrics:
+            return ""
+        
+        cumulative_return = metrics.get('cumulative_return', 0)
+        sharpe_ratio = metrics.get('sharpe_ratio', 0)
+        max_drawdown = metrics.get('max_drawdown', 0)
+        win_rate = metrics.get('win_rate', 0)
+        
+        explanation = f"📊 **Performance Analysis:** "
+        
+        # Cumulative return assessment
+        if cumulative_return > 5:
+            explanation += f"The stock has shown strong performance with a {cumulative_return:.1f}% cumulative return. "
+        elif cumulative_return > 0:
+            explanation += f"The stock has generated a modest {cumulative_return:.1f}% return. "
+        else:
+            explanation += f"The stock has declined by {abs(cumulative_return):.1f}% during this period. "
+        
+        # Sharpe ratio assessment
+        if sharpe_ratio > 1.0:
+            explanation += f"The Sharpe ratio of {sharpe_ratio:.2f} indicates good risk-adjusted returns. "
+        elif sharpe_ratio > 0:
+            explanation += f"The Sharpe ratio of {sharpe_ratio:.2f} suggests moderate risk-adjusted performance. "
+        else:
+            explanation += f"The negative Sharpe ratio of {sharpe_ratio:.2f} indicates poor risk-adjusted returns. "
+        
+        # Max drawdown assessment
+        if abs(max_drawdown) < 5:
+            explanation += f"Risk management appears solid with a maximum drawdown of only {abs(max_drawdown):.1f}%. "
+        elif abs(max_drawdown) < 10:
+            explanation += f"The maximum drawdown of {abs(max_drawdown):.1f}% shows moderate volatility. "
+        else:
+            explanation += f"The significant maximum drawdown of {abs(max_drawdown):.1f}% indicates high volatility and risk. "
+        
+        # Win rate assessment
+        if win_rate > 60:
+            explanation += f"With a {win_rate:.0f}% win rate, the stock has been consistently positive. "
+        elif win_rate > 50:
+            explanation += f"The {win_rate:.0f}% win rate shows slightly more positive than negative days. "
+        else:
+            explanation += f"The {win_rate:.0f}% win rate indicates more negative than positive trading days. "
+        
+        return explanation
+    
     # Determine analysis type based on message
     message_lower = message.lower()
     
@@ -201,6 +292,15 @@ def create_stock_analysis_response(stock_data, message):
 • Volatility: {stock_data['volatility']:.2f}%
 • Avg Volume: {stock_data['avg_volume']:,}
 
+📊 **Performance Metrics:**
+• Cumulative Return: {metrics.get('cumulative_return', 0):+.2f}%
+• Sharpe Ratio: {metrics.get('sharpe_ratio', 0):.2f}
+• Max Drawdown: {metrics.get('max_drawdown', 0):.2f}%
+• Win Rate: {metrics.get('win_rate', 0):.1f}%
+• Trade Count: {metrics.get('trade_count', 0)}
+
+{get_performance_explanation(metrics)}
+
 💡 **Analysis:** {stock_data['company_name']} has {'📈 increased' if stock_data['price_change'] >= 0 else '📉 decreased'} by {abs(stock_data['price_change_pct']):.1f}% over the past {stock_data['period_days']} days."""
 
     elif 'performance' in message_lower or 'trend' in message_lower:
@@ -210,6 +310,15 @@ def create_stock_analysis_response(stock_data, message):
 • Current Price: ${stock_data['current_price']}
 • Change: ${stock_data['price_change']} ({stock_data['price_change_pct']:+.2f}%)
 • Volatility: {stock_data['volatility']:.2f}%
+
+📊 **Performance Metrics:**
+• Cumulative Return: {metrics.get('cumulative_return', 0):+.2f}%
+• Sharpe Ratio: {metrics.get('sharpe_ratio', 0):.2f}
+• Max Drawdown: {metrics.get('max_drawdown', 0):.2f}%
+• Win Rate: {metrics.get('win_rate', 0):.1f}%
+• Trade Count: {metrics.get('trade_count', 0)}
+
+{get_performance_explanation(metrics)}
 
 📅 **Daily Performance:**
 """
@@ -241,6 +350,15 @@ def create_stock_analysis_response(stock_data, message):
 • P/E Ratio: {stock_data['pe_ratio'] if stock_data['pe_ratio'] > 0 else 'N/A'}
 • Volatility: {stock_data['volatility']:.2f}%
 • Average Volume: {stock_data['avg_volume']:,}
+
+📊 **Performance Metrics:**
+• Cumulative Return: {metrics.get('cumulative_return', 0):+.2f}%
+• Sharpe Ratio: {metrics.get('sharpe_ratio', 0):.2f}
+• Max Drawdown: {metrics.get('max_drawdown', 0):.2f}%
+• Win Rate: {metrics.get('win_rate', 0):.1f}%
+• Trade Count: {metrics.get('trade_count', 0)}
+
+{get_performance_explanation(metrics)}
 
 📅 **Price Range:**
 • High: ${stock_data['high_price']}
@@ -315,6 +433,119 @@ def call_free_api(messages, model="mistral-small", temperature=0.7, max_tokens=1
         logger.error(f"Unexpected error: {str(e)}")
         return {"error": f"Unexpected error: {str(e)}"}
 
+def test_single_model(model, prompt, temperature=0.7, max_tokens=1000):
+    """Test a single model and return performance metrics"""
+    start_time = time.time()
+    
+    messages = [{"role": "user", "content": prompt}]
+    result = call_free_api(messages, model, temperature, max_tokens)
+    
+    end_time = time.time()
+    response_time = end_time - start_time
+    
+    if "error" in result:
+        return {
+            "model": model,
+            "success": False,
+            "error": result["error"],
+            "response_time": response_time,
+            "response": None,
+            "token_count": 0
+        }
+    
+    # Calculate response quality metrics
+    response_text = result["response"]
+    token_count = result.get("usage", {}).get("completion_tokens", len(response_text.split()))
+    
+    # Simple quality metrics
+    word_count = len(response_text.split())
+    avg_word_length = sum(len(word) for word in response_text.split()) / max(word_count, 1)
+    
+    return {
+        "model": model,
+        "success": True,
+        "response_time": response_time,
+        "response": response_text,
+        "token_count": token_count,
+        "word_count": word_count,
+        "avg_word_length": avg_word_length,
+        "usage": result.get("usage", {})
+    }
+
+@deepseek_chatbot_bp.route('/compare_models', methods=['POST'])
+def compare_models():
+    """Compare performance of multiple models"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        prompt = data.get('prompt', '').strip()
+        if not prompt:
+            return jsonify({"error": "Prompt is required"}), 400
+        
+        # Get optional parameters
+        models_to_test = data.get('models', list(FREE_MODELS.keys()))
+        temperature = float(data.get('temperature', 0.7))
+        max_tokens = int(data.get('max_tokens', 1000))
+        
+        # Validate parameters
+        if not all(model in FREE_MODELS for model in models_to_test):
+            return jsonify({"error": "Invalid model specified"}), 400
+        if not 0 <= temperature <= 2:
+            return jsonify({"error": "Temperature must be between 0 and 2"}), 400
+        if not 1 <= max_tokens <= 4000:
+            return jsonify({"error": "Max tokens must be between 1 and 4000"}), 400
+        
+        # Test all models concurrently
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_model = {
+                executor.submit(test_single_model, model, prompt, temperature, max_tokens): model 
+                for model in models_to_test
+            }
+            
+            for future in concurrent.futures.as_completed(future_to_model):
+                result = future.result()
+                results.append(result)
+        
+        # Sort results by response time
+        results.sort(key=lambda x: x.get('response_time', float('inf')))
+        
+        # Calculate summary statistics
+        successful_results = [r for r in results if r['success']]
+        avg_response_time = sum(r['response_time'] for r in successful_results) / len(successful_results) if successful_results else 0
+        avg_token_count = sum(r['token_count'] for r in successful_results) / len(successful_results) if successful_results else 0
+        
+        return jsonify({
+            "success": True,
+            "prompt": prompt,
+            "results": results,
+            "summary": {
+                "total_models": len(results),
+                "successful_models": len(successful_results),
+                "avg_response_time": avg_response_time,
+                "avg_token_count": avg_token_count,
+                "fastest_model": results[0]['model'] if results else None,
+                "slowest_model": results[-1]['model'] if results else None
+            },
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except ValueError as e:
+        return jsonify({"error": f"Invalid parameter value: {str(e)}"}), 400
+    except Exception as e:
+        logger.error(f"Error in compare_models endpoint: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
+@deepseek_chatbot_bp.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint to verify API configuration"""
+    return jsonify({
+        "api_configured": validate_api_key(),
+        "timestamp": datetime.now().isoformat()
+    })
+
 @deepseek_chatbot_bp.route('/chat', methods=['POST'])
 def chat():
     """Main chat endpoint"""
@@ -351,7 +582,13 @@ def chat():
 2. **Real-time Data**: Access current stock prices, price changes, volatility, and trading volume
 3. **Company Information**: Provide sector analysis, P/E ratios, market cap, and other financial metrics
 4. **Technical Analysis**: Analyze price trends, support/resistance levels, and market patterns
-5. **General Assistance**: Help with coding, mathematics, analysis, and other questions
+5. **Performance Metrics**: Calculate and explain key performance indicators including:
+   - Cumulative Return: Total percentage gain/loss over the period
+   - Sharpe Ratio: Risk-adjusted return measure (higher is better)
+   - Max Drawdown: Largest peak-to-trough decline percentage
+   - Win Rate: Percentage of positive trading days
+   - Trade Count: Number of trading days analyzed
+6. **General Assistance**: Help with coding, mathematics, analysis, and other questions
 
 When users ask about stocks, you can provide:
 - Current stock prices and price changes
@@ -360,8 +597,11 @@ When users ask about stocks, you can provide:
 - Sector and market analysis
 - Trading volume and market activity
 - Technical indicators and trends
+- Comprehensive performance metrics for risk assessment
 
-Always be respectful, accurate, and provide detailed, actionable information. For complex stock analysis, you can fetch real-time data and provide comprehensive insights."""
+When presenting performance metrics, always include a clear explanation paragraph that interprets what the metrics mean for the stock's performance and risk profile. Explain whether the metrics indicate good or poor performance relative to typical market standards.
+
+Always be respectful, accurate, and provide detailed, actionable information. For complex stock analysis, you can fetch real-time data and provide comprehensive insights including performance metrics."""
         messages.append(format_chat_message("system", system_message))
         
         # Add conversation history
@@ -469,11 +709,4 @@ def get_models():
         "api_configured": validate_api_key()
     })
 
-@deepseek_chatbot_bp.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        "status": "healthy",
-        "api_configured": validate_api_key(),
-        "timestamp": datetime.now().isoformat()
-    }) 
+ 

@@ -1322,7 +1322,7 @@ window.fetchTweetVolatilityAnalysis = function() {
   const e = React.createElement;
 
   function DeepSeekChatbot() {
-    const [message, setMessage] = React.useState("");
+    const [message, setMessage] = React.useState("Show Apple stock's performance by checking how much return it gave for the risk taken and how much it fell from its highest point with specific days performance");
     const [conversation, setConversation] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
@@ -1330,6 +1330,23 @@ window.fetchTweetVolatilityAnalysis = function() {
     const [temperature, setTemperature] = React.useState(0.7);
     const [maxTokens, setMaxTokens] = React.useState(1000);
     const [apiStatus, setApiStatus] = React.useState(null);
+    const [hasShownDemo, setHasShownDemo] = React.useState(false);
+    const [activeTab, setActiveTab] = React.useState('chat');
+
+    // Model Performance Comparison state
+    const [comparisonPrompt, setComparisonPrompt] = React.useState("Explain the concept of machine learning in simple terms");
+    const [selectedModels, setSelectedModels] = React.useState(["mistral-small", "deepseek-r1", "qwen3-8b"]);
+    const [comparisonLoading, setComparisonLoading] = React.useState(false);
+    const [comparisonResults, setComparisonResults] = React.useState(null);
+    const [comparisonError, setComparisonError] = React.useState(null);
+
+    const availableModels = [
+      { value: "mistral-small", label: "Mistral Small", description: "General conversation and analysis" },
+      { value: "deepseek-r1", label: "DeepSeek R1", description: "Specialized for coding and programming" },
+      { value: "qwen3-8b", label: "Qwen 3 8B", description: "Optimized for mathematical problems" },
+      { value: "gemma-3n", label: "Gemma 3N", description: "Google's efficient model" },
+      { value: "kimi-k2", label: "Kimi K2", description: "Moonshot's conversational model" }
+    ];
 
     const models = [
       { value: "mistral-small", label: "Mistral Small", description: "General conversation and analysis" },
@@ -1339,17 +1356,24 @@ window.fetchTweetVolatilityAnalysis = function() {
       { value: "kimi-k2", label: "Kimi K2", description: "Moonshot's conversational model" }
     ];
 
-    // Check API status on component mount
+    // Check API status and show demo on component mount
     React.useEffect(() => {
       fetch('/health')
         .then(res => res.json())
         .then(data => {
           setApiStatus(data.api_configured);
+          // Show demo if API is configured and we haven't shown it yet
+          if (data.api_configured && !hasShownDemo) {
+            setTimeout(() => {
+              handleSubmit(null, "Show Apple stock's performance by checking how much return it gave for the risk taken and how much it fell from its highest point with specific days performance");
+              setHasShownDemo(true);
+            }, 1000);
+          }
         })
         .catch(() => {
           setApiStatus(false);
         });
-    }, []);
+    }, [hasShownDemo]);
 
     const handleSubmit = async (ev) => {
       ev.preventDefault();
@@ -1399,6 +1423,50 @@ window.fetchTweetVolatilityAnalysis = function() {
       setError(null);
     };
 
+    // Model Performance Comparison functions
+    const handleCompare = async (ev) => {
+      ev.preventDefault();
+      if (!comparisonPrompt.trim() || selectedModels.length === 0) return;
+
+      setComparisonLoading(true);
+      setComparisonError(null);
+      setComparisonResults(null);
+
+      try {
+        const response = await fetch('/compare_models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: comparisonPrompt.trim(),
+            models: selectedModels,
+            temperature: temperature,
+            max_tokens: maxTokens
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Comparison failed');
+        setComparisonResults(data);
+      } catch (err) {
+        setComparisonError(err.message);
+      } finally {
+        setComparisonLoading(false);
+      }
+    };
+
+    const toggleModel = (modelValue) => {
+      setSelectedModels(prev => 
+        prev.includes(modelValue) 
+          ? prev.filter(m => m !== modelValue)
+          : [...prev, modelValue]
+      );
+    };
+
+    const getModelDisplayName = (modelValue) => {
+      const model = availableModels.find(m => m.value === modelValue);
+      return model ? model.label : modelValue;
+    };
+
     const formatMessage = (content) => {
       // Simple markdown-like formatting
       return content
@@ -1408,7 +1476,7 @@ window.fetchTweetVolatilityAnalysis = function() {
         .replace(/\n/g, '<br>');
     };
 
-    return e('div', { className: 'deepseek-chatbot', style: { maxWidth: '800px', margin: '0 auto' } },
+    return e('div', { className: 'deepseek-chatbot', style: { maxWidth: '1200px', margin: '0 auto' } },
       e('style', null, `
         .deepseek-chatbot { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .chat-header { margin-bottom: 20px; }
@@ -1430,11 +1498,32 @@ window.fetchTweetVolatilityAnalysis = function() {
         .api-status.success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
         .api-status.error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
         .api-status.warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .tab-nav { display: flex; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+        .tab-nav button { background: none; border: none; padding: 12px 20px; font-size: 16px; font-weight: 500; color: #718096; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .tab-nav button.active { color: #183153; border-bottom-color: #183153; }
+        .tab-nav button:hover { color: #183153; }
+        .model-checkboxes { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+        .model-checkbox { display: flex; align-items: center; gap: 6px; }
+        .model-checkbox input { margin: 0; }
+        .model-checkbox label { font-size: 14px; color: #4a5568; }
+        .summary-stats { background: #e6fffa; border: 1px solid #9ae6b4; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+        .summary-stats h4 { margin-bottom: 12px; color: #22543d; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 18px; font-weight: 600; color: #22543d; }
+        .stat-label { font-size: 12px; color: #718096; margin-top: 4px; }
+        .comparison-table { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .comparison-table th { background: #183153 !important; color: white; font-weight: 600; padding: 12px 8px; }
+        .comparison-table td { padding: 12px 8px; vertical-align: middle; }
+        .comparison-table .table-success { background-color: #d1fae5 !important; }
+        .comparison-table .table-danger { background-color: #fee2e2 !important; }
+        .comparison-table .badge { font-size: 0.75rem; }
+        .comparison-table .fw-bold { color: #183153; }
       `),
 
       // Header
       e('div', { className: 'chat-header' },
-        e('h2', null, '🤖 Model Evaluation'),
+        e('h2', null, '🤖 Chatbot'),
         e('p', null, 'Powered by AI models via OpenRouter API')
       ),
 
@@ -1443,7 +1532,21 @@ window.fetchTweetVolatilityAnalysis = function() {
       apiStatus === false && e('div', { className: 'api-status error' }, '❌ API Not Configured - Please set OPENROUTER_API_KEY'),
       apiStatus === null && e('div', { className: 'api-status warning' }, '⏳ Checking API Status...'),
 
-      // Controls
+      // Tab Navigation
+      e('div', { className: 'tab-nav' },
+        e('button', {
+          className: activeTab === 'chat' ? 'active' : '',
+          onClick: () => setActiveTab('chat')
+        }, '💬 Chat'),
+        e('button', {
+          className: activeTab === 'comparison' ? 'active' : '',
+          onClick: () => setActiveTab('comparison')
+        }, '🏁 Model Performance Comparison')
+      ),
+
+      // Chat Tab Content
+      activeTab === 'chat' && e('div', null,
+        // Controls
       e('div', { className: 'chat-controls' },
         e('div', { className: 'control-group' },
           e('label', null, 'Model:'),
@@ -1486,8 +1589,19 @@ window.fetchTweetVolatilityAnalysis = function() {
       // Messages
       e('div', { className: 'chat-messages' },
         conversation.length === 0 ? 
-          e('div', { style: { textAlign: 'center', color: '#666', marginTop: '100px' } },
-            'Start a conversation with DeepSeek!'
+          e('div', { style: { textAlign: 'center', color: '#666', marginTop: '50px' } },
+            e('div', { style: { marginBottom: '20px' } },
+              e('h5', { style: { color: '#183153', marginBottom: '10px' } }, '🧪 Welcome to Model Evaluation!'),
+              e('p', { style: { fontSize: '14px', lineHeight: '1.5' } }, 
+                'Test and compare AI models with your questions.'
+              )
+            ),
+            e('div', { style: { background: '#f8f9fa', padding: '15px', borderRadius: '8px', border: '1px solid #e9ecef' } },
+              e('p', { style: { margin: '0', fontSize: '14px', color: '#6c757d' } },
+                e('strong', null, '💡 Tip: '), 
+                'The demo will automatically show you Apple stock analysis with performance metrics using Mistral Small model.'
+              )
+            )
           ) :
           conversation.map((msg, index) => 
             e('div', { 
@@ -1531,6 +1645,141 @@ window.fetchTweetVolatilityAnalysis = function() {
           }, 'Clear Chat')
         )
       )
+      ),
+
+      // Comparison Tab Content
+      activeTab === 'comparison' && e('div', null,
+        e('div', { className: 'mb-3' },
+          e('label', { htmlFor: 'comparison-prompt', className: 'form-label' }, 'Test Prompt:'),
+          e('textarea', {
+            id: 'comparison-prompt',
+            className: 'form-control',
+            rows: 3,
+            value: comparisonPrompt,
+            onChange: ev => setComparisonPrompt(ev.target.value),
+            placeholder: 'Enter a prompt to test all selected models...'
+          })
+        ),
+
+        e('div', { className: 'mb-3' },
+          e('label', { className: 'form-label' }, 'Select Models to Compare:'),
+          e('div', { className: 'model-checkboxes' },
+            availableModels.map(model => 
+              e('div', { key: model.value, className: 'model-checkbox' },
+                e('input', {
+                  type: 'checkbox',
+                  id: `model-${model.value}`,
+                  checked: selectedModels.includes(model.value),
+                  onChange: () => toggleModel(model.value)
+                }),
+                e('label', { htmlFor: `model-${model.value}` }, model.label)
+              )
+            )
+          )
+        ),
+
+        e('div', { className: 'row g-3 mb-3' },
+          e('div', { className: 'col-md-6' },
+            e('label', { className: 'form-label' }, 'Temperature:'),
+            e('input', {
+              type: 'range',
+              className: 'form-control',
+              min: '0',
+              max: '2',
+              step: '0.1',
+              value: temperature,
+              onChange: ev => setTemperature(parseFloat(ev.target.value))
+            }),
+            e('small', { className: 'text-muted' }, `Current: ${temperature}`)
+          ),
+          e('div', { className: 'col-md-6' },
+            e('label', { className: 'form-label' }, 'Max Tokens:'),
+            e('input', {
+              type: 'number',
+              className: 'form-control',
+              min: '100',
+              max: '4000',
+              value: maxTokens,
+              onChange: ev => setMaxTokens(parseInt(ev.target.value))
+            })
+          )
+        ),
+
+        e('button', {
+          type: 'submit',
+          className: 'btn btn-primary',
+          onClick: handleCompare,
+          disabled: comparisonLoading || selectedModels.length === 0 || !comparisonPrompt.trim()
+        }, comparisonLoading ? '🔄 Comparing Models...' : '🏁 Start Comparison'),
+
+        comparisonError && e('div', { className: 'alert alert-danger mt-3' }, comparisonError),
+
+        comparisonResults && e('div', { className: 'mt-4' },
+          e('div', { className: 'summary-stats' },
+            e('h4', null, '📊 Comparison Summary'),
+            e('div', { className: 'stats-grid' },
+              e('div', { className: 'stat-item' },
+                e('div', { className: 'stat-value' }, comparisonResults.summary.successful_models),
+                e('div', { className: 'stat-label' }, 'Successful Models')
+              ),
+              e('div', { className: 'stat-item' },
+                e('div', { className: 'stat-value' }, `${comparisonResults.summary.avg_response_time.toFixed(2)}s`),
+                e('div', { className: 'stat-label' }, 'Avg Response Time')
+              ),
+              e('div', { className: 'stat-item' },
+                e('div', { className: 'stat-value' }, Math.round(comparisonResults.summary.avg_token_count)),
+                e('div', { className: 'stat-label' }, 'Avg Tokens Used')
+              ),
+              e('div', { className: 'stat-item' },
+                e('div', { className: 'stat-value' }, getModelDisplayName(comparisonResults.summary.fastest_model)),
+                e('div', { className: 'stat-label' }, 'Fastest Model')
+              )
+            )
+          ),
+
+          e('h4', { style: { marginBottom: '16px', color: '#1a202c' } }, '📋 Performance Comparison Table'),
+
+          e('div', { className: 'table-responsive' },
+            e('table', { className: 'table table-striped table-hover comparison-table' },
+              e('thead', { className: 'table-dark' },
+                e('tr', null,
+                  e('th', null, 'Model'),
+                  e('th', null, 'Status'),
+                  e('th', null, 'Response Time'),
+                  e('th', null, 'Tokens'),
+                  e('th', null, 'Words'),
+                  e('th', null, 'Avg Word Length'),
+                  e('th', null, 'Response Preview')
+                )
+              ),
+              e('tbody', null,
+                comparisonResults.results.map((result, index) => 
+                  e('tr', { key: result.model, className: result.success ? 'table-success' : 'table-danger' },
+                    e('td', { className: 'fw-bold' }, getModelDisplayName(result.model)),
+                    e('td', null, 
+                      result.success ? 
+                        e('span', { className: 'badge bg-success' }, '✅ Success') :
+                        e('span', { className: 'badge bg-danger' }, '❌ Failed')
+                    ),
+                    e('td', null, result.success ? `${result.response_time.toFixed(2)}s` : '-'),
+                    e('td', null, result.success ? result.token_count : '-'),
+                    e('td', null, result.success ? result.word_count : '-'),
+                    e('td', null, result.success ? result.avg_word_length.toFixed(1) : '-'),
+                    e('td', { className: 'text-muted', style: { maxWidth: '300px' } },
+                      result.success && result.response ? 
+                        (result.response.length > 100 ? 
+                          `${result.response.substring(0, 100)}...` : 
+                          result.response
+                        ) : 
+                        (result.error || 'N/A')
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
     );
   }
 
@@ -1539,6 +1788,8 @@ window.fetchTweetVolatilityAnalysis = function() {
     ReactDOM.createRoot(root).render(React.createElement(DeepSeekChatbot));
   }
 })();
+
+
 
 
   
