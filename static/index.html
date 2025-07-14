@@ -4,530 +4,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tokimeki</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
-    <style>
-        body, .card-title, .form-label, .card-body, .card-section-vertical, .mb-2, .mb-3, .mb-4, .market-controls, .explore-controls, .poetry-controls, .d3-tooltip, .chart-area, .container, .row, .col-12, .d-flex, .text-center, .text-muted, .fs-6 {
-            font-family: 'Inter', 'Roboto', Arial, sans-serif !important;
-            color: #183153 !important;
-            font-size: 1rem;
-        }
-        .card-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #183153 !important;
-            letter-spacing: 0.01em;
-            text-align: left;
-            margin-bottom: 0;
-            line-height: 1.1;
-            text-transform: none;
-            white-space: nowrap;
-        }
-        .form-label {
-            color: #183153 !important;
-            font-weight: 500;
-            font-size: 1rem;
-            margin-bottom: 0;
-            white-space: nowrap;
-        }
-        .d3-tooltip {
-            color: #183153 !important;
-            font-size: 1rem;
-        }
-        body { font-family: Inter, Roboto, Arial, sans-serif; background: #fff; color: #222; }
-        .container { max-width: 900px; margin: 0 auto; padding-top: 2.5rem; }
-        .letsplay-row img { width: 60px; height: 60px; object-fit: cover; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.13); margin-bottom: 4px; }
-        .letsplay-row h1 { font-size: 1.5rem; color: #183153; letter-spacing: 0.5px; margin: 0; font-weight: 700; }
-        .noUi-target { background: #e0e0e0; border-radius: 8px; border: none; height: 8px; margin-top: 18px; }
-        .noUi-connect { background: #183153; border-radius: 8px; }
-        .noUi-horizontal .noUi-handle { width: 18px; height: 18px; border-radius: 50%; background: #183153; border: 2px solid #fff; top: -5px; cursor: pointer; }
-        .noUi-tooltip { background: #fff; color: #183153; border-radius: 6px; border: 1px solid #183153; font-size: 0.95em; padding: 2px 8px; }
-        select:disabled { background: #f3f3f3; color: #aaa; border-color: #ddd; cursor: not-allowed; }
-        .row.g-4 { gap: 1.5rem 0; flex-direction: column; }
-        .card { min-height: 100%; background: #fff; border: 1px solid #e0e0e0; box-shadow: 0 2px 16px rgba(16,26,43,0.07); border-radius: 14px; padding: 1.2rem 1.2rem 1.2rem 1.2rem; display: flex; flex-direction: column; justify-content: stretch; margin-bottom: 0.6rem; }
-        .card-header-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1.1rem; margin-bottom: 0.7rem; }
-        .card-section-vertical { display: flex; flex-direction: column; gap: 0.4rem; }
-        .chart-area {
-            background: #fff;
-            border-radius: 12px;
-            padding: 1.2rem 1.2rem 1.2rem 1.2rem;
-            min-width: 320px;
-            width: 100%;
-            max-width: 900px;
-            height: 340px;
-            aspect-ratio: unset;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            margin: 0 auto;
-        }
-        #d3-stock-chart, #volatility-correlation-chart {
-            width: 100%;
-            height: 100%;
-            min-height: 0;
-            min-width: 0;
-            max-width: 100%;
-            margin: 0 auto;
-            overflow-x: auto;
-            background: transparent;
-        }
-        .market-controls, .explore-controls, .poetry-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; margin-bottom: 0; }
-        .btn-dark-bbg { background: #183153; color: #fff; font-weight: 500; border: none; font-size: 1rem; padding: 0.38rem 1.1rem; }
-        .btn-dark-bbg:hover { background: #27457c; color: #fff; }
-        .btn-outline-secondary { border-color: #183153; color: #183153; background: transparent; font-size: 1rem; padding: 0.38rem 1.1rem; }
-        .btn-outline-secondary:hover { background: #183153; color: #fff; }
-        .form-select, .form-control { background: #fff; color: #222; border: 1px solid #ccc; font-size: 1rem; }
-        .form-select:focus, .form-control:focus { border-color: #183153; box-shadow: 0 0 0 2px #18315333; }
-        .mb-2, .mb-3, .mb-4 { margin-bottom: 0.7rem !important; }
-        .mb-4 { margin-bottom: 1.1rem !important; }
-        .d-flex.align-items-end.gap-2 { gap: 0.3rem; }
-        .row.g-4 > [class^='col-'] { display: flex; flex-direction: column; }
-        .card-body { flex: 1 1 auto; display: flex; flex-direction: column; padding: 0.6rem 1rem 0.6rem 1rem; }
-        .divider { display: none; }
-        @media (max-width: 991px) {
-            .container { padding: 0.5rem; }
-            .card-header-row, .market-controls, .explore-controls, .poetry-controls { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
-            .chart-area {
-                min-width: 0;
-                max-width: 100%;
-                width: 100%;
-                height: 220px;
-                padding: 0.7rem;
-            }
-        }
-        .col-12.d-flex + .col-12.d-flex { margin-top: -0.2rem; }
-        #main-nav .nav-link {
-            color: #183153;
-            font-weight: 500;
-            margin-bottom: 5px;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        #main-nav .nav-link.active,
-        #main-nav .nav-link:hover {
-            background-color: #183153;
-            color: #fff;
-        }
-        #left-nav-container {
-            background-color: #f8f9fa;
-            padding: 1rem;
-            border-right: 1px solid #dee2e6;
-            height: 100vh;
-            position: sticky;
-            top: 0;
-        }
-        .tab-content > .tab-pane {
-            display: none;
-        }
-        .tab-content > .active {
-            display: block;
-        }
-
-        .tooltip-container {
-            position: relative;
-            display: inline-block;
-            cursor: help;
-            border-bottom: 1px dotted #000;
-        }
-
-        .tooltip-text {
-            visibility: hidden;
-            width: 280px;
-            background-color: #183153;
-            color: #fff;
-            text-align: left;
-            border-radius: 6px;
-            padding: 8px 12px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            margin-left: -140px;
-            opacity: 0;
-            transition: opacity 0.3s;
-            font-size: 0.95rem;
-            line-height: 1.4;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-
-        .tooltip-container:hover .tooltip-text {
-            visibility: visible;
-            opacity: 1;
-        }
-    </style>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-2" id="left-nav-container">
-                <div class="letsplay-row d-flex align-items-center justify-content-between gap-2 mb-4">
-                    <img src="static/img/cute.png" alt="Cute" style="width: 40px; height: 40px; border-radius: 10px;">
-                    <h4 class="mb-0" style="font-weight: 700;">Tokimeki</h4>
-                    <img src="static/img/handsome.png" alt="Handsome" style="width: 40px; height: 40px; border-radius: 10px;">
-                </div>
+    <!-- Debug Info -->
+    <div id="debug-info" style="display: none;"></div>
 
-                <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="market-overtime-tab" data-bs-toggle="pill" data-bs-target="#market-overtime-content" role="tab" aria-controls="market-overtime-content" aria-selected="true">Market Overtime</a>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="volatility-explorer-tab" data-bs-toggle="pill" data-bs-target="#volatility-explorer-content" role="tab" aria-controls="volatility-explorer-content" aria-selected="false">Volatility Explorer</a>
-                    </li>
-
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">Trading Strategy Analyzer</a>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="investment-playbooks-tab" data-bs-toggle="pill" data-bs-target="#investment-playbooks-content" role="tab" aria-controls="investment-playbooks-content" aria-selected="false">Investment Playbooks</a>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="volatility-regime-tab" data-bs-toggle="pill" data-bs-target="#volatility-regime-content" role="tab" aria-controls="volatility-regime-content" aria-selected="false">Volatility Regime Strategy</a>
-                    </li>
-                </ul>
-            </div>
-
-            <div class="col-md-10 py-4">
-                <div class="tab-content" id="main-tab-content">
-                    <div class="tab-pane fade show active" id="market-overtime-content" role="tabpanel" aria-labelledby="market-overtime-tab">
-                        <div class="card shadow-sm flex-fill d-flex flex-column">
-                            <div class="card-body d-flex flex-column">
-                                <div class="card-header-row flex-column align-items-stretch" style="gap:0.5rem;">
-                                    <div class="d-flex align-items-center">
-                                        <div class="card-title" style="font-size:1.1rem;font-weight:600;color:#183153;">Market Overtime</div>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#marketOvertimeHelpModal">
-                                            How it works
-                                        </button>
-                                    </div>
-                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                                        <div id="react-stock-select"></div>
-                                        <label for="stock-select" class="form-label">Select companies:</label>
-                                        <select id="stock-select" class="form-select" multiple>
-                                            <option value="AAPL">Apple (AAPL)</option>
-                                            <option value="MSFT">Microsoft (MSFT)</option>
-                                            <option value="GOOGL">Google (GOOGL)</option>
-                                            <option value="AMZN">Amazon (AMZN)</option>
-                                            <option value="META">Meta (META)</option>
-                                            <option value="NVDA">Nvidia (NVDA)</option>
-                                            <option value="TSLA">Tesla (TSLA)</option>
-                                            <option value="NFLX">Netflix (NFLX)</option>
-                                            <option value="AMD">AMD (AMD)</option>
-                                            <option value="INTC">Intel (INTC)</option>
-                                            <option value="BRK-B">Berkshire Hathaway (BRK-B)</option>
-                                            <option value="JNJ">Johnson & Johnson (JNJ)</option>
-                                            <option value="V">Visa (V)</option>
-                                            <option value="JPM">JPMorgan Chase (JPM)</option>
-                                            <option value="WMT">Walmart (WMT)</option>
-                                            <option value="PG">Procter & Gamble (PG)</option>
-                                            <option value="KO">Coca-Cola (KO)</option>
-                                            <option value="XOM">Exxon Mobil (XOM)</option>
-                                            <option value="SPY">S&P 500 ETF (SPY)</option>
-                                            <option value="QQQ">Nasdaq 100 ETF (QQQ)</option>
-                                            <option value="VOO">S&P 500 ETF (VOO)</option>
-                                            <option value="ARKK">ARK Innovation ETF (ARKK)</option>
-                                            <option value="EEM">Emerging Markets ETF (EEM)</option>
-                                            <option value="XLF">Financial Select Sector SPDR (XLF)</option>
-                                            <option value="ES=F">S&P 500 E-mini (ES=F)</option>
-                                            <option value="NQ=F">Nasdaq 100 E-mini (NQ=F)</option>
-                                            <option value="YM=F">Dow Jones E-mini (YM=F)</option>
-                                            <option value="RTY=F">Russell 2000 E-mini (RTY=F)</option>
-                                            <option value="MES=F">Micro E-mini S&P 500 (MES=F)</option>
-                                            <option value="MNQ=F">Micro E-mini Nasdaq 100 (MNQ=F)</option>
-                                            <option value="MYM=F">Micro E-mini Dow (MYM=F)</option>
-                                            <option value="M2K=F">Micro E-mini Russell 2000 (M2K=F)</option>
-                                            <option value="GC=F">Gold (GC=F)</option>
-                                            <option value="SI=F">Silver (SI=F)</option>
-                                            <option value="CL=F">Crude Oil WTI (CL=F)</option>
-                                            <option value="BZ=F">Brent Oil (BZ=F)</option>
-                                            <option value="NG=F">Natural Gas (NG=F)</option>
-                                            <option value="HG=F">Copper (HG=F)</option>
-                                            <option value="ZC=F">Corn (ZC=F)</option>
-                                            <option value="ZS=F">Soybeans (ZS=F)</option>
-                                            <option value="ZW=F">Wheat (ZW=F)</option>
-                                            <option value="VX=F">VIX (VX=F)</option>
-                                            <option value="BTC=F">Bitcoin Futures (BTC=F)</option>
-                                            <option value="ETH=F">Ethereum Futures (ETH=F)</option>
-                                        </select>
-                                    </div>
-                                    <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
-                                    </div>
-                                    <div id="market-legend" class="mb-2" style="font-size:1rem;color:#183153;font-weight:500;"></div>
-                                </div>
-                                <div class="card-section-vertical">
-                                    <div id="stock-trends-result" class="mb-2"></div>
-                                    <div class="chart-area"><div id="d3-stock-chart"></div></div>
-                                    <div class="mb-2" style="width:100%;max-width:700px;">
-                                        <div id="market-slider"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="tab-pane fade" id="volatility-explorer-content" role="tabpanel" aria-labelledby="volatility-explorer-tab">
-                        <div class="card shadow-sm flex-fill d-flex flex-column">
-                            <div class="card-body d-flex flex-column">
-                                <div class="card-header-row">
-                                    <div class="d-flex align-items-center">
-                                        <span class="card-title">Volatility Explorer</span>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#volatilityExplorerHelpModal">
-                                            How it works
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="card-section-vertical">
-                                    <div class="mb-2" style="color:#183153;font-size:1.04rem;">
-                                        <span style="font-size:1.1rem;">📈 <b>Rolling volatility</b> reveals when the stock experienced sharp price movements.</span>
-                                    </div>
-                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="volatility-controls">
-                                        <label for="vol-window" class="form-label mb-0">Rolling Window (days):</label>
-                                        <input type="number" id="vol-window" class="form-control w-auto" value="10" min="1" style="max-width:80px;">
-                                        <label for="vol-years" class="form-label mb-0">Time Range (years):</label>
-                                        <input type="number" id="vol-years" class="form-control w-auto" value="2" min="1" style="max-width:80px;">
-                                        <button type="button" onclick="fetchAndRenderVolatilityCorrelation()" class="btn btn-dark-bbg">Fetch & Visualize</button>
-                                    </div>
-                                    <div class="chart-area"><div id="volatility-correlation-chart"></div></div>
-                                    <div class="mb-2" style="width:100%;max-width:700px;">
-                                        <div id="volatility-range-slider"></div>
-                                        <div class="d-flex justify-content-between mt-1">
-                                            <span id="volatility-range-start" style="font-size:0.98rem;"></span>
-                                            <span id="volatility-range-end" style="font-size:0.98rem;"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-pane fade" id="hf-signal-tool-content" role="tabpanel" aria-labelledby="hf-signal-tool-tab">
-                        <div class="card shadow-sm flex-fill d-flex flex-column">
-                            <div class="card-body d-flex flex-column">
-                                <div class="card-header-row">
-                                    <div class="d-flex align-items-center">
-                                        <span class="card-title">Trading Strategy Analyzer</span>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#tradingStrategyHelpModal">
-                                            How it works
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="container py-4"><div id="react-hedge-fund-tool"></div></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="tab-pane fade" id="investment-playbooks-content" role="tabpanel" aria-labelledby="investment-playbooks-tab">
-                        <div class="card shadow-sm flex-fill d-flex flex-column">
-                            <div class="card-body d-flex flex-column">
-                                <div class="card-header-row">
-                                    <div class="d-flex align-items-center">
-                                        <span class="card-title">Investment Playbooks</span>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#investmentPlaybooksHelpModal">
-                                            How it works
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="container py-4"><div id="react-investment-playbooks-tool"></div></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="tab-pane fade" id="volatility-regime-content" role="tabpanel" aria-labelledby="volatility-regime-tab">
-                        <div class="card shadow-sm flex-fill d-flex flex-column">
-                            <div class="card-body d-flex flex-column">
-                                <div class="card-header-row">
-                                    <div class="d-flex align-items-center">
-                                        <span class="card-title">Volatility Regime Strategy</span>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#volatilityRegimeHelpModal">
-                                            How it works
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="container py-4"><div id="react-volatility-regime-tool"></div></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Market Overtime Help Modal -->
-    <div class="modal fade" id="marketOvertimeHelpModal" tabindex="-1" aria-labelledby="marketOvertimeHelpModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="marketOvertimeHelpModalLabel">How Market Overtime Works</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>This tool fetches and visualizes historical stock price data to help you analyze market trends over time.</p>
-                    <ol>
-                        <li><strong>Select Companies:</strong> Choose one or more companies from the dropdown menu. The chart will automatically update to show their stock price trends. You can select up to 10 companies to compare.</li>
-                        <li><strong>Interactive Chart:</strong> The main chart displays the closing stock prices for the selected companies over the last three years. You can hover your mouse over the lines to see the exact price for a specific date.</li>
-                        <li><strong>Zoom and Pan:</strong> Use the slider below the chart to zoom in on a specific time period. Drag the handles to adjust the start and end dates of your analysis.</li>
-                    </ol>
-                    <p class="text-muted small">All stock data is sourced from Yahoo Finance via yfinance.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Volatility Explorer Help Modal -->
-    <div class="modal fade" id="volatilityExplorerHelpModal" tabindex="-1" aria-labelledby="volatilityExplorerHelpModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="volatilityExplorerHelpModalLabel">How Volatility Explorer Works</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>This tool analyzes stock price volatility to help you understand market risk and identify periods of high uncertainty.</p>
-                    <ol>
-                        <li><strong>Rolling Window:</strong> Set the number of days for calculating rolling volatility. A larger window (e.g., 30 days) shows longer-term trends, while a smaller window (e.g., 10 days) reveals short-term fluctuations.</li>
-                        <li><strong>Time Range:</strong> Choose how many years of historical data to analyze. More data provides better context for volatility patterns.</li>
-                        <li><strong>Interactive Visualization:</strong> The chart shows rolling volatility over time. Higher peaks indicate periods of increased price volatility and market uncertainty.</li>
-                        <li><strong>Zoom Control:</strong> Use the slider below the chart to focus on specific time periods and examine volatility patterns in detail.</li>
-                    </ol>
-                    <p class="text-muted small">Volatility is calculated using the standard deviation of daily returns over the specified rolling window.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-
-
-    <!-- Trading Strategy Analyzer Help Modal -->
-    <div class="modal fade" id="tradingStrategyHelpModal" tabindex="-1" aria-labelledby="tradingStrategyHelpModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="tradingStrategyHelpModalLabel">How Trading Strategy Analyzer Works</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>This tool backtests trading strategies using historical data to evaluate their performance and risk metrics.</p>
-                    <ol>
-                        <li><strong>Strategy Parameters:</strong> Configure your trading strategy by setting entry/exit conditions, position sizing, and risk management rules.</li>
-                        <li><strong>Historical Backtesting:</strong> The tool simulates your strategy on historical market data to see how it would have performed.</li>
-                        <li><strong>Performance Metrics:</strong> View key metrics including total return, Sharpe ratio, maximum drawdown, and win rate.</li>
-                        <li><strong>Risk Analysis:</strong> Understand the risk profile of your strategy with detailed risk metrics and performance breakdowns.</li>
-                    </ol>
-                    <p class="text-muted small">Backtesting results are based on historical data and may not predict future performance. Always consider market conditions and risk management.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Investment Playbooks Help Modal -->
-    <div class="modal fade" id="investmentPlaybooksHelpModal" tabindex="-1" aria-labelledby="investmentPlaybooksHelpModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="investmentPlaybooksHelpModalLabel">How Investment Playbooks Works</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>This tool analyzes stocks using predefined investment strategies to help you make informed investment decisions.</p>
-                    <ol>
-                        <li><strong>Select Company:</strong> Choose a company from the dropdown menu to analyze. The tool will fetch current financial data for the selected stock.</li>
-                        <li><strong>Investment Playbooks:</strong> Each playbook represents a different investment strategy with specific criteria and rules for evaluating stocks.</li>
-                        <li><strong>Analysis Results:</strong> The tool evaluates the stock against each playbook's criteria and provides recommendations with confidence scores.</li>
-                        <li><strong>Financial Metrics:</strong> View key financial indicators including P/E ratio, market cap, dividend yield, and more to understand the stock's fundamentals.</li>
-                    </ol>
-                    <p class="text-muted small">All financial data is sourced from Yahoo Finance. Investment recommendations are for educational purposes and should not be considered as financial advice.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Volatility Regime Strategy Help Modal -->
-    <div class="modal fade" id="volatilityRegimeHelpModal" tabindex="-1" aria-labelledby="volatilityRegimeHelpModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="volatilityRegimeHelpModalLabel">How Volatility Regime Strategy Works</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>This tool uses machine learning to predict volatility regimes and dynamically switch between momentum and mean-reversion strategies.</p>
-                    <ol>
-                        <li><strong>Select Futures Contract:</strong> Choose from major futures contracts like E-mini S&P 500, NASDAQ, or commodities.</li>
-                        <li><strong>Configure Parameters:</strong> Set the lookback period and volatility threshold to customize the regime detection.</li>
-                        <li><strong>Machine Learning Analysis:</strong> The tool calculates technical features and trains a model to predict high vs. low volatility periods.</li>
-                        <li><strong>Strategy Execution:</strong> In low volatility: trend-following momentum strategy. In high volatility: mean-reversion strategy.</li>
-                        <li><strong>Backtesting Results:</strong> View performance metrics including Sharpe ratio, maximum drawdown, and win rate.</li>
-                    </ol>
-                    <p class="text-muted small">Uses Random Forest classifier with technical indicators. Results are for educational purposes and past performance doesn't guarantee future returns.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <!-- React Dependencies -->
+    <script>
+        console.log('Loading React dependencies...');
+    </script>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-    <script src="static/main.js"></script>
-    
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
     <script>
-        // Handle hover-triggered modals for "How it works" buttons
+        console.log('React version:', React.version);
+        console.log('ReactDOM version:', ReactDOM.version);
+    </script>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        <h1 class="mb-4">Tokimeki</h1>
+        <div class="row">
+            <!-- Ask your question component (left) -->
+            <div class="col-md-6 mb-4">
+                <div id="react-speech-recorder"></div>
+            </div>
+            <!-- Hedge Fund Signal Tool component (right) -->
+            <div class="col-md-6 mb-4">
+                <div id="react-hedge-fund-tool"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 bg-light">
+        <div class="container text-center">
+            <span class="text-muted">© 2024 Tokimeki</span>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Your Custom JS -->
+    <script type="text/babel">
+        console.log('Initializing React components...');
+        // Debug function to check if elements exist
+        function checkElements() {
+            const elements = {
+                'react-tweet-sentiment': document.getElementById('react-tweet-sentiment'),
+                'react-speech-recorder': document.getElementById('react-speech-recorder')
+            };
+            console.log('Checking mount points:', elements);
+            return elements;
+        }
+        // Check elements after DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
-            const howItWorksButtons = document.querySelectorAll('.how-it-works-btn');
-            
-            howItWorksButtons.forEach(button => {
-                let modal = null;
-                let timeoutId = null;
-                
-                button.addEventListener('mouseenter', function() {
-                    const targetId = this.getAttribute('data-bs-target');
-                    modal = new bootstrap.Modal(document.querySelector(targetId));
-                    modal.show();
-                });
-                
-                button.addEventListener('mouseleave', function() {
-                    if (timeoutId) {
-                        clearTimeout(timeoutId);
-                    }
-                    timeoutId = setTimeout(() => {
-                        if (modal) {
-                            modal.hide();
-                        }
-                    }, 300); // Small delay to prevent immediate closing
-                });
-                
-                // Also close modal when mouse leaves the modal itself
-                const targetId = button.getAttribute('data-bs-target');
-                const modalElement = document.querySelector(targetId);
-                modalElement.addEventListener('mouseenter', function() {
-                    if (timeoutId) {
-                        clearTimeout(timeoutId);
-                    }
-                });
-                
-                modalElement.addEventListener('mouseleave', function() {
-                    if (modal) {
-                        modal.hide();
-                    }
-                });
-            });
+            console.log('DOM loaded, checking elements...');
+            checkElements();
         });
     </script>
+    <script src="{{ url_for('static', filename='main.js') }}" type="text/babel"></script>
 </body>
 </html> 

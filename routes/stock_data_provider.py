@@ -227,7 +227,7 @@ def available_tickers():
             'SPY', 'QQQ', 'VOO', 'ARKK', 'EEM', 'XLF',
             'ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'MES=F', 'MNQ=F', 'MYM=F', 'M2K=F',
             'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZS=F', 'ZW=F',
-            'VX=F', 'BTC=F', 'ETH=F'
+            '^VIX', 'BTC=F', 'ETH=F'
         ]
         
         # If yfinance is not available, return default list
@@ -310,12 +310,10 @@ def volatility_event_correlation():
     except Exception as e:
         return jsonify({'error': f'Error fetching stock data: {str(e)}'}), 500
     # Remove event/news/sentiment fetching and alignment
-    event_count = [0 for _ in dates]
     event_titles = [[] for _ in dates]
     return jsonify({
         'dates': dates,
         'volatility': rolling_vol,
-        'event_count': event_count,
         'event_titles': event_titles,
         'min_vol': min_vol,
         'min_vol_date': min_vol_date

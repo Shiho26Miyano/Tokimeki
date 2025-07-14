@@ -84,6 +84,14 @@ document.addEventListener('DOMContentLoaded', function() {
             window.fetchStockTrends();
         });
     }
+    
+    // Auto-fetch volatility analysis when volatility stock selector changes
+    const volatilityStockSelect = document.getElementById('volatility-stock-select');
+    if (volatilityStockSelect) {
+        volatilityStockSelect.addEventListener('change', function() {
+            fetchAndRenderVolatilityCorrelation();
+        });
+    }
     const metricSelect = document.getElementById('metric-select');
     const rangeSelect = document.getElementById('range-select');
     const windowSelect = document.getElementById('window-select');
@@ -102,6 +110,11 @@ document.addEventListener('DOMContentLoaded', function() {
             window.fetchStockTrends();
         });
     }
+
+    // Initialize chat functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        // ... existing code ...
+    });
 });
 
 // Store last fetched data and chart state
@@ -412,26 +425,31 @@ window._volatilityChartState = {
 };
 
 function fetchAndRenderVolatilityCorrelation() {
-    // Use the first selected company from #stock-select
-    const stockSelect = document.getElementById('stock-select');
-    const symbols = Array.from(stockSelect.selectedOptions).map(opt => opt.value);
-    if (!symbols.length) {
+    // Use the selected company from #volatility-stock-select
+    const stockSelect = document.getElementById('volatility-stock-select');
+    if (!stockSelect || !stockSelect.value) {
         document.getElementById('volatility-correlation-chart').innerHTML = 'Please select a company above.';
         return;
     }
-    const symbol = symbols[0];
+    const symbol = stockSelect.value;
     // Get window and years from UI
     const windowInput = document.getElementById('vol-window');
     const yearsInput = document.getElementById('vol-years');
-    const windowSize = windowInput ? parseInt(windowInput.value) || 10 : 10;
+    const regimeWindowInput = document.getElementById('regime-window');
+    const windowSize = windowInput ? parseInt(windowInput.value) || 30 : 30;
     const years = yearsInput ? parseInt(yearsInput.value) || 2 : 2;
+    const regimeWindow = regimeWindowInput ? parseInt(regimeWindowInput.value) || 30 : 30;
+    
     const today = new Date();
     const start = new Date();
     start.setFullYear(today.getFullYear() - years);
     const start_date = start.toISOString().split('T')[0];
     const end_date = today.toISOString().split('T')[0];
+    
     const chartDiv = document.getElementById('volatility-correlation-chart');
-    chartDiv.innerHTML = 'Loading...';
+    chartDiv.innerHTML = 'Loading volatility data...';
+    
+    // Fetch volatility data
     fetch(`/volatility_event_correlation?symbol=${symbol}&start_date=${start_date}&end_date=${end_date}&window=${windowSize}`)
         .then(res => res.json())
         .then(data => {
@@ -443,8 +461,28 @@ function fetchAndRenderVolatilityCorrelation() {
                 window._volatilityChartState.range = [0, data.dates.length - 1];
             }
             renderVolatilityCorrelationChart(data);
+            
+            // Now fetch regime analysis
+            return fetch('/volatility_regime/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    symbol: symbol, 
+                    window: regimeWindow, 
+                    period: `${years}y` 
+                })
+            });
         })
-        .catch(() => {
+        .then(res => res.json())
+        .then(regimeData => {
+            if (regimeData.error) {
+                console.warn('Regime analysis error:', regimeData.error);
+                return;
+            }
+            displayRegimeAnalysis(regimeData);
+        })
+        .catch((err) => {
+            console.error('Error:', err);
             chartDiv.innerHTML = 'Error fetching data.';
         });
 }
@@ -512,7 +550,6 @@ function renderVolatilityCorrelationChart(data) {
     // Slice data for visible range
     const dates = data.dates.slice(startIdx, endIdx + 1).map(d3.timeParse('%Y-%m-%d'));
     const vol = data.volatility.slice(startIdx, endIdx + 1);
-    const eventCount = data.event_count.slice(startIdx, endIdx + 1);
     const eventTitles = (data.event_titles || []).slice(startIdx, endIdx + 1);
     // X scale
     const x = d3.scaleTime()
@@ -606,19 +643,6 @@ function renderVolatilityCorrelationChart(data) {
             }
         }
     }
-    // Event count as bars (optional)
-    const barWidth = Math.max(1, width / dates.length * 0.7);
-    g.selectAll('.event-bar')
-        .data(eventCount)
-        .enter()
-        .append('rect')
-        .attr('class', 'event-bar')
-        .attr('x', (d, i) => x(dates[i]) - barWidth/2)
-        .attr('y', (d, i) => yLeft((vol[i] !== null ? 0 : null)))
-        .attr('width', barWidth)
-        .attr('height', (d, i) => d > 0 ? 8 : 0)
-        .attr('fill', '#2196f3')
-        .attr('opacity', 0.25);
     // Axes
     g.append('g')
         .attr('transform', `translate(0,${height})`)
@@ -674,12 +698,11 @@ function renderVolatilityCorrelationChart(data) {
             // Tooltip content
             let html = `<b>${d3.timeFormat('%Y-%m-%d')(dates[idx])}</b><br>`;
             html += `Volatility: <b>${vol[idx] !== null ? vol[idx].toFixed(4) : 'N/A'}</b><br>`;
-            html += `Event count: <b>${eventCount[idx]}</b><br>`;
             // Always show the lowest volatility window date range
             if (highlightStartDate && highlightEndDate) {
                 html += `<span style='color:#ff9800'><b>Lowest Volatility Window:</b><br>${highlightStartDate} to ${highlightEndDate}</span><br>`;
             }
-            // Always show news titles for this date, even if event count is N/A
+            // Always show news titles for this date
             if (eventTitles && eventTitles[idx] && eventTitles[idx].length > 0) {
                 html += '<hr style="margin:4px 0;">';
                 html += '<b>News headlines:</b><ul style="margin:0 0 0 1em;padding:0;">';
@@ -699,11 +722,240 @@ function renderVolatilityCorrelationChart(data) {
         });
 }
 
+// Function to display regime analysis results
+function displayRegimeAnalysis(regimeData) {
+    const resultsDiv = document.getElementById('regime-analysis-results');
+    const statsDiv = document.getElementById('regime-statistics');
+    const periodsDiv = document.getElementById('regime-periods');
+    
+    if (!resultsDiv || !statsDiv || !periodsDiv) return;
+    
+    resultsDiv.style.display = 'block';
+    
+    // Display current regime info
+    const currentInfo = document.createElement('div');
+    currentInfo.className = 'alert alert-info mb-3';
+    currentInfo.innerHTML = `
+        <strong>${regimeData.symbol} - Current Regime: </strong>
+        <span class="badge bg-primary">${regimeData.current_regime}</span><br>
+        <small>Current Volatility: ${regimeData.current_volatility}% | Window: ${regimeData.rolling_window} days | Period: ${regimeData.analysis_period}</small>
+    `;
+    resultsDiv.insertBefore(currentInfo, resultsDiv.firstChild);
+    
+    // Display regime statistics
+    statsDiv.innerHTML = '';
+    Object.entries(regimeData.regime_statistics).forEach(([regime, stats]) => {
+        const getRegimeColor = (regime) => {
+            switch (regime) {
+                case 'Low Volatility': return '#10b981';
+                case 'Medium Volatility': return '#f59e0b';
+                case 'High Volatility': return '#ef4444';
+                case 'Extreme Volatility': return '#7c3aed';
+                default: return '#6b7280';
+            }
+        };
+        
+        const card = document.createElement('div');
+        card.className = 'col-md-6 col-lg-3 mb-3';
+        card.innerHTML = `
+            <div class="card h-100" style="border-left: 4px solid ${getRegimeColor(regime)}">
+                <div class="card-body">
+                    <h6 class="card-title">${regime}</h6>
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted">Count</small>
+                            <div class="fw-bold">${stats.count}</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Avg Vol</small>
+                            <div class="fw-bold">${stats.avg_volatility}%</div>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <small class="text-muted">Min-Max</small>
+                            <div class="fw-bold">${stats.min_volatility}%-${stats.max_volatility}%</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Time %</small>
+                            <div class="fw-bold">${stats.percentage_of_time}%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        statsDiv.appendChild(card);
+    });
+    
+    // Display regime periods
+    periodsDiv.innerHTML = `
+        <h6 class="mb-3">Regime Periods</h6>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Regime</th>
+                        <th>Avg Volatility</th>
+                        <th>Duration (days)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${regimeData.regime_periods.map(period => `
+                        <tr>
+                            <td>${period.start_date}</td>
+                            <td>${period.end_date}</td>
+                            <td>${period.regime}</td>
+                            <td>${period.avg_volatility}%</td>
+                            <td>${period.duration_days}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
 
+window.fetchTweetVolatilityAnalysis = function() {
+    const resultDiv = document.getElementById('tweet-volatility-result');
+    resultDiv.innerHTML = 'Loading HuggingFace tweet_eval sample...';
+    fetch('/hf_tweeteval_sample')
+        .then(res => res.json())
+        .then(data => {
+            resultDiv.innerHTML = `<pre style='font-size:1.05rem;color:#183153;background:#f7f7fa;padding:0.7em;border-radius:8px;'>${JSON.stringify(data, null, 2)}</pre>`;
+        })
+        .catch(err => {
+            resultDiv.innerHTML = `<span style='color:#c00;'>Error: ${err}</span>`;
+        });
+};
 
+// --- React Tweet Sentiment Component ---
+(function() {
+  const e = React.createElement;
 
+  function TweetSentiment() {
+    const [text, setText] = React.useState("");
+    const [result, setResult] = React.useState(null);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState(null);
+    const [model, setModel] = React.useState("mistral-small");
+    const modelExplanations = {
+      "distilbert-base-uncased-finetuned-sst-2-english": "DistilBERT is a lightweight, fast transformer model fine-tuned on SST-2 for general English sentiment analysis.",
+      "nreimers/TinyBERT_L-4_H-312_A-12-SST2": "TinyBERT (NReimers) is a compact transformer model fine-tuned on SST-2 for efficient English sentiment analysis.",
+      "cardiffnlp/twitter-roberta-base-sentiment-latest": "Twitter-RoBERTa is a RoBERTa model specifically trained for sentiment analysis on tweets and social media text."
+    };
 
+    const placeholderText = "Today I watch a movie called Whiplash. Love the quote There are no two words in the English language more harmful than 'good job.'";
 
+    const handleSubmit = async (ev, customText) => {
+      if (ev) ev.preventDefault();
+      setLoading(true);
+      setError(null);
+      setResult(null);
+      try {
+        let toAnalyze = typeof customText === 'string' ? customText : text;
+        const usedPlaceholder = !toAnalyze || !toAnalyze.trim();
+        if (usedPlaceholder) {
+          toAnalyze = placeholderText;
+        }
+        const resp = await fetch("/analyze_tweet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: toAnalyze })
+        });
+        if (!resp.ok) throw new Error("API error");
+        const data = await resp.json();
+        setResult(data);
+        if (!usedPlaceholder) {
+          setText(toAnalyze);
+        }
+      } catch (err) {
+        setError("Could not analyze tweet. Try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return e('div', { className: 'card shadow-sm p-4', style: { maxWidth: 500, margin: '0 auto' } },
+      e('h3', { className: 'card-title mb-3', style: { color: '#183153' } }, 'Human Sentiment Explorer'),
+      e('div', { style: { color: '#888', fontSize: '0.97em', marginBottom: '0.7em' } }, 'Model: DistilBERT (distilbert-base-uncased-finetuned-sst-2-english)'),
+      e('form', { onSubmit: handleSubmit },
+        e('div', { className: 'mb-3' },
+          e('label', { htmlFor: 'model-select', className: 'form-label', style: { fontWeight: 500 } }, 'Choose model:'),
+          e('select', {
+            id: 'model-select',
+            className: 'form-select',
+            value: model,
+            onChange: ev => setModel(ev.target.value),
+            style: { maxWidth: 350, marginBottom: 8 }
+          },
+            e('option', { value: 'distilbert-base-uncased-finetuned-sst-2-english' }, 'DistilBERT (default)'),
+            e('option', { value: 'nreimers/TinyBERT_L-4_H-312_A-12-SST2' }, 'TinyBERT (NReimers, SST-2)'),
+            e('option', { value: 'cardiffnlp/twitter-roberta-base-sentiment-latest' }, 'Twitter-RoBERTa (CardiffNLP)')
+          ),
+          e('div', { style: { color: '#888', fontSize: '0.97em', marginTop: 2, minHeight: 24 } }, modelExplanations[model])
+        ),
+        e('div', { className: 'mb-3' },
+          e('label', { htmlFor: 'tweet-input', className: 'form-label' }, 'Enter your sentence:'),
+          e('textarea', {
+            id: 'tweet-input',
+            className: 'form-control',
+            rows: 2,
+            value: text,
+            onChange: ev => setText(ev.target.value),
+            placeholder: placeholderText
+          })
+        ),
+        e('button', { type: 'submit', className: 'btn btn-dark-bbg', disabled: loading }, loading ? 'Analyzing...' : 'Analyze')
+      ),
+      error && e('div', { className: 'alert alert-danger mt-3' }, error),
+      result && e('div', { className: 'alert alert-info mt-3' },
+        e('div', null, e('b', null, 'Sentiment: '), result.label),
+        e('div', null, e('b', null, 'Confidence: '), (result.confidence * 100).toFixed(1) + '%'),
+        (() => {
+          const match = result.explanation && result.explanation.match(/Top contributing words: (.*)\./);
+          if (match && match[1]) {
+            const stopwords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'if', 'in', 'on', 'at', 'to', 'of', 'for', 'with', 'is', 'it', 'this', 'that', 'these', 'those', 'as', 'by', 'from', 'be', 'are', 'was', 'were', 'word', 'words', 'i', 'you', 'he', 'she', 'they', 'we', 'me', 'my', 'your', 'his', 'her', 'their', 'our', 'so', 'do', 'does', 'did', 'not', 'no', 'yes', 'can', 'will', 'just', 'have', 'has', 'had', 'been', 'being', 'am', 'up', 'down', 'out', 'about', 'into', 'over', 'after', 'before', 'more', 'most', 'some', 'such', 'only', 'own', 'same', 'other', 'than', 'too', 'very', 's', 't', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', 'couldn', 'didn', 'doesn', 'hadn', 'hasn', 'haven', 'isn', 'ma', 'mightn', 'mustn', 'needn', 'shan', 'shouldn', 'wasn', 'weren', 'won', 'wouldn']);
+            const words = match[1].replace(/'/g, '').split(',').map(w => w.trim()).filter(w => w && w !== '[CLS]' && !stopwords.has(w.toLowerCase()));
+            if (words.length > 0) {
+              const sentiment = result.label.toLowerCase();
+              let reason = '';
+              if (sentiment === 'positive') {
+                reason = `The model thinks this is positive because it sees ${words.join(', ')} as happy or enjoyable words.`;
+              } else if (sentiment === 'negative') {
+                reason = `The model thinks this is negative because it sees ${words.join(', ')} as unhappy or problematic words.`;
+              } else {
+                reason = `The model thinks this is neutral because it sees ${words.join(', ')} as neither strongly positive nor negative.`;
+              }
+              return e('div', { className: 'mt-2', style: { color: '#183153', fontStyle: 'italic', fontSize: '0.98em' } }, reason);
+            }
+          }
+          return null;
+        })(),
+        result.similar_example && (() => {
+          // Check overlap between user input and example
+          const userWords = new Set(text.toLowerCase().split(/\s+/));
+          const exampleWords = new Set(result.similar_example.text.toLowerCase().split(/\s+/));
+          const overlap = Array.from(userWords).filter(w => exampleWords.has(w)).length;
+          if (overlap > 0) {
+            return e('div', { className: 'mt-3', style: { background: '#f7f7fa', borderRadius: '8px', padding: '0.7em', border: '1px solid #e0e0e0' } },
+              e('div', { style: { fontWeight: 600, color: '#183153' } }, 'Similar example from dataset:'),
+              e('div', { style: { color: '#222', marginTop: '0.2em' } }, `"${result.similar_example.text}"`),
+              e('div', { style: { color: '#888', fontSize: '0.97em', marginTop: '0.1em' } }, `Label: ${result.similar_example.label}`)
+            );
+          }
+          return null;
+        })()
+      )
+    );
+  }
+
+  const root = document.getElementById('react-tweet-sentiment');
+  if (root && window.React && window.ReactDOM) {
+    ReactDOM.createRoot(root).render(React.createElement(TweetSentiment));
+  }
+})();
 
 // Hedge Fund Signal Tool Component
 (function() {
@@ -1065,160 +1317,464 @@ function renderVolatilityCorrelationChart(data) {
   }
 })();
 
-// Volatility Regime Strategy Tool Component
+// DeepSeek Chatbot Component
 (function() {
   const e = React.createElement;
 
-  function VolatilityRegimeStrategy() {
-    const [futures, setFutures] = React.useState([]);
-    const [selectedSymbol, setSelectedSymbol] = React.useState('ES=F');
-    const [lookbackDays, setLookbackDays] = React.useState(252);
-    const [volatilityThreshold, setVolatilityThreshold] = React.useState(0.75);
+  function DeepSeekChatbot() {
+    const [message, setMessage] = React.useState("Show Apple stock's performance by checking how much return it gave for the risk taken and how much it fell from its highest point with specific days performance");
+    const [conversation, setConversation] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
-    const [result, setResult] = React.useState(null);
     const [error, setError] = React.useState(null);
+    const [model, setModel] = React.useState("mistral-small");
+    const [temperature, setTemperature] = React.useState(0.7);
+    const [maxTokens, setMaxTokens] = React.useState(1000);
+    const [apiStatus, setApiStatus] = React.useState(null);
+    const [hasShownDemo, setHasShownDemo] = React.useState(false);
+    const [activeTab, setActiveTab] = React.useState('chat');
 
+    // Model Performance Comparison state
+    const [comparisonPrompt, setComparisonPrompt] = React.useState("Explain the concept of machine learning in simple terms");
+    const [selectedModels, setSelectedModels] = React.useState(["mistral-small", "deepseek-r1", "qwen3-8b"]);
+    const [comparisonLoading, setComparisonLoading] = React.useState(false);
+    const [comparisonResults, setComparisonResults] = React.useState(null);
+    const [comparisonError, setComparisonError] = React.useState(null);
+
+    const availableModels = [
+      { value: "mistral-small", label: "Mistral Small", description: "General conversation and analysis" },
+      { value: "deepseek-r1", label: "DeepSeek R1", description: "Specialized for coding and programming" },
+      { value: "qwen3-8b", label: "Qwen 3 8B", description: "Optimized for mathematical problems" },
+      { value: "gemma-3n", label: "Gemma 3N", description: "Google's efficient model" },
+      { value: "kimi-k2", label: "Kimi K2", description: "Moonshot's conversational model" }
+    ];
+
+    const models = [
+      { value: "mistral-small", label: "Mistral Small", description: "General conversation and analysis" },
+      { value: "deepseek-r1", label: "DeepSeek R1", description: "Specialized for coding and programming" },
+      { value: "qwen3-8b", label: "Qwen 3 8B", description: "Optimized for mathematical problems" },
+      { value: "gemma-3n", label: "Gemma 3N", description: "Google's efficient model" },
+      { value: "kimi-k2", label: "Kimi K2", description: "Moonshot's conversational model" }
+    ];
+
+    // Check API status and show demo on component mount
     React.useEffect(() => {
-      fetch('/available_futures')
-        .then(res => {
-          if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-          return res.json();
-        })
+      fetch('/health')
+        .then(res => res.json())
         .then(data => {
-          if (Array.isArray(data)) {
-            setFutures(data);
-            if (data.length > 0) setSelectedSymbol(data[0].symbol);
-          } else {
-            throw new Error('Received invalid futures data from server.');
+          setApiStatus(data.api_configured);
+          // Show demo if API is configured and we haven't shown it yet
+          if (data.api_configured && !hasShownDemo) {
+            setTimeout(() => {
+              handleSubmit(null, "Show Apple stock's performance by checking how much return it gave for the risk taken and how much it fell from its highest point with specific days performance");
+              setHasShownDemo(true);
+            }, 1000);
           }
         })
-        .catch(err => {
-          console.error("Error fetching futures:", err);
-          setError('Could not fetch futures contracts. Please ensure the server is running.');
+        .catch(() => {
+          setApiStatus(false);
         });
-    }, []);
+    }, [hasShownDemo]);
 
-    const handleAnalyze = async (ev) => {
-      if (ev) ev.preventDefault();
-      if (!selectedSymbol) return;
+    const handleSubmit = async (ev) => {
+      ev.preventDefault();
+      if (!message.trim() || loading) return;
 
+      const userMessage = message.trim();
+      setMessage("");
       setLoading(true);
       setError(null);
-      setResult(null);
+
+      // Add user message to conversation
+      const newConversation = [...conversation, { role: "user", content: userMessage }];
+      setConversation(newConversation);
 
       try {
-        const resp = await fetch('/analyze_volatility_regime', {
+        const response = await fetch('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            symbol: selectedSymbol,
-            lookback_days: lookbackDays,
-            volatility_threshold: volatilityThreshold
+          body: JSON.stringify({
+            message: userMessage,
+            model: model,
+            temperature: temperature,
+            max_tokens: maxTokens,
+            history: newConversation
           })
         });
+
+        const data = await response.json();
         
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'Analysis failed');
-        setResult(data);
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get response');
+        }
+
+        // Add AI response to conversation
+        setConversation(prev => [...prev, { role: "assistant", content: data.response }]);
       } catch (err) {
         setError(err.message);
+        // Remove the user message if there was an error
+        setConversation(prev => prev.slice(0, -1));
       } finally {
         setLoading(false);
       }
     };
 
-    const Metric = ({ title, value, isPercentage = false, isDecimal = false }) => {
-      let displayValue = value;
-      if (isPercentage) {
-        displayValue = `${(value * 100).toFixed(2)}%`;
-      } else if (isDecimal) {
-        displayValue = value.toFixed(4);
-      } else {
-        displayValue = value.toFixed(2);
+    const clearConversation = () => {
+      setConversation([]);
+      setError(null);
+    };
+
+    // Model Performance Comparison functions
+    const handleCompare = async (ev) => {
+      ev.preventDefault();
+      if (!comparisonPrompt.trim() || selectedModels.length === 0) return;
+
+      setComparisonLoading(true);
+      setComparisonError(null);
+      setComparisonResults(null);
+
+      try {
+        const response = await fetch('/compare_models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: comparisonPrompt.trim(),
+            models: selectedModels,
+            temperature: temperature,
+            max_tokens: maxTokens
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Comparison failed');
+        setComparisonResults(data);
+      } catch (err) {
+        setComparisonError(err.message);
+      } finally {
+        setComparisonLoading(false);
       }
-      
-      return e('div', { className: 'col-md-3 mb-3' },
-        e('div', { className: 'card h-100' },
-          e('div', { className: 'card-body text-center' },
-            e('h6', { className: 'card-title text-muted' }, title),
-            e('h4', { className: 'card-text fw-bold' }, displayValue)
-          )
-        )
+    };
+
+    const toggleModel = (modelValue) => {
+      setSelectedModels(prev => 
+        prev.includes(modelValue) 
+          ? prev.filter(m => m !== modelValue)
+          : [...prev, modelValue]
       );
     };
 
-    return e('div', { className: 'volatility-regime-tool', style: { maxWidth: '1000px', margin: '0 auto' } },
-      e('form', { className: 'row g-3 align-items-end mb-4', onSubmit: handleAnalyze },
-        e('div', { className: 'col-md-4' },
-          e('label', { htmlFor: 'futures-select', className: 'form-label' }, 'Select Futures Contract'),
-          e('select', { 
-            id: 'futures-select', 
-            className: 'form-select', 
-            value: selectedSymbol, 
-            onChange: ev => setSelectedSymbol(ev.target.value) 
-          },
-            futures.map(future => e('option', { key: future.symbol, value: future.symbol }, `${future.name} (${future.symbol})`))
-          )
+    const getModelDisplayName = (modelValue) => {
+      const model = availableModels.find(m => m.value === modelValue);
+      return model ? model.label : modelValue;
+    };
+
+    const formatMessage = (content) => {
+      // Simple markdown-like formatting
+      return content
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+    };
+
+    return e('div', { className: 'deepseek-chatbot', style: { maxWidth: '1200px', margin: '0 auto' } },
+      e('style', null, `
+        .deepseek-chatbot { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .chat-header { margin-bottom: 20px; }
+        .chat-header h2 { font-size: 22px; font-weight: 600; color: #1a202c; margin-bottom: 8px; }
+        .chat-header p { font-size: 15px; color: #718096; }
+        .chat-controls { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .control-group { flex: 1; min-width: 150px; }
+        .control-group label { font-weight: 500; font-size: 14px; margin-bottom: 6px; color: #4a5568; display: block; }
+        .control-group .form-control, .control-group .form-select { font-size: 15px; }
+        .chat-messages { height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #f8fafc; }
+        .message { margin-bottom: 16px; padding: 12px; border-radius: 8px; }
+        .message.user { background: #183153; color: white; margin-left: 20px; }
+        .message.assistant { background: white; border: 1px solid #e2e8f0; margin-right: 20px; }
+        .message-content { line-height: 1.5; }
+        .message-content code { background: #f1f5f9; padding: 2px 4px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        .chat-input { display: flex; gap: 12px; }
+        .chat-input textarea { flex: 1; resize: vertical; min-height: 60px; }
+        .api-status { padding: 8px 12px; border-radius: 6px; font-size: 14px; margin-bottom: 16px; }
+        .api-status.success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        .api-status.error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .api-status.warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .tab-nav { display: flex; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+        .tab-nav button { background: none; border: none; padding: 12px 20px; font-size: 16px; font-weight: 500; color: #718096; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .tab-nav button.active { color: #183153; border-bottom-color: #183153; }
+        .tab-nav button:hover { color: #183153; }
+        .model-checkboxes { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+        .model-checkbox { display: flex; align-items: center; gap: 6px; }
+        .model-checkbox input { margin: 0; }
+        .model-checkbox label { font-size: 14px; color: #4a5568; }
+        .summary-stats { background: #e6fffa; border: 1px solid #9ae6b4; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+        .summary-stats h4 { margin-bottom: 12px; color: #22543d; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 18px; font-weight: 600; color: #22543d; }
+        .stat-label { font-size: 12px; color: #718096; margin-top: 4px; }
+        .comparison-table { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .comparison-table th { background: #183153 !important; color: white; font-weight: 600; padding: 12px 8px; }
+        .comparison-table td { padding: 12px 8px; vertical-align: middle; }
+        .comparison-table .table-success { background-color: #d1fae5 !important; }
+        .comparison-table .table-danger { background-color: #fee2e2 !important; }
+        .comparison-table .badge { font-size: 0.75rem; }
+        .comparison-table .fw-bold { color: #183153; }
+      `),
+
+      // Header
+      e('div', { className: 'chat-header' },
+        e('h2', null, '🤖 Chatbot'),
+        e('p', null, 'Powered by AI models via OpenRouter API')
+      ),
+
+      // API Status
+      apiStatus === true && e('div', { className: 'api-status success' }, '✅ API Connected'),
+      apiStatus === false && e('div', { className: 'api-status error' }, '❌ API Not Configured - Please set OPENROUTER_API_KEY'),
+      apiStatus === null && e('div', { className: 'api-status warning' }, '⏳ Checking API Status...'),
+
+      // Tab Navigation
+      e('div', { className: 'tab-nav' },
+        e('button', {
+          className: activeTab === 'chat' ? 'active' : '',
+          onClick: () => setActiveTab('chat')
+        }, '💬 Chat'),
+        e('button', {
+          className: activeTab === 'comparison' ? 'active' : '',
+          onClick: () => setActiveTab('comparison')
+        }, '🏁 Model Performance Comparison')
+      ),
+
+      // Chat Tab Content
+      activeTab === 'chat' && e('div', null,
+        // Controls
+      e('div', { className: 'chat-controls' },
+        e('div', { className: 'control-group' },
+          e('label', null, 'Model:'),
+          e('select', {
+            className: 'form-select',
+            value: model,
+            onChange: ev => setModel(ev.target.value)
+          }, models.map(m => e('option', { key: m.value, value: m.value }, m.label)))
         ),
-        e('div', { className: 'col-md-2' },
-          e('label', { htmlFor: 'lookback-days', className: 'form-label' }, 'Lookback Days'),
-          e('input', { 
-            id: 'lookback-days', 
-            type: 'number', 
-            className: 'form-control', 
-            value: lookbackDays, 
-            onChange: ev => setLookbackDays(parseInt(ev.target.value)),
-            min: 100,
-            max: 500
+        e('div', { className: 'control-group' },
+          e('label', null, 'Temperature:'),
+          e('input', {
+            type: 'range',
+            className: 'form-control',
+            min: '0',
+            max: '2',
+            step: '0.1',
+            value: temperature,
+            onChange: ev => setTemperature(parseFloat(ev.target.value))
           })
         ),
-        e('div', { className: 'col-md-2' },
-          e('label', { htmlFor: 'volatility-threshold', className: 'form-label' }, 'Volatility Threshold'),
-          e('input', { 
-            id: 'volatility-threshold', 
-            type: 'number', 
-            className: 'form-control', 
-            value: volatilityThreshold, 
-            onChange: ev => setVolatilityThreshold(parseFloat(ev.target.value)),
-            min: 0.5,
-            max: 0.95,
-            step: 0.05
+        e('div', { className: 'control-group' },
+          e('label', null, 'Max Tokens:'),
+          e('input', {
+            type: 'number',
+            className: 'form-control',
+            min: '100',
+            max: '4000',
+            value: maxTokens,
+            onChange: ev => setMaxTokens(parseInt(ev.target.value))
           })
-        ),
-        e('div', { className: 'col-md-4' },
-          e('button', { 
-            type: 'submit', 
-            className: 'btn btn-primary w-100', 
-            disabled: loading || !selectedSymbol 
-          }, loading ? 'Analyzing...' : 'Analyze Strategy')
         )
       ),
 
-      error && e('div', { className: 'alert alert-danger' }, error),
+      // Parameter display
+      e('div', { style: { fontSize: '14px', color: '#666', marginBottom: '16px' } },
+        `Temperature: ${temperature} | Max Tokens: ${maxTokens}`
+      ),
 
-      loading && e('div', { className: 'text-center p-5' }, e('div', { className: 'spinner-border', role: 'status' })),
-
-      result && e('div', { className: 'results-section' },
-        e('div', { className: 'card mb-4' },
-          e('div', { className: 'card-header' }, `Volatility Regime Strategy Analysis for ${result.symbol}`),
-          e('div', { className: 'card-body' },
-            e('div', { className: 'row' },
-              Metric({ title: 'Total Return', value: result.strategy_results.total_return, isPercentage: true }),
-              Metric({ title: 'Sharpe Ratio', value: result.strategy_results.sharpe_ratio, isDecimal: true }),
-              Metric({ title: 'Max Drawdown', value: result.strategy_results.max_drawdown, isPercentage: true }),
-              Metric({ title: 'Win Rate', value: result.strategy_results.win_rate, isPercentage: true })
+      // Messages
+      e('div', { className: 'chat-messages' },
+        conversation.length === 0 ? 
+          e('div', { style: { textAlign: 'center', color: '#666', marginTop: '50px' } },
+            e('div', { style: { marginBottom: '20px' } },
+              e('h5', { style: { color: '#183153', marginBottom: '10px' } }, '🧪 Welcome to Model Evaluation!'),
+              e('p', { style: { fontSize: '14px', lineHeight: '1.5' } }, 
+                'Test and compare AI models with your questions.'
+              )
             ),
-            e('hr'),
-            e('div', { className: 'row' },
-              e('div', { className: 'col-md-6' },
-                e('h6', null, 'Regime Distribution'),
-                e('p', null, `Low Volatility Periods: ${result.regime_distribution.low_volatility}`),
-                e('p', null, `High Volatility Periods: ${result.regime_distribution.high_volatility}`)
+            e('div', { style: { background: '#f8f9fa', padding: '15px', borderRadius: '8px', border: '1px solid #e9ecef' } },
+              e('p', { style: { margin: '0', fontSize: '14px', color: '#6c757d' } },
+                e('strong', null, '💡 Tip: '), 
+                'The demo will automatically show you Apple stock analysis with performance metrics using Mistral Small model.'
+              )
+            )
+          ) :
+          conversation.map((msg, index) => 
+            e('div', { 
+              key: index, 
+              className: `message ${msg.role}`,
+              style: { textAlign: msg.role === 'user' ? 'right' : 'left' }
+            },
+              e('div', { 
+                className: 'message-content',
+                dangerouslySetInnerHTML: { __html: formatMessage(msg.content) }
+              })
+            )
+          ),
+        loading && e('div', { className: 'message assistant', style: { textAlign: 'left' } },
+          e('div', { className: 'message-content' }, '🤔 Thinking...')
+        )
+      ),
+
+      // Error display
+      error && e('div', { className: 'alert alert-danger mb-3' }, error),
+
+      // Input and buttons
+      e('div', { className: 'chat-input' },
+        e('textarea', {
+          className: 'form-control',
+          placeholder: 'Type your message here...',
+          value: message,
+          onChange: ev => setMessage(ev.target.value),
+          onKeyPress: ev => ev.key === 'Enter' && !ev.shiftKey && handleSubmit(ev)
+        }),
+        e('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+          e('button', {
+            className: 'btn btn-dark-bbg',
+            onClick: handleSubmit,
+            disabled: loading || !message.trim() || apiStatus === false
+          }, loading ? 'Sending...' : 'Send'),
+          e('button', {
+            className: 'btn btn-outline-secondary',
+            onClick: clearConversation,
+            disabled: conversation.length === 0
+          }, 'Clear Chat')
+        )
+      )
+      ),
+
+      // Comparison Tab Content
+      activeTab === 'comparison' && e('div', null,
+        e('div', { className: 'mb-3' },
+          e('label', { htmlFor: 'comparison-prompt', className: 'form-label' }, 'Test Prompt:'),
+          e('textarea', {
+            id: 'comparison-prompt',
+            className: 'form-control',
+            rows: 3,
+            value: comparisonPrompt,
+            onChange: ev => setComparisonPrompt(ev.target.value),
+            placeholder: 'Enter a prompt to test all selected models...'
+          })
+        ),
+
+        e('div', { className: 'mb-3' },
+          e('label', { className: 'form-label' }, 'Select Models to Compare:'),
+          e('div', { className: 'model-checkboxes' },
+            availableModels.map(model => 
+              e('div', { key: model.value, className: 'model-checkbox' },
+                e('input', {
+                  type: 'checkbox',
+                  id: `model-${model.value}`,
+                  checked: selectedModels.includes(model.value),
+                  onChange: () => toggleModel(model.value)
+                }),
+                e('label', { htmlFor: `model-${model.value}` }, model.label)
+              )
+            )
+          )
+        ),
+
+        e('div', { className: 'row g-3 mb-3' },
+          e('div', { className: 'col-md-6' },
+            e('label', { className: 'form-label' }, 'Temperature:'),
+            e('input', {
+              type: 'range',
+              className: 'form-control',
+              min: '0',
+              max: '2',
+              step: '0.1',
+              value: temperature,
+              onChange: ev => setTemperature(parseFloat(ev.target.value))
+            }),
+            e('small', { className: 'text-muted' }, `Current: ${temperature}`)
+          ),
+          e('div', { className: 'col-md-6' },
+            e('label', { className: 'form-label' }, 'Max Tokens:'),
+            e('input', {
+              type: 'number',
+              className: 'form-control',
+              min: '100',
+              max: '4000',
+              value: maxTokens,
+              onChange: ev => setMaxTokens(parseInt(ev.target.value))
+            })
+          )
+        ),
+
+        e('button', {
+          type: 'submit',
+          className: 'btn btn-primary',
+          onClick: handleCompare,
+          disabled: comparisonLoading || selectedModels.length === 0 || !comparisonPrompt.trim()
+        }, comparisonLoading ? '🔄 Comparing Models...' : '🏁 Start Comparison'),
+
+        comparisonError && e('div', { className: 'alert alert-danger mt-3' }, comparisonError),
+
+        comparisonResults && e('div', { className: 'mt-4' },
+          e('div', { className: 'summary-stats' },
+            e('h4', null, '📊 Comparison Summary'),
+            e('div', { className: 'stats-grid' },
+              e('div', { className: 'stat-item' },
+                e('div', { className: 'stat-value' }, comparisonResults.summary.successful_models),
+                e('div', { className: 'stat-label' }, 'Successful Models')
               ),
-              e('div', { className: 'col-md-6' },
-                e('h6', null, 'Model Performance'),
-                e('p', null, `Regime Prediction Accuracy: ${(result.regime_accuracy * 100).toFixed(2)}%`),
-                e('p', null, `Data Points Analyzed: ${result.data_points}`)
+              e('div', { className: 'stat-item' },
+                e('div', { className: 'stat-value' }, `${comparisonResults.summary.avg_response_time.toFixed(2)}s`),
+                e('div', { className: 'stat-label' }, 'Avg Response Time')
+              ),
+              e('div', { className: 'stat-item' },
+                e('div', { className: 'stat-value' }, Math.round(comparisonResults.summary.avg_token_count)),
+                e('div', { className: 'stat-label' }, 'Avg Tokens Used')
+              ),
+              e('div', { className: 'stat-item' },
+                e('div', { className: 'stat-value' }, getModelDisplayName(comparisonResults.summary.fastest_model)),
+                e('div', { className: 'stat-label' }, 'Fastest Model')
+              )
+            )
+          ),
+
+          e('h4', { style: { marginBottom: '16px', color: '#1a202c' } }, '📋 Performance Comparison Table'),
+
+          e('div', { className: 'table-responsive' },
+            e('table', { className: 'table table-striped table-hover comparison-table' },
+              e('thead', { className: 'table-dark' },
+                e('tr', null,
+                  e('th', null, 'Model'),
+                  e('th', null, 'Status'),
+                  e('th', null, 'Response Time'),
+                  e('th', null, 'Tokens'),
+                  e('th', null, 'Words'),
+                  e('th', null, 'Avg Word Length'),
+                  e('th', null, 'Response Preview')
+                )
+              ),
+              e('tbody', null,
+                comparisonResults.results.map((result, index) => 
+                  e('tr', { key: result.model, className: result.success ? 'table-success' : 'table-danger' },
+                    e('td', { className: 'fw-bold' }, getModelDisplayName(result.model)),
+                    e('td', null, 
+                      result.success ? 
+                        e('span', { className: 'badge bg-success' }, '✅ Success') :
+                        e('span', { className: 'badge bg-danger' }, '❌ Failed')
+                    ),
+                    e('td', null, result.success ? `${result.response_time.toFixed(2)}s` : '-'),
+                    e('td', null, result.success ? result.token_count : '-'),
+                    e('td', null, result.success ? result.word_count : '-'),
+                    e('td', null, result.success ? result.avg_word_length.toFixed(1) : '-'),
+                    e('td', { className: 'text-muted', style: { maxWidth: '300px' } },
+                      result.success && result.response ? 
+                        (result.response.length > 100 ? 
+                          `${result.response.substring(0, 100)}...` : 
+                          result.response
+                        ) : 
+                        (result.error || 'N/A')
+                    )
+                  )
+                )
               )
             )
           )
@@ -1227,9 +1783,82 @@ function renderVolatilityCorrelationChart(data) {
     );
   }
 
-  const root = document.getElementById('react-volatility-regime-tool');
+  const root = document.getElementById('react-deepseek-chatbot');
   if (root && window.React && window.ReactDOM) {
-    ReactDOM.createRoot(root).render(React.createElement(VolatilityRegimeStrategy));
+    ReactDOM.createRoot(root).render(React.createElement(DeepSeekChatbot));
   }
+})();
+
+
+
+
+  
+// --- AI Platform Comparables Interactivity ---
+(function() {
+    // Simple in-browser filtering, sorting, and chip logic
+    const table = document.getElementById('ai-platform-table');
+    const search = document.getElementById('ai-platform-search');
+    const chips = document.querySelectorAll('.filter-chip');
+    let currentCategory = null;
+    let currentSort = null;
+    let sortAsc = true;
+
+    function filterTable() {
+        const query = (search.value || '').toLowerCase();
+        Array.from(table.tBodies[0].rows).forEach(row => {
+            const text = row.innerText.toLowerCase();
+            const matchesSearch = text.includes(query);
+            const matchesCategory = !currentCategory || row.getAttribute('data-category') === currentCategory;
+            row.style.display = (matchesSearch && matchesCategory) ? '' : 'none';
+        });
+    }
+    search && search.addEventListener('input', filterTable);
+    chips.forEach(chip => {
+        chip.addEventListener('click', function() {
+            if (currentCategory === chip.dataset.category) {
+                currentCategory = null;
+                chips.forEach(c => c.classList.remove('active'));
+            } else {
+                currentCategory = chip.dataset.category;
+                chips.forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+            }
+            filterTable();
+        });
+    });
+    // Sortable columns
+    Array.from(table.tHead.rows[0].cells).forEach((th, idx) => {
+        if (!th.hasAttribute('data-sort')) return;
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', function() {
+            const rows = Array.from(table.tBodies[0].rows).filter(r => r.style.display !== 'none');
+            rows.sort((a, b) => {
+                const aText = a.cells[idx].innerText.toLowerCase();
+                const bText = b.cells[idx].innerText.toLowerCase();
+                if (aText < bText) return sortAsc ? -1 : 1;
+                if (aText > bText) return sortAsc ? 1 : -1;
+                return 0;
+            });
+            sortAsc = currentSort === idx ? !sortAsc : true;
+            currentSort = idx;
+            rows.forEach(row => table.tBodies[0].appendChild(row));
+        });
+    });
+    // Chart placeholder (future: Chart.js integration)
+    if (window.Chart) {
+        const ctx = document.getElementById('ai-platform-chart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['OpenRouter', 'Together.ai', 'Hugging Face', 'Fireworks.ai', 'Groq API', 'Anyscale', 'Ollama', 'Vercel AI SDK', 'LangChain', 'Helicone', 'PromptLayer'],
+                datasets: [{
+                    label: 'Relative Popularity (Demo)',
+                    data: [90, 70, 95, 60, 50, 40, 30, 35, 60, 45, 40],
+                    backgroundColor: '#27457c',
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+    }
 })();
   

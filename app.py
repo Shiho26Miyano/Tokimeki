@@ -27,8 +27,10 @@ from routes.trading_strategy_analyzer import hf_signal_bp as trading_strategy_an
 app.register_blueprint(trading_strategy_analyzer_bp)
 from routes.investment_playbooks import investment_playbooks_bp
 app.register_blueprint(investment_playbooks_bp)
-from routes.volatility_regime_strategy import volatility_regime_bp
-app.register_blueprint(volatility_regime_bp)
+from routes.deepseek_chatbot import deepseek_chatbot_bp
+app.register_blueprint(deepseek_chatbot_bp)
+from routes.ai_platform_comparison import ai_platform_comparison_bp
+app.register_blueprint(ai_platform_comparison_bp)
 
 @app.after_request
 def after_request(response):
@@ -41,7 +43,9 @@ def after_request(response):
 def index():
     return send_from_directory('static', 'index.html')
 
-
+@app.route('/test')
+def test():
+    return 'Hello, world!'
 
 @app.errorhandler(500)
 def handle_500(e):
