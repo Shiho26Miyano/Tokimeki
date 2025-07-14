@@ -84,6 +84,14 @@ document.addEventListener('DOMContentLoaded', function() {
             window.fetchStockTrends();
         });
     }
+    
+    // Auto-fetch volatility analysis when volatility stock selector changes
+    const volatilityStockSelect = document.getElementById('volatility-stock-select');
+    if (volatilityStockSelect) {
+        volatilityStockSelect.addEventListener('change', function() {
+            fetchAndRenderVolatilityCorrelation();
+        });
+    }
     const metricSelect = document.getElementById('metric-select');
     const rangeSelect = document.getElementById('range-select');
     const windowSelect = document.getElementById('window-select');
@@ -417,14 +425,13 @@ window._volatilityChartState = {
 };
 
 function fetchAndRenderVolatilityCorrelation() {
-    // Use the first selected company from #stock-select
-    const stockSelect = document.getElementById('stock-select');
-    const symbols = Array.from(stockSelect.selectedOptions).map(opt => opt.value);
-    if (!symbols.length) {
+    // Use the selected company from #volatility-stock-select
+    const stockSelect = document.getElementById('volatility-stock-select');
+    if (!stockSelect || !stockSelect.value) {
         document.getElementById('volatility-correlation-chart').innerHTML = 'Please select a company above.';
         return;
     }
-    const symbol = symbols[0];
+    const symbol = stockSelect.value;
     // Get window and years from UI
     const windowInput = document.getElementById('vol-window');
     const yearsInput = document.getElementById('vol-years');
@@ -543,7 +550,6 @@ function renderVolatilityCorrelationChart(data) {
     // Slice data for visible range
     const dates = data.dates.slice(startIdx, endIdx + 1).map(d3.timeParse('%Y-%m-%d'));
     const vol = data.volatility.slice(startIdx, endIdx + 1);
-    const eventCount = data.event_count.slice(startIdx, endIdx + 1);
     const eventTitles = (data.event_titles || []).slice(startIdx, endIdx + 1);
     // X scale
     const x = d3.scaleTime()
@@ -637,19 +643,6 @@ function renderVolatilityCorrelationChart(data) {
             }
         }
     }
-    // Event count as bars (optional)
-    const barWidth = Math.max(1, width / dates.length * 0.7);
-    g.selectAll('.event-bar')
-        .data(eventCount)
-        .enter()
-        .append('rect')
-        .attr('class', 'event-bar')
-        .attr('x', (d, i) => x(dates[i]) - barWidth/2)
-        .attr('y', (d, i) => yLeft((vol[i] !== null ? 0 : null)))
-        .attr('width', barWidth)
-        .attr('height', (d, i) => d > 0 ? 8 : 0)
-        .attr('fill', '#2196f3')
-        .attr('opacity', 0.25);
     // Axes
     g.append('g')
         .attr('transform', `translate(0,${height})`)
@@ -705,12 +698,11 @@ function renderVolatilityCorrelationChart(data) {
             // Tooltip content
             let html = `<b>${d3.timeFormat('%Y-%m-%d')(dates[idx])}</b><br>`;
             html += `Volatility: <b>${vol[idx] !== null ? vol[idx].toFixed(4) : 'N/A'}</b><br>`;
-            html += `Event count: <b>${eventCount[idx]}</b><br>`;
             // Always show the lowest volatility window date range
             if (highlightStartDate && highlightEndDate) {
                 html += `<span style='color:#ff9800'><b>Lowest Volatility Window:</b><br>${highlightStartDate} to ${highlightEndDate}</span><br>`;
             }
-            // Always show news titles for this date, even if event count is N/A
+            // Always show news titles for this date
             if (eventTitles && eventTitles[idx] && eventTitles[idx].length > 0) {
                 html += '<hr style="margin:4px 0;">';
                 html += '<b>News headlines:</b><ul style="margin:0 0 0 1em;padding:0;">';

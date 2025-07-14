@@ -310,12 +310,10 @@ def volatility_event_correlation():
     except Exception as e:
         return jsonify({'error': f'Error fetching stock data: {str(e)}'}), 500
     # Remove event/news/sentiment fetching and alignment
-    event_count = [0 for _ in dates]
     event_titles = [[] for _ in dates]
     return jsonify({
         'dates': dates,
         'volatility': rolling_vol,
-        'event_count': event_count,
         'event_titles': event_titles,
         'min_vol': min_vol,
         'min_vol_date': min_vol_date
