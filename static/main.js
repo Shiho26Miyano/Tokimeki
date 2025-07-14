@@ -428,15 +428,21 @@ function fetchAndRenderVolatilityCorrelation() {
     // Get window and years from UI
     const windowInput = document.getElementById('vol-window');
     const yearsInput = document.getElementById('vol-years');
-    const windowSize = windowInput ? parseInt(windowInput.value) || 10 : 10;
+    const regimeWindowInput = document.getElementById('regime-window');
+    const windowSize = windowInput ? parseInt(windowInput.value) || 30 : 30;
     const years = yearsInput ? parseInt(yearsInput.value) || 2 : 2;
+    const regimeWindow = regimeWindowInput ? parseInt(regimeWindowInput.value) || 30 : 30;
+    
     const today = new Date();
     const start = new Date();
     start.setFullYear(today.getFullYear() - years);
     const start_date = start.toISOString().split('T')[0];
     const end_date = today.toISOString().split('T')[0];
+    
     const chartDiv = document.getElementById('volatility-correlation-chart');
-    chartDiv.innerHTML = 'Loading...';
+    chartDiv.innerHTML = 'Loading volatility data...';
+    
+    // Fetch volatility data
     fetch(`/volatility_event_correlation?symbol=${symbol}&start_date=${start_date}&end_date=${end_date}&window=${windowSize}`)
         .then(res => res.json())
         .then(data => {
@@ -448,8 +454,28 @@ function fetchAndRenderVolatilityCorrelation() {
                 window._volatilityChartState.range = [0, data.dates.length - 1];
             }
             renderVolatilityCorrelationChart(data);
+            
+            // Now fetch regime analysis
+            return fetch('/volatility_regime/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    symbol: symbol, 
+                    window: regimeWindow, 
+                    period: `${years}y` 
+                })
+            });
         })
-        .catch(() => {
+        .then(res => res.json())
+        .then(regimeData => {
+            if (regimeData.error) {
+                console.warn('Regime analysis error:', regimeData.error);
+                return;
+            }
+            displayRegimeAnalysis(regimeData);
+        })
+        .catch((err) => {
+            console.error('Error:', err);
             chartDiv.innerHTML = 'Error fetching data.';
         });
 }
@@ -702,6 +728,101 @@ function renderVolatilityCorrelationChart(data) {
             tooltip.style('display', 'none');
             g.selectAll('.hover-dot').remove();
         });
+}
+
+// Function to display regime analysis results
+function displayRegimeAnalysis(regimeData) {
+    const resultsDiv = document.getElementById('regime-analysis-results');
+    const statsDiv = document.getElementById('regime-statistics');
+    const periodsDiv = document.getElementById('regime-periods');
+    
+    if (!resultsDiv || !statsDiv || !periodsDiv) return;
+    
+    resultsDiv.style.display = 'block';
+    
+    // Display current regime info
+    const currentInfo = document.createElement('div');
+    currentInfo.className = 'alert alert-info mb-3';
+    currentInfo.innerHTML = `
+        <strong>${regimeData.symbol} - Current Regime: </strong>
+        <span class="badge bg-primary">${regimeData.current_regime}</span><br>
+        <small>Current Volatility: ${regimeData.current_volatility}% | Window: ${regimeData.rolling_window} days | Period: ${regimeData.analysis_period}</small>
+    `;
+    resultsDiv.insertBefore(currentInfo, resultsDiv.firstChild);
+    
+    // Display regime statistics
+    statsDiv.innerHTML = '';
+    Object.entries(regimeData.regime_statistics).forEach(([regime, stats]) => {
+        const getRegimeColor = (regime) => {
+            switch (regime) {
+                case 'Low Volatility': return '#10b981';
+                case 'Medium Volatility': return '#f59e0b';
+                case 'High Volatility': return '#ef4444';
+                case 'Extreme Volatility': return '#7c3aed';
+                default: return '#6b7280';
+            }
+        };
+        
+        const card = document.createElement('div');
+        card.className = 'col-md-6 col-lg-3 mb-3';
+        card.innerHTML = `
+            <div class="card h-100" style="border-left: 4px solid ${getRegimeColor(regime)}">
+                <div class="card-body">
+                    <h6 class="card-title">${regime}</h6>
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted">Count</small>
+                            <div class="fw-bold">${stats.count}</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Avg Vol</small>
+                            <div class="fw-bold">${stats.avg_volatility}%</div>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <small class="text-muted">Min-Max</small>
+                            <div class="fw-bold">${stats.min_volatility}%-${stats.max_volatility}%</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Time %</small>
+                            <div class="fw-bold">${stats.percentage_of_time}%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        statsDiv.appendChild(card);
+    });
+    
+    // Display regime periods
+    periodsDiv.innerHTML = `
+        <h6 class="mb-3">Regime Periods</h6>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Regime</th>
+                        <th>Avg Volatility</th>
+                        <th>Duration (days)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${regimeData.regime_periods.map(period => `
+                        <tr>
+                            <td>${period.start_date}</td>
+                            <td>${period.end_date}</td>
+                            <td>${period.regime}</td>
+                            <td>${period.avg_volatility}%</td>
+                            <td>${period.duration_days}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
 }
 
 window.fetchTweetVolatilityAnalysis = function() {
@@ -1425,5 +1546,76 @@ window.fetchTweetVolatilityAnalysis = function() {
   if (root && window.React && window.ReactDOM) {
     ReactDOM.createRoot(root).render(React.createElement(DeepSeekChatbot));
   }
+})();
+
+
+  
+// --- AI Platform Comparables Interactivity ---
+(function() {
+    // Simple in-browser filtering, sorting, and chip logic
+    const table = document.getElementById('ai-platform-table');
+    const search = document.getElementById('ai-platform-search');
+    const chips = document.querySelectorAll('.filter-chip');
+    let currentCategory = null;
+    let currentSort = null;
+    let sortAsc = true;
+
+    function filterTable() {
+        const query = (search.value || '').toLowerCase();
+        Array.from(table.tBodies[0].rows).forEach(row => {
+            const text = row.innerText.toLowerCase();
+            const matchesSearch = text.includes(query);
+            const matchesCategory = !currentCategory || row.getAttribute('data-category') === currentCategory;
+            row.style.display = (matchesSearch && matchesCategory) ? '' : 'none';
+        });
+    }
+    search && search.addEventListener('input', filterTable);
+    chips.forEach(chip => {
+        chip.addEventListener('click', function() {
+            if (currentCategory === chip.dataset.category) {
+                currentCategory = null;
+                chips.forEach(c => c.classList.remove('active'));
+            } else {
+                currentCategory = chip.dataset.category;
+                chips.forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+            }
+            filterTable();
+        });
+    });
+    // Sortable columns
+    Array.from(table.tHead.rows[0].cells).forEach((th, idx) => {
+        if (!th.hasAttribute('data-sort')) return;
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', function() {
+            const rows = Array.from(table.tBodies[0].rows).filter(r => r.style.display !== 'none');
+            rows.sort((a, b) => {
+                const aText = a.cells[idx].innerText.toLowerCase();
+                const bText = b.cells[idx].innerText.toLowerCase();
+                if (aText < bText) return sortAsc ? -1 : 1;
+                if (aText > bText) return sortAsc ? 1 : -1;
+                return 0;
+            });
+            sortAsc = currentSort === idx ? !sortAsc : true;
+            currentSort = idx;
+            rows.forEach(row => table.tBodies[0].appendChild(row));
+        });
+    });
+    // Chart placeholder (future: Chart.js integration)
+    if (window.Chart) {
+        const ctx = document.getElementById('ai-platform-chart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['OpenRouter', 'Together.ai', 'Hugging Face', 'Fireworks.ai', 'Groq API', 'Anyscale', 'Ollama', 'Vercel AI SDK', 'LangChain', 'Helicone', 'PromptLayer'],
+                datasets: [{
+                    label: 'Relative Popularity (Demo)',
+                    data: [90, 70, 95, 60, 50, 40, 30, 35, 60, 45, 40],
+                    backgroundColor: '#27457c',
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+    }
 })();
   

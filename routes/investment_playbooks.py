@@ -1,4 +1,3 @@
-# DISABLED: This script is not currently used/imported in the app.
 from flask import Blueprint, request, jsonify
 import yfinance as yf
 

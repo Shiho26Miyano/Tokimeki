@@ -252,23 +252,23 @@
                         <a class="nav-link active" id="deepseek-chatbot-tab" data-bs-toggle="pill" data-bs-target="#deepseek-chatbot-content" role="tab" aria-controls="deepseek-chatbot-content" aria-selected="true">🤖 Model Evaluation</a>
                     </li>
                     <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="ai-platform-comparables-tab" data-bs-toggle="pill" data-bs-target="#ai-platform-comparables-content" role="tab" aria-controls="ai-platform-comparables-content" aria-selected="false">🤖 AI Platform Comparables</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
                         <a class="nav-link" id="market-overtime-tab" data-bs-toggle="pill" data-bs-target="#market-overtime-content" role="tab" aria-controls="market-overtime-content" aria-selected="false">📈 Market Overtime</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="volatility-explorer-tab" data-bs-toggle="pill" data-bs-target="#volatility-explorer-content" role="tab" aria-controls="volatility-explorer-content" aria-selected="false">📊 Volatility Explorer</a>
                     </li>
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="tweet-sentiment-tab" data-bs-toggle="pill" data-bs-target="#tweet-sentiment-content" role="tab" aria-controls="tweet-sentiment-content" aria-selected="false">🐦 Tweet Sentiment</a>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="speech-analysis-tab" data-bs-toggle="pill" data-bs-target="#speech-analysis-content" role="tab" aria-controls="speech-analysis-content" aria-selected="false">🎤 Financial Q&A</a>
-                    </li>
+
+
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">⚡ Trading Strategy Analyzer</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="investment-playbooks-tab" data-bs-toggle="pill" data-bs-target="#investment-playbooks-content" role="tab" aria-controls="investment-playbooks-content" aria-selected="false">📚 Investment Playbooks</a>
                     </li>
+
                 </ul>
             </div>
 
@@ -276,6 +276,131 @@
                 <div class="tab-content" id="main-tab-content">
                     <div class="tab-pane fade show active" id="deepseek-chatbot-content" role="tabpanel" aria-labelledby="deepseek-chatbot-tab">
                         <div id="react-deepseek-chatbot"></div>
+                    </div>
+                    <div class="tab-pane fade" id="ai-platform-comparables-content" role="tabpanel" aria-labelledby="ai-platform-comparables-tab">
+                        <div class="card shadow-sm flex-fill d-flex flex-column" style="max-width: 1100px; margin: 0 auto; border-radius: 16px;">
+                            <div class="card-body d-flex flex-column" style="padding: 32px;">
+                                <div class="card-header-row mb-3">
+                                    <span class="card-title" style="font-size: 2rem; font-weight: 600; color: #183153;">🤖 AI Platform Comparables</span>
+                                </div>
+                                <div class="alert alert-info mb-4" style="background: #f1f5fa; color: #27457c; border: none; border-radius: 10px;">
+                                    <strong>What is this?</strong> This section compares leading AI/LLM platforms and toolkits that serve as alternatives or complements to <b>OpenRouter</b> for LLM access, orchestration, monitoring, and local inference.
+                                </div>
+                                <!-- Interactive Filters -->
+                                <div class="mb-3 d-flex flex-wrap align-items-center" id="ai-platform-filters">
+                                    <input type="text" id="ai-platform-search" class="form-control me-3" style="max-width: 260px; margin-bottom: 8px;" placeholder="Search platforms or features...">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <span class="badge bg-primary filter-chip" data-category="Commercial">Commercial</span>
+                                        <span class="badge bg-success filter-chip" data-category="Open-Source">Open-Source</span>
+                                        <span class="badge bg-info filter-chip" data-category="Monitoring">Monitoring</span>
+                                        <span class="badge bg-warning text-dark filter-chip" data-category="Orchestration">Orchestration</span>
+                                        <span class="badge bg-secondary filter-chip" data-category="Local">Local</span>
+                                    </div>
+                                </div>
+                                <!-- Chart Placeholder -->
+                                <div class="mb-4" style="background: #f8fafc; border-radius: 10px; padding: 18px 10px; text-align: center;">
+                                    <canvas id="ai-platform-chart" width="600" height="220" style="max-width: 100%; margin-bottom: 8px;"></canvas>
+                                    <div style="color: #888; font-size: 0.98rem;">(Interactive chart coming soon: popularity, speed, or cost comparison)</div>
+                                </div>
+                                <h2 style="font-size: 1.3rem; margin-top: 24px; margin-bottom: 12px; color: #27457c;">Platform Comparison</h2>
+                                <div class="table-responsive mb-4">
+                                    <table class="table table-bordered" id="ai-platform-table" style="background: #fff; cursor: pointer;">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th data-sort="Platform">Platform</th>
+                                                <th data-sort="Description">Description</th>
+                                                <th data-sort="Key Features">Key Features</th>
+                                                <th data-sort="Notes">Notes</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr data-category="Commercial">
+                                                <td>OpenRouter</td><td>Unified API for commercial LLMs</td><td>OpenAI, Anthropic, Cohere, Mistral, etc.; OpenAI-compatible API</td><td>Best for commercial LLM aggregation</td>
+                                                <td><a href="https://openrouter.ai/" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                            <tr data-category="Open-Source">
+                                                <td>Together.ai</td><td>Open LLM inference platform</td><td>Mixtral, LLaMA, Gemma, etc.; OpenAI-compatible API</td><td>Often free/cheaper, focused on open models</td>
+                                                <td><a href="https://www.together.ai/" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                            <tr data-category="Open-Source">
+                                                <td>Hugging Face</td><td>Model hub & inference endpoints</td><td>100,000+ models, Spaces, datasets, OSS focus</td><td>Largest OSS model library</td>
+                                                <td><a href="https://huggingface.co/" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                            <tr data-category="Open-Source">
+                                                <td>Fireworks.ai</td><td>OSS LLM hosting at scale</td><td>Fast, OpenAI-style endpoint, Mistral, LLaMA2</td><td>Production-grade OSS LLMs</td>
+                                                <td><a href="https://fireworks.ai/" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                            <tr data-category="Open-Source">
+                                                <td>Groq API</td><td>Ultra-fast inference (Mixtral)</td><td>Low latency, custom hardware, Mixtral</td><td>Limited to select models</td>
+                                                <td><a href="https://groq.com/" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                            <tr data-category="Open-Source">
+                                                <td>Anyscale Endpoints</td><td>Hosted open LLMs</td><td>OpenAI-compatible, Ray-based, cost-efficient</td><td>Performance/cost focus</td>
+                                                <td><a href="https://www.anyscale.com/endpoints" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                            <tr data-category="Local">
+                                                <td>Ollama (local)</td><td>Run LLMs locally</td><td>CLI/API, LLaMA2, Code LLaMA, Mistral</td><td>For local/dev use only</td>
+                                                <td><a href="https://ollama.com/" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                            <tr data-category="Commercial">
+                                                <td>Vercel AI SDK</td><td>LLM app toolkit</td><td>Unified LLM access, OpenAI, Anthropic, Cohere</td><td>Requires Vercel + backend</td>
+                                                <td><a href="https://vercel.com/docs/ai" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                            <tr data-category="Orchestration">
+                                                <td>LangChain</td><td>LLM orchestration framework</td><td>Multi-LLM routing, agents, plugins</td><td>You write orchestration logic</td>
+                                                <td><a href="https://www.langchain.com/" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                            <tr data-category="Monitoring">
+                                                <td>Helicone</td><td>LLM API logging/monitoring</td><td>Proxy, dashboards, analytics</td><td>Not a router, but often used with OpenRouter</td>
+                                                <td><a href="https://www.helicone.ai/" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                            <tr data-category="Monitoring">
+                                                <td>PromptLayer</td><td>Prompt management & tracking</td><td>Logs, versions, routes prompts</td><td>Great for prompt versioning</td>
+                                                <td><a href="https://www.promptlayer.com/" target="_blank" class="btn btn-outline-primary btn-sm">Learn More</a></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <h2 style="font-size: 1.15rem; margin-top: 24px; margin-bottom: 10px; color: #27457c;">Parameter Explanations</h2>
+                                <div class="alert alert-secondary mb-4" style="background: #f8fafc; color: #183153; border: none; border-radius: 10px;">
+                                    <div style="margin-bottom: 8px;"><strong>Model:</strong> Choose the AI model that best fits your needs. Each model has different strengths and capabilities.</div>
+                                    <div style="margin-bottom: 8px;"><strong>Temperature:</strong> Controls randomness in responses. Lower values (0.1-0.3) make responses more focused and deterministic. Higher values (0.7-1.0) make responses more creative and varied. Range: 0.0 to 2.0.</div>
+                                    <div><strong>Max Tokens:</strong> Limits the length of the AI response. Higher values allow longer, more detailed responses. Lower values create shorter, more concise answers. Range: 100 to 4000 tokens.</div>
+                                </div>
+                                <h2 style="font-size: 1.15rem; margin-top: 24px; margin-bottom: 10px; color: #27457c;">🧠 Summary of Positioning</h2>
+                                <ul style="margin-bottom: 24px;">
+                                    <li><b>Best router for commercial LLMs:</b> OpenRouter</li>
+                                    <li><b>Best for open-source LLMs:</b> Together.ai, Fireworks.ai</li>
+                                    <li><b>Best for monitoring/tracking:</b> Helicone, PromptLayer</li>
+                                    <li><b>Best for orchestration & logic:</b> LangChain</li>
+                                    <li><b>Best for local dev:</b> Ollama</li>
+                                </ul>
+                                <h2 style="font-size: 1.15rem; margin-top: 24px; margin-bottom: 10px; color: #27457c;">Use Case → Best Tool(s) → Highlights</h2>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered usecase-table" style="background: #fff;">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Use Case</th>
+                                                <th>Best Tool(s)</th>
+                                                <th>Highlights</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td>Commercial LLM Aggregation</td><td>🏆 OpenRouter</td><td>Unified access to OpenAI, Anthropic, Cohere, etc.</td></tr>
+                                            <tr><td>Open-Source Model Access</td><td>Together.ai, Fireworks.ai</td><td>Fast, cost-efficient access to Mixtral, LLaMA, Mistral</td></tr>
+                                            <tr><td>Prompt Logging & Monitoring</td><td>Helicone, PromptLayer</td><td>Dashboards, prompt tracking, version control</td></tr>
+                                            <tr><td>LLM Orchestration Logic</td><td>LangChain</td><td>Workflow control, multi-model routing, agents</td></tr>
+                                            <tr><td>Local Model Running</td><td>Ollama</td><td>Run LLMs (like LLaMA2) locally via CLI/API</td></tr>
+                                            <tr><td>Fast Open-Source Inference</td><td>Groq API</td><td>Lightning-fast Mixtral, low latency</td></tr>
+                                            <tr><td>Custom App Integration</td><td>Vercel AI SDK</td><td>LLM abstraction with Vercel + custom backend</td></tr>
+                                            <tr><td>Performance-Focused LLM APIs</td><td>Anyscale Endpoints</td><td>Optimized OpenAI-compatible APIs, from Ray team</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div style="margin-top: 32px; color: #888; font-size: 0.98rem;">Want a visual diagram of these tools by category? Let us know!</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="tab-pane fade" id="market-overtime-content" role="tabpanel" aria-labelledby="market-overtime-tab">
                         <div class="card shadow-sm flex-fill d-flex flex-column">
@@ -356,7 +481,7 @@
                             <div class="card-body d-flex flex-column">
                                 <div class="card-header-row">
                                     <div class="d-flex align-items-center">
-                                        <span class="card-title">Volatility Explorer</span>
+                                        <span class="card-title">📊 Enhanced Volatility Explorer</span>
                                         <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#volatilityExplorerHelpModal">
                                             How it works
                                         </button>
@@ -365,15 +490,33 @@
                                 <div class="card-section-vertical">
                                     <div class="mb-2" style="color:#183153;font-size:1.04rem;">
                                         <span style="font-size:1.1rem;">📈 <b>Rolling volatility</b> reveals when the stock experienced sharp price movements.</span>
+                                        <br>
+                                        <span style="font-size:1rem;">🎯 <b>Regime analysis</b> identifies different market conditions and volatility patterns.</span>
                                     </div>
-                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="volatility-controls">
-                                        <label for="vol-window" class="form-label mb-0">Rolling Window (days):</label>
-                                        <input type="number" id="vol-window" class="form-control w-auto" value="10" min="1" style="max-width:80px;">
-                                        <label for="vol-years" class="form-label mb-0">Time Range (years):</label>
-                                        <input type="number" id="vol-years" class="form-control w-auto" value="2" min="1" style="max-width:80px;">
-                                        <button type="button" onclick="fetchAndRenderVolatilityCorrelation()" class="btn btn-dark-bbg">Fetch & Visualize</button>
+                                    
+                                    <!-- Enhanced Controls -->
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="volatility-controls">
+                                                <label for="vol-window" class="form-label mb-0">Rolling Window (days):</label>
+                                                <input type="number" id="vol-window" class="form-control w-auto" value="30" min="1" style="max-width:80px;">
+                                                <label for="vol-years" class="form-label mb-0">Time Range (years):</label>
+                                                <input type="number" id="vol-years" class="form-control w-auto" value="2" min="1" style="max-width:80px;">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                                <label for="regime-window" class="form-label mb-0">Regime Window (days):</label>
+                                                <input type="number" id="regime-window" class="form-control w-auto" value="30" min="5" style="max-width:80px;">
+                                                <button type="button" onclick="fetchAndRenderVolatilityCorrelation()" class="btn btn-dark-bbg">Analyze Volatility</button>
+                                            </div>
+                                        </div>
                                     </div>
+                                    
+                                    <!-- Chart Area -->
                                     <div class="chart-area"><div id="volatility-correlation-chart"></div></div>
+                                    
+                                    <!-- Slider Controls -->
                                     <div class="mb-2" style="width:100%;max-width:700px;">
                                         <div id="volatility-range-slider"></div>
                                         <div class="d-flex justify-content-between mt-1">
@@ -381,40 +524,19 @@
                                             <span id="volatility-range-end" style="font-size:0.98rem;"></span>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="tab-pane fade" id="tweet-sentiment-content" role="tabpanel" aria-labelledby="tweet-sentiment-tab">
-                        <div class="card shadow-sm flex-fill d-flex flex-column">
-                            <div class="card-body d-flex flex-column">
-                                <div class="card-header-row">
-                                    <div class="d-flex align-items-center">
-                                        <span class="card-title">Tweet Sentiment</span>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#tweetSentimentHelpModal">
-                                            How it works
-                                        </button>
+                                    
+                                    <!-- Regime Analysis Results -->
+                                    <div id="regime-analysis-results" class="mt-4" style="display: none;">
+                                        <h6 class="mb-3">📊 Volatility Regime Analysis</h6>
+                                        <div id="regime-statistics" class="row mb-3"></div>
+                                        <div id="regime-periods" class="mt-3"></div>
                                     </div>
                                 </div>
-                                <div class="container py-4"><div id="react-tweet-sentiment"></div></div>
                             </div>
                         </div>
                     </div>
-                    <div class="tab-pane fade" id="speech-analysis-content" role="tabpanel" aria-labelledby="speech-analysis-tab">
-                        <div class="card shadow-sm flex-fill d-flex flex-column">
-                            <div class="card-body d-flex flex-column">
-                                <div class="card-header-row">
-                                    <div class="d-flex align-items-center">
-                                        <span class="card-title">Financial Q&A</span>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#financialQAHelpModal">
-                                            How it works
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="container py-4"><div id="react-speech-recorder"></div></div>
-                            </div>
-                        </div>
-                    </div>
+
+
                     <div class="tab-pane fade" id="hf-signal-tool-content" role="tabpanel" aria-labelledby="hf-signal-tool-tab">
                         <div class="card shadow-sm flex-fill d-flex flex-column">
                             <div class="card-body d-flex flex-column">
@@ -445,6 +567,7 @@
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -479,18 +602,20 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="volatilityExplorerHelpModalLabel">How Volatility Explorer Works</h5>
+                    <h5 class="modal-title" id="volatilityExplorerHelpModalLabel">How Enhanced Volatility Explorer Works</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>This tool analyzes stock price volatility to help you understand market risk and identify periods of high uncertainty.</p>
+                    <p>This enhanced tool combines rolling volatility analysis with regime detection to provide comprehensive market risk insights.</p>
                     <ol>
-                        <li><strong>Rolling Window:</strong> Set the number of days for calculating rolling volatility. A larger window (e.g., 30 days) shows longer-term trends, while a smaller window (e.g., 10 days) reveals short-term fluctuations.</li>
+                        <li><strong>Rolling Volatility:</strong> Set the number of days for calculating rolling volatility. A larger window (e.g., 30 days) shows longer-term trends, while a smaller window (e.g., 10 days) reveals short-term fluctuations.</li>
                         <li><strong>Time Range:</strong> Choose how many years of historical data to analyze. More data provides better context for volatility patterns.</li>
-                        <li><strong>Interactive Visualization:</strong> The chart shows rolling volatility over time. Higher peaks indicate periods of increased price volatility and market uncertainty.</li>
+                        <li><strong>Regime Window:</strong> Set the window size for regime detection. This determines how volatility is classified into different market conditions.</li>
+                        <li><strong>Interactive Visualization:</strong> The chart shows rolling volatility over time with highlighted periods of interest.</li>
+                        <li><strong>Regime Analysis:</strong> Automatically identifies and analyzes different volatility regimes (Low, Medium, High, Extreme) with detailed statistics.</li>
                         <li><strong>Zoom Control:</strong> Use the slider below the chart to focus on specific time periods and examine volatility patterns in detail.</li>
                     </ol>
-                    <p class="text-muted small">Volatility is calculated using the standard deviation of daily returns over the specified rolling window.</p>
+                    <p class="text-muted small">Volatility is calculated using the standard deviation of daily returns. Regime analysis helps identify market stress periods and optimal trading conditions.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -499,55 +624,9 @@
         </div>
     </div>
 
-    <!-- Tweet Sentiment Help Modal -->
-    <div class="modal fade" id="tweetSentimentHelpModal" tabindex="-1" aria-labelledby="tweetSentimentHelpModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="tweetSentimentHelpModalLabel">How Tweet Sentiment Works</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>This tool analyzes the sentiment of tweets to gauge public opinion about stocks, companies, or financial topics.</p>
-                    <ol>
-                        <li><strong>Enter Text:</strong> Type or paste the text you want to analyze. This could be a tweet, news headline, or any financial commentary.</li>
-                        <li><strong>Sentiment Analysis:</strong> The tool uses advanced natural language processing to determine whether the text expresses positive, negative, or neutral sentiment.</li>
-                        <li><strong>Results:</strong> You'll see a sentiment score and classification, along with confidence levels for the analysis.</li>
-                        <li><strong>Use Cases:</strong> Analyze social media sentiment about stocks, evaluate news headlines, or assess public opinion on financial topics.</li>
-                    </ol>
-                    <p class="text-muted small">The sentiment analysis is powered by a fine-tuned financial language model trained on Twitter data.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Financial Q&A Help Modal -->
-    <div class="modal fade" id="financialQAHelpModal" tabindex="-1" aria-labelledby="financialQAHelpModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="financialQAHelpModalLabel">How Financial Q&A Works</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>This tool provides AI-powered answers to your financial questions using advanced language models.</p>
-                    <ol>
-                        <li><strong>Ask Questions:</strong> Type any financial question you have, from basic concepts to complex market analysis.</li>
-                        <li><strong>Voice Input:</strong> Click the microphone button to ask your question using voice input for hands-free interaction.</li>
-                        <li><strong>AI Response:</strong> The tool uses a specialized financial language model to provide accurate, context-aware answers.</li>
-                        <li><strong>Conversation:</strong> You can ask follow-up questions to dive deeper into topics or clarify previous responses.</li>
-                    </ol>
-                    <p class="text-muted small">The AI model is trained on financial data and can help with investment strategies, market analysis, and financial education.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
+
+
 
     <!-- Trading Strategy Analyzer Help Modal -->
     <div class="modal fade" id="tradingStrategyHelpModal" tabindex="-1" aria-labelledby="tradingStrategyHelpModalLabel" aria-hidden="true">
@@ -591,6 +670,31 @@
                         <li><strong>Financial Metrics:</strong> View key financial indicators including P/E ratio, market cap, dividend yield, and more to understand the stock's fundamentals.</li>
                     </ol>
                     <p class="text-muted small">All financial data is sourced from Yahoo Finance. Investment recommendations are for educational purposes and should not be considered as financial advice.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Volatility Regime Strategy Help Modal -->
+    <div class="modal fade" id="volatilityRegimeHelpModal" tabindex="-1" aria-labelledby="volatilityRegimeHelpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="volatilityRegimeHelpModalLabel">How Volatility Regime Strategy Works</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>This tool analyzes market volatility regimes to help you understand different market conditions and adjust your investment strategy accordingly.</p>
+                    <ol>
+                        <li><strong>Select Stock:</strong> Choose a stock symbol to analyze its volatility patterns over time.</li>
+                        <li><strong>Regime Detection:</strong> The tool identifies different volatility regimes: Low, Medium, High, and Extreme volatility periods.</li>
+                        <li><strong>Regime Analysis:</strong> View statistics for each regime including duration, average volatility, and percentage of time spent in each regime.</li>
+                        <li><strong>Strategy Insights:</strong> Understand how different market conditions affect your investment strategy and risk management.</li>
+                    </ol>
+                    <p class="text-muted small">Volatility regimes help identify market stress periods and can inform position sizing and risk management decisions.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>

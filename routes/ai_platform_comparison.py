@@ -1,3 +1,5 @@
+# DISABLED: This script is not currently used/imported in the app.
+# The AI Platform Comparables content is now integrated into the main index.html
 from flask import Blueprint, render_template
 
 ai_platform_comparison_bp = Blueprint('ai_platform_comparison', __name__)
