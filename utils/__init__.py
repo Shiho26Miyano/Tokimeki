@@ -1,1 +1,1 @@
-# Utils package for Tokimeki AI application 
+# Utils package 

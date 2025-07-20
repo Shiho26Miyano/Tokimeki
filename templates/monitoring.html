@@ -268,7 +268,7 @@
                     document.getElementById('redis-status').className = 'metric-value status-disconnected';
                 }
                 
-                document.getElementById('cache-ttl').textContent = `${cacheStatus.cache_ttl || 300}s`;
+                document.getElementById('cache-ttl').textContent = `${cacheStatus.default_ttl || 300}s`;
                 
                 // Update cost analysis
                 if (stats.success && stats.model_costs) {
@@ -279,7 +279,7 @@
                         const row = tableBody.insertRow();
                         row.innerHTML = `
                             <td>${model}</td>
-                            <td>${stats.model_requests[model] || 0}</td>
+                            <td>${stats.model_usage[model] || 0}</td>
                             <td>$${cost || 0}</td>
                         `;
                     });

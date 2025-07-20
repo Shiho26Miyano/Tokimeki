@@ -1,179 +1,154 @@
 import time
-import json
-import os
 import psutil
-from datetime import datetime, timedelta
-from collections import defaultdict, deque
-from typing import Dict, List, Any
 import threading
+import logging
+from collections import defaultdict, deque
+from datetime import datetime, timedelta
+from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
 
 class UsageTracker:
     def __init__(self):
-        self.usage_data = {
-            'requests': defaultdict(int),
-            'api_calls': defaultdict(int),
-            'errors': defaultdict(int),
-            'response_times': defaultdict(list),
-            'memory_usage': deque(maxlen=1000),
-            'start_time': time.time()
-        }
+        self.requests = deque(maxlen=10000)  # Keep last 10k requests
+        self.model_usage = defaultdict(int)
+        self.model_costs = defaultdict(float)
+        self.start_time = time.time()
         self.lock = threading.Lock()
-        
-        # Load usage limits from environment
-        self.daily_limit = int(os.environ.get('DAILY_REQUEST_LIMIT', 1000))
-        self.hourly_limit = int(os.environ.get('HOURLY_REQUEST_LIMIT', 100))
-        self.monthly_limit = int(os.environ.get('MONTHLY_REQUEST_LIMIT', 10000))
-        
-        # Cost tracking (estimated costs per API call)
-        self.cost_per_request = {
-            'mistral-small': 0.0001,  # $0.0001 per request
-            'deepseek-r1': 0.0002,    # $0.0002 per request
-            'deepseek-chat': 0.0002,  # $0.0002 per request
-            'qwen3-8b': 0.00005,      # $0.00005 per request
-            'gemma-3n': 0.00003,      # $0.00003 per request
-            'hunyuan': 0.0001,        # $0.0001 per request
-        }
         
         # Start background monitoring
         self.start_monitoring()
-
-    def track_request(self, endpoint: str, model: str = None, response_time: float = None, 
-                     success: bool = True, error: str = None):
+    
+    def track_request(self, endpoint: str, model: str = None, response_time: float = 0, success: bool = True):
         """Track a single request"""
         with self.lock:
-            timestamp = datetime.now()
-            date_key = timestamp.strftime('%Y-%m-%d')
-            hour_key = timestamp.strftime('%Y-%m-%d-%H')
+            request_data = {
+                'timestamp': time.time(),
+                'endpoint': endpoint,
+                'model': model,
+                'response_time': response_time,
+                'success': success
+            }
+            self.requests.append(request_data)
             
-            # Track basic request metrics
-            self.usage_data['requests'][date_key] += 1
-            self.usage_data['requests'][hour_key] += 1
-            
-            # Track API calls by model
             if model:
-                self.usage_data['api_calls'][model] += 1
-            
-            # Track response times
-            if response_time:
-                self.usage_data['response_times'][model or 'unknown'].append(response_time)
-            
-            # Track errors
-            if not success:
-                self.usage_data['errors'][error or 'unknown'] += 1
-            
-            # Track memory usage
-            memory_percent = psutil.virtual_memory().percent
-            self.usage_data['memory_usage'].append({
-                'timestamp': timestamp.isoformat(),
-                'memory_percent': memory_percent
-            })
-
+                self.model_usage[model] += 1
+                # Simple cost calculation (you can adjust based on actual costs)
+                cost_per_request = self._get_model_cost(model)
+                self.model_costs[model] += cost_per_request
+    
+    def _get_model_cost(self, model: str) -> float:
+        """Get cost per request for a model (simplified)"""
+        # Simplified cost model - adjust based on actual OpenRouter pricing
+        cost_map = {
+            'deepseek-chat': 0.0001,
+            'deepseek-r1': 0.0002,
+            'mistral-small': 0.00005,
+            'qwen3-8b': 0.00003,
+            'gemma-3n': 0.00002
+        }
+        return cost_map.get(model, 0.0001)  # Default cost
+    
     def get_usage_stats(self, period: str = 'today') -> Dict[str, Any]:
-        """Get usage statistics for a specific period"""
+        """Get usage statistics for a period"""
         with self.lock:
-            now = datetime.now()
+            now = time.time()
             
+            # Calculate time range
             if period == 'today':
-                date_key = now.strftime('%Y-%m-%d')
-                requests = self.usage_data['requests'].get(date_key, 0)
+                start_time = now - (24 * 60 * 60)  # 24 hours
             elif period == 'hour':
-                hour_key = now.strftime('%Y-%m-%d-%H')
-                requests = self.usage_data['requests'].get(hour_key, 0)
+                start_time = now - (60 * 60)  # 1 hour
             elif period == 'month':
-                month_key = now.strftime('%Y-%m')
-                requests = sum(v for k, v in self.usage_data['requests'].items() 
-                             if k.startswith(month_key))
+                start_time = now - (30 * 24 * 60 * 60)  # 30 days
             else:
-                requests = sum(self.usage_data['requests'].values())
+                start_time = now - (24 * 60 * 60)  # Default to today
+            
+            # Filter requests by time
+            recent_requests = [
+                req for req in self.requests 
+                if req['timestamp'] >= start_time
+            ]
+            
+            # Calculate statistics
+            total_requests = len(recent_requests)
+            successful_requests = len([req for req in recent_requests if req['success']])
+            failed_requests = total_requests - successful_requests
+            
+            # Calculate response times
+            response_times = [req['response_time'] for req in recent_requests if req['response_time'] > 0]
+            avg_response_time = sum(response_times) / len(response_times) if response_times else 0
             
             # Calculate costs
-            total_cost = 0
-            model_costs = {}
-            for model, count in self.usage_data['api_calls'].items():
-                cost = count * self.cost_per_request.get(model, 0.0001)
-                model_costs[model] = {
-                    'requests': count,
-                    'cost': cost
-                }
-                total_cost += cost
-            
-            # Calculate average response times
-            avg_response_times = {}
-            for model, times in self.usage_data['response_times'].items():
-                if times:
-                    avg_response_times[model] = sum(times) / len(times)
+            total_cost = sum(self.model_costs.values())
             
             # Get memory usage
-            current_memory = psutil.virtual_memory().percent
-            avg_memory = 0
-            if self.usage_data['memory_usage']:
-                avg_memory = sum(item['memory_percent'] for item in self.usage_data['memory_usage']) / len(self.usage_data['memory_usage'])
+            memory_usage = psutil.virtual_memory().percent
+            
+            # Calculate uptime
+            uptime_seconds = now - self.start_time
+            uptime_hours = int(uptime_seconds // 3600)
+            uptime_minutes = int((uptime_seconds % 3600) // 60)
+            uptime_str = f"{uptime_hours}h {uptime_minutes}m"
             
             return {
-                'period': period,
-                'requests': requests,
-                'total_cost': round(total_cost, 4),
-                'model_costs': model_costs,
-                'avg_response_times': avg_response_times,
-                'errors': dict(self.usage_data['errors']),
-                'current_memory_percent': current_memory,
-                'avg_memory_percent': round(avg_memory, 2),
-                'uptime_seconds': time.time() - self.usage_data['start_time'],
-                'limits': {
-                    'daily': self.daily_limit,
-                    'hourly': self.hourly_limit,
-                    'monthly': self.monthly_limit
-                }
+                "success": True,
+                "requests_today": total_requests,
+                "requests_hour": len([req for req in recent_requests if req['timestamp'] >= now - 3600]),
+                "requests_month": len([req for req in self.requests if req['timestamp'] >= now - (30 * 24 * 3600)]),
+                "successful_requests": successful_requests,
+                "failed_requests": failed_requests,
+                "avg_response_time": round(avg_response_time, 3),
+                "total_cost": round(total_cost, 4),
+                "memory_usage": round(memory_usage, 1),
+                "uptime": uptime_str,
+                "model_usage": dict(self.model_usage),
+                "model_costs": dict(self.model_costs)
             }
-
-    def check_limits(self) -> Dict[str, bool]:
+    
+    def check_limits(self) -> Dict[str, Any]:
         """Check if usage limits are exceeded"""
-        stats = self.get_usage_stats()
+        stats = self.get_usage_stats('today')
         
-        return {
-            'daily_exceeded': stats['requests'] > self.daily_limit,
-            'hourly_exceeded': self.get_usage_stats('hour')['requests'] > self.hourly_limit,
-            'monthly_exceeded': self.get_usage_stats('month')['requests'] > self.monthly_limit
+        limits = {
+            "daily_limit": 1000,
+            "hourly_limit": 100,
+            "monthly_limit": 10000,
+            "daily_used": stats.get("requests_today", 0),
+            "hourly_used": stats.get("requests_hour", 0),
+            "monthly_used": stats.get("requests_month", 0),
+            "daily_exceeded": stats.get("requests_today", 0) >= 1000,
+            "hourly_exceeded": stats.get("requests_hour", 0) >= 100,
+            "monthly_exceeded": stats.get("requests_month", 0) >= 10000
         }
-
-    def get_cost_estimate(self, model: str, requests: int = 1) -> float:
-        """Get cost estimate for a number of requests"""
-        return requests * self.cost_per_request.get(model, 0.0001)
-
+        
+        return limits
+    
+    def reset_stats(self):
+        """Reset all usage statistics"""
+        with self.lock:
+            self.requests.clear()
+            self.model_usage.clear()
+            self.model_costs.clear()
+            self.start_time = time.time()
+            logger.info("Usage statistics reset")
+    
     def start_monitoring(self):
         """Start background monitoring thread"""
         def monitor():
             while True:
                 try:
-                    # Check limits and log warnings
-                    limits = self.check_limits()
-                    if any(limits.values()):
-                        print(f"⚠️ Usage limits exceeded: {limits}")
-                    
-                    # Log usage every hour
-                    if datetime.now().minute == 0:
-                        stats = self.get_usage_stats()
-                        print(f"📊 Hourly usage: {stats['requests']} requests, ${stats['total_cost']} cost")
-                    
-                    time.sleep(60)  # Check every minute
+                    # Log current stats every 5 minutes
+                    stats = self.get_usage_stats()
+                    logger.info(f"Current usage: {stats['requests_today']} requests today, "
+                              f"${stats['total_cost']} total cost")
+                    time.sleep(300)  # 5 minutes
                 except Exception as e:
-                    print(f"Monitoring error: {e}")
-                    time.sleep(60)
+                    logger.error(f"Monitoring error: {e}")
+                    time.sleep(60)  # Wait 1 minute on error
         
         monitor_thread = threading.Thread(target=monitor, daemon=True)
         monitor_thread.start()
-
-    def reset_stats(self):
-        """Reset all usage statistics"""
-        with self.lock:
-            self.usage_data = {
-                'requests': defaultdict(int),
-                'api_calls': defaultdict(int),
-                'errors': defaultdict(int),
-                'response_times': defaultdict(list),
-                'memory_usage': deque(maxlen=1000),
-                'start_time': time.time()
-            }
 
 # Global usage tracker instance
 usage_tracker = UsageTracker() 
