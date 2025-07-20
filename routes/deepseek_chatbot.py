@@ -6,10 +6,17 @@ import logging
 from datetime import datetime, timedelta
 import yfinance as yf
 import time
+
+# Import our utilities
+from utils.cache_manager import cached_response
+from utils.usage_tracker import usage_tracker
 import concurrent.futures
 from utils.usage_tracker import usage_tracker
 
 deepseek_chatbot_bp = Blueprint('deepseek_chatbot', __name__)
+
+# Global limiter variable that will be set by the main app
+limiter = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -79,6 +86,7 @@ def calculate_performance_metrics(hist):
         'trade_count': total_days
     }
 
+@cached_response(ttl=300, key_prefix="stock_data")  # Cache for 5 minutes
 def get_stock_data(symbol, days=7):
     """Fetch comprehensive stock data using yfinance"""
     try:
@@ -380,6 +388,7 @@ def create_stock_analysis_response(stock_data, message):
 
     return return_text
 
+@cached_response(ttl=300, key_prefix="api_call")  # Cache for 5 minutes
 def call_free_api(messages, model="mistral-small", temperature=0.7, max_tokens=1000):
     """Call the free AI API via OpenRouter"""
     if not validate_api_key():
@@ -528,6 +537,13 @@ def test_single_model(model, prompt, temperature=0.7, max_tokens=1000):
 @deepseek_chatbot_bp.route('/compare_models', methods=['POST'])
 def compare_models():
     """Compare performance of multiple models"""
+    # Apply rate limiting manually
+    if limiter:
+        try:
+            limiter.limit("10 per hour")(lambda: None)()
+        except Exception as e:
+            return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
+    
     start_time = time.time()
     try:
         data = request.get_json()
@@ -610,6 +626,13 @@ def health_check():
 @deepseek_chatbot_bp.route('/chat', methods=['POST'])
 def chat():
     """Main chat endpoint"""
+    # Apply rate limiting manually
+    if limiter:
+        try:
+            limiter.limit("50 per hour")(lambda: None)()
+        except Exception as e:
+            return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
+    
     start_time = time.time()
     try:
         data = request.get_json()

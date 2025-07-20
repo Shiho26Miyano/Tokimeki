@@ -1377,6 +1377,66 @@ window.fetchTweetVolatilityAnalysis = function() {
         });
     }, [hasShownDemo]);
 
+    // Rate limiting warning function
+    const showRateLimitWarning = (message) => {
+      const warningDiv = document.createElement('div');
+      warningDiv.className = 'rate-limit-warning';
+      warningDiv.innerHTML = `
+        <div style="
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #fef3c7;
+          color: #92400e;
+          border: 1px solid #fde68a;
+          border-radius: 8px;
+          padding: 16px;
+          max-width: 400px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          z-index: 10000;
+          animation: slideIn 0.3s ease-out;
+        ">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span style="font-size: 18px;">⚠️</span>
+            <strong>Rate Limit Exceeded</strong>
+          </div>
+          <p style="margin: 0; font-size: 14px; line-height: 1.4;">${message}</p>
+          <button onclick="this.parentElement.remove()" style="
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #92400e;
+          ">×</button>
+        </div>
+      `;
+      
+      // Add CSS animation
+      if (!document.getElementById('rate-limit-styles')) {
+        const style = document.createElement('style');
+        style.id = 'rate-limit-styles';
+        style.textContent = `
+          @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      
+      document.body.appendChild(warningDiv);
+      
+      // Auto-remove after 10 seconds
+      setTimeout(() => {
+        if (warningDiv.parentElement) {
+          warningDiv.remove();
+        }
+      }, 10000);
+    };
+
     const handleSubmit = async (ev) => {
       if (ev) ev.preventDefault();
       if (!message.trim() || loading) return;
@@ -1406,7 +1466,12 @@ window.fetchTweetVolatilityAnalysis = function() {
         const data = await response.json();
         
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to get response');
+          if (response.status === 429) {
+            showRateLimitWarning('Chat rate limit exceeded. Please wait before sending another message.');
+            throw new Error('Rate limit exceeded. Please try again later.');
+          } else {
+            throw new Error(data.error || 'Failed to get response');
+          }
         }
 
         // Add AI response to conversation
@@ -1447,7 +1512,14 @@ window.fetchTweetVolatilityAnalysis = function() {
         });
 
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Comparison failed');
+        if (!response.ok) {
+          if (response.status === 429) {
+            showRateLimitWarning('Model comparison rate limit exceeded. Please wait before trying again.');
+            throw new Error('Rate limit exceeded. Please try again later.');
+          } else {
+            throw new Error(data.error || 'Comparison failed');
+          }
+        }
         setComparisonResults(data);
       } catch (err) {
         setComparisonError(err.message);
@@ -2328,3 +2400,284 @@ window.fetchTweetVolatilityAnalysis = function() {
         return colors[modelKey] || "#95A5A6";
     }
 })();
+
+// --- Monitoring Dashboard Functionality ---
+(function() {
+    let monitoringInterval = null;
+
+    // Initialize monitoring when the tab is shown
+    document.addEventListener('DOMContentLoaded', function() {
+        const monitoringTab = document.getElementById('monitoring-tab');
+        if (monitoringTab) {
+            monitoringTab.addEventListener('shown.bs.tab', function() {
+                loadMonitoringData();
+                startMonitoringUpdates();
+            });
+            
+            monitoringTab.addEventListener('hidden.bs.tab', function() {
+                stopMonitoringUpdates();
+            });
+        }
+    });
+
+    async function loadMonitoringData() {
+        try {
+            // Load usage statistics
+            const usageResponse = await fetch('/api/usage-stats?period=today');
+            if (usageResponse.status === 429) {
+                window.showRateLimitWarning('Usage stats rate limit exceeded. Please wait before trying again.');
+                return;
+            }
+            const usageData = await usageResponse.json();
+            updateUsageStats(usageData);
+
+            // Load cache status
+            const cacheResponse = await fetch('/api/cache-status');
+            if (cacheResponse.status === 429) {
+                window.showRateLimitWarning('Cache status rate limit exceeded. Please wait before trying again.');
+                return;
+            }
+            const cacheData = await cacheResponse.json();
+            updateCacheStatus(cacheData);
+
+            // Load cost analysis
+            updateCostAnalysis(usageData);
+        } catch (error) {
+            console.error('Error loading monitoring data:', error);
+        }
+    }
+
+    function updateUsageStats(data) {
+        const container = document.getElementById('usage-stats');
+        if (!container) return;
+
+        const uptimeHours = Math.floor(data.uptime_seconds / 3600);
+        const uptimeMinutes = Math.floor((data.uptime_seconds % 3600) / 60);
+
+        container.innerHTML = `
+            <div class="row text-center">
+                <div class="col-6">
+                    <div class="h4 text-primary">${data.requests}</div>
+                    <small class="text-muted">Requests Today</small>
+                </div>
+                <div class="col-6">
+                    <div class="h4 text-success">$${data.total_cost}</div>
+                    <small class="text-muted">Total Cost</small>
+                </div>
+            </div>
+            <hr>
+            <div class="row text-center">
+                <div class="col-6">
+                    <div class="h5">${data.current_memory_percent}%</div>
+                    <small class="text-muted">Memory Usage</small>
+                </div>
+                <div class="col-6">
+                    <div class="h5">${uptimeHours}h ${uptimeMinutes}m</div>
+                    <small class="text-muted">Uptime</small>
+                </div>
+            </div>
+            <hr>
+            <div class="small">
+                <strong>Limits:</strong><br>
+                Daily: ${data.requests}/${data.limits.daily}<br>
+                Hourly: ${data.limits.hourly}<br>
+                Monthly: ${data.limits.monthly}
+            </div>
+        `;
+    }
+
+    function updateCacheStatus(data) {
+        const container = document.getElementById('cache-status');
+        if (!container) return;
+
+        const statusClass = data.redis_connected && data.redis_test ? 'text-success' : 'text-danger';
+        const statusText = data.redis_connected && data.redis_test ? 'Connected' : 'Disconnected';
+        const testStatus = data.redis_test ? '✅ Test Passed' : '❌ Test Failed';
+
+        container.innerHTML = `
+            <div class="row text-center">
+                <div class="col-6">
+                    <div class="h5 ${statusClass}">${statusText}</div>
+                    <small class="text-muted">Redis Status</small>
+                </div>
+                <div class="col-6">
+                    <div class="h5">${data.default_ttl}s</div>
+                    <small class="text-muted">Cache TTL</small>
+                </div>
+            </div>
+            <hr>
+            <div class="row text-center">
+                <div class="col-12">
+                    <div class="small">${testStatus}</div>
+                    <div class="small text-muted">Cache Enabled: ${data.cache_enabled ? 'Yes' : 'No'}</div>
+                </div>
+            </div>
+            <hr>
+            <div class="text-center">
+                <button class="btn btn-sm btn-outline-primary" onclick="clearCache()">
+                    Clear Cache
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="resetStats()">
+                    Reset Stats
+                </button>
+                <button class="btn btn-sm btn-outline-info" onclick="testRedis()">
+                    Test Redis
+                </button>
+            </div>
+        `;
+    }
+
+    function updateCostAnalysis(data) {
+        const container = document.getElementById('cost-analysis');
+        if (!container) return;
+
+        let modelCostsHtml = '';
+        for (const [model, info] of Object.entries(data.model_costs)) {
+            modelCostsHtml += `
+                <div class="row mb-2">
+                    <div class="col-6">${model}</div>
+                    <div class="col-3">${info.requests}</div>
+                    <div class="col-3">$${info.cost}</div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = `
+            <div class="row mb-3">
+                <div class="col-6"><strong>Model</strong></div>
+                <div class="col-3"><strong>Requests</strong></div>
+                <div class="col-3"><strong>Cost</strong></div>
+            </div>
+            ${modelCostsHtml}
+            <hr>
+            <div class="row">
+                <div class="col-6"><strong>Total Cost:</strong></div>
+                <div class="col-6"><strong>$${data.total_cost}</strong></div>
+            </div>
+        `;
+    }
+
+    function startMonitoringUpdates() {
+        if (monitoringInterval) {
+            clearInterval(monitoringInterval);
+        }
+        monitoringInterval = setInterval(loadMonitoringData, 30000); // Update every 30 seconds
+    }
+
+    function stopMonitoringUpdates() {
+        if (monitoringInterval) {
+            clearInterval(monitoringInterval);
+            monitoringInterval = null;
+        }
+    }
+
+    // Global functions for buttons
+    window.clearCache = async function() {
+        try {
+            const response = await fetch('/api/cache-clear', { method: 'POST' });
+            const result = await response.json();
+            if (response.status === 429) {
+                window.showRateLimitWarning('Cache clear rate limit exceeded. Please wait before trying again.');
+            } else {
+                alert(result.message);
+            }
+            loadMonitoringData();
+        } catch (error) {
+            alert('Error clearing cache: ' + error.message);
+        }
+    };
+
+    window.resetStats = async function() {
+        if (confirm('Are you sure you want to reset all usage statistics?')) {
+            try {
+                const response = await fetch('/api/reset-stats', { method: 'POST' });
+                const result = await response.json();
+                if (response.status === 429) {
+                    window.showRateLimitWarning('Reset stats rate limit exceeded. Please wait before trying again.');
+                } else {
+                    alert(result.message);
+                }
+                loadMonitoringData();
+            } catch (error) {
+                alert('Error resetting stats: ' + error.message);
+            }
+        }
+    };
+
+    window.testRedis = async function() {
+        try {
+            const response = await fetch('/api/test-redis');
+            const result = await response.json();
+            if (response.status === 429) {
+                window.showRateLimitWarning('Redis test rate limit exceeded. Please wait before trying again.');
+            } else if (result.success) {
+                alert('✅ Redis test successful!\n\n' + result.message);
+            } else {
+                alert('❌ Redis test failed:\n\n' + result.error);
+            }
+            loadMonitoringData();
+        } catch (error) {
+            alert('Error testing Redis: ' + error.message);
+        }
+    };
+})();
+
+// Global rate limit warning function for use across the application
+window.showRateLimitWarning = function(message) {
+    const warningDiv = document.createElement('div');
+    warningDiv.className = 'rate-limit-warning';
+    warningDiv.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+            border-radius: 8px;
+            padding: 16px;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            animation: slideIn 0.3s ease-out;
+        ">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 18px;">⚠️</span>
+                <strong>Rate Limit Exceeded</strong>
+            </div>
+            <p style="margin: 0; font-size: 14px; line-height: 1.4;">${message}</p>
+            <button onclick="this.parentElement.remove()" style="
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background: none;
+                border: none;
+                font-size: 18px;
+                cursor: pointer;
+                color: #92400e;
+            ">×</button>
+        </div>
+    `;
+    
+    // Add CSS animation if not already present
+    if (!document.getElementById('rate-limit-styles')) {
+        const style = document.createElement('style');
+        style.id = 'rate-limit-styles';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(warningDiv);
+    
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+        if (warningDiv.parentElement) {
+            warningDiv.remove();
+        }
+    }, 10000);
+};
