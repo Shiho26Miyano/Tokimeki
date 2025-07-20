@@ -399,6 +399,89 @@
                                     </table>
                                 </div>
                                 <div style="margin-top: 32px; color: #888; font-size: 0.98rem;">Want a visual diagram of these tools by category? Let us know!</div>
+                                
+                                <!-- Detailed Model Comparison Section -->
+                                <h2 style="font-size: 1.5rem; margin-top: 48px; margin-bottom: 20px; color: #27457c; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px;">🔍 Detailed Free Model Comparison</h2>
+                                <div class="alert alert-success mb-4" style="background: #f0f8f0; color: #27457c; border: none; border-radius: 10px;">
+                                    <strong>Updated Models:</strong> This section provides a comprehensive comparison of the latest free models available on OpenRouter, including context windows, performance metrics, and use case recommendations.
+                                </div>
+                                
+                                <!-- Model Comparison Filters -->
+                                <div class="mb-4 d-flex flex-wrap align-items-center gap-3" id="model-comparison-filters">
+                                    <input type="text" id="model-search" class="form-control" style="max-width: 300px;" placeholder="Search models by name, provider, or features...">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <span class="badge bg-primary filter-chip" data-category="high_context">High Context</span>
+                                        <span class="badge bg-success filter-chip" data-category="fast_inference">Fast Inference</span>
+                                        <span class="badge bg-info filter-chip" data-category="multilingual">Multilingual</span>
+                                        <span class="badge bg-warning text-dark filter-chip" data-category="code_focused">Code Focused</span>
+                                        <span class="badge bg-secondary filter-chip" data-category="chat_optimized">Chat Optimized</span>
+                                        <span class="badge bg-danger filter-chip" data-category="experimental">Experimental</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Detailed Model Comparison Table -->
+                                <div class="table-responsive mb-4">
+                                    <table class="table table-bordered table-hover" id="model-comparison-table" style="background: #fff; font-size: 0.95rem;">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th style="min-width: 150px;">Model Name</th>
+                                                <th style="min-width: 120px;">Provider</th>
+                                                <th style="min-width: 100px;">Context Window</th>
+                                                <th style="min-width: 100px;">Performance</th>
+                                                <th style="min-width: 100px;">Model Size</th>
+                                                <th style="min-width: 120px;">Best For</th>
+                                                <th style="min-width: 150px;">Strengths</th>
+                                                <th style="min-width: 150px;">Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="model-comparison-tbody">
+                                            <!-- Model data will be populated by JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Model Performance Chart -->
+                                <div class="mb-4" style="background: #f8fafc; border-radius: 10px; padding: 20px; text-align: center;">
+                                    <h4 style="color: #27457c; margin-bottom: 15px;">Model Performance Comparison</h4>
+                                    <canvas id="model-performance-chart" width="800" height="300" style="max-width: 100%; margin-bottom: 10px;"></canvas>
+                                    <div style="color: #888; font-size: 0.9rem;">Context window size vs. model performance rating</div>
+                                </div>
+                                
+                                <!-- Model Recommendations -->
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <div class="card h-100" style="border: 1px solid #e0e0e0;">
+                                            <div class="card-header" style="background: #f8f9fa; color: #27457c; font-weight: 600;">
+                                                🏆 Top Recommendations
+                                            </div>
+                                            <div class="card-body">
+                                                <ul class="list-unstyled mb-0">
+                                                    <li class="mb-2"><strong>Best Overall:</strong> <span class="text-primary">DeepSeek Chat V3</span> (chat-optimized)</li>
+                                                    <li class="mb-2"><strong>Best for Code:</strong> <span class="text-success">Mistral Small 3.2</span> (strong reasoning)</li>
+                                                    <li class="mb-2"><strong>Best for Long Context:</strong> <span class="text-info">Kimi K2</span> (200K tokens)</li>
+                                                    <li class="mb-2"><strong>Fastest:</strong> <span class="text-warning">Gemma 3N</span> (2B parameters)</li>
+                                                    <li class="mb-2"><strong>Most Experimental:</strong> <span class="text-danger">Quasar Alpha</span> (cutting-edge)</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card h-100" style="border: 1px solid #e0e0e0;">
+                                            <div class="card-header" style="background: #f8f9fa; color: #27457c; font-weight: 600;">
+                                                📊 Performance Metrics
+                                            </div>
+                                            <div class="card-body">
+                                                <ul class="list-unstyled mb-0">
+                                                    <li class="mb-2"><strong>Context Range:</strong> 8K - 200K tokens</li>
+                                                    <li class="mb-2"><strong>Model Sizes:</strong> 2B - 24B+ parameters</li>
+                                                    <li class="mb-2"><strong>All Models:</strong> Free tier available</li>
+                                                    <li class="mb-2"><strong>API Compatibility:</strong> OpenAI-compatible</li>
+                                                    <li class="mb-2"><strong>Total Models:</strong> 9 free models</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

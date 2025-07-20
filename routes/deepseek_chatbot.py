@@ -18,13 +18,14 @@ logger = logging.getLogger(__name__)
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
-# Free model configuration - Top 5 free models on OpenRouter
+# Free model configuration - Updated free models on OpenRouter
 FREE_MODELS = {
     "mistral-small": "mistralai/mistral-small-3.2-24b-instruct:free",
-    "deepseek-r1": "deepseek/deepseek-r1-0528:free", 
+    "deepseek-r1": "deepseek/deepseek-r1-0528:free",
+    "deepseek-chat": "deepseek/deepseek-chat-v3-0324:free",
     "qwen3-8b": "qwen/qwen3-8b:free",
     "gemma-3n": "google/gemma-3n-e2b-it:free",
-    "kimi-k2": "moonshotai/kimi-k2:free"
+    "hunyuan": "tencent/hunyuan-a13b-instruct:free"
 }
 
 def validate_api_key():
@@ -404,15 +405,33 @@ def call_free_api(messages, model="mistral-small", temperature=0.7, max_tokens=1
         
         if response.status_code == 200:
             data = response.json()
+            logger.info(f"API response for {model}: {data}")
+            
             if "choices" in data and len(data["choices"]) > 0:
+                content = data["choices"][0]["message"]["content"]
+                logger.info(f"Extracted content for {model}: {content[:200]}...")
+                
                 return {
                     "success": True,
-                    "response": data["choices"][0]["message"]["content"],
+                    "response": content,
+                    "model": model,
+                    "usage": data.get("usage", {}),
+                    "timestamp": datetime.now().isoformat()
+                }
+            elif "response" in data:
+                # Fallback for different API response formats
+                content = data["response"]
+                logger.info(f"Fallback extracted content for {model}: {content[:200]}...")
+                
+                return {
+                    "success": True,
+                    "response": content,
                     "model": model,
                     "usage": data.get("usage", {}),
                     "timestamp": datetime.now().isoformat()
                 }
             else:
+                logger.error(f"Invalid response format for {model}: {data}")
                 return {"error": "Invalid response format from API"}
         else:
             error_msg = f"API request failed with status {response.status_code}"
@@ -450,11 +469,44 @@ def test_single_model(model, prompt, temperature=0.7, max_tokens=1000):
             "error": result["error"],
             "response_time": response_time,
             "response": None,
-            "token_count": 0
+            "token_count": 0,
+            "word_count": 0,
+            "avg_word_length": 0
+        }
+    
+    # Check if we have a successful response
+    if not result.get("success", False) or "response" not in result:
+        return {
+            "model": model,
+            "success": False,
+            "error": "No valid response received",
+            "response_time": response_time,
+            "response": None,
+            "token_count": 0,
+            "word_count": 0,
+            "avg_word_length": 0
         }
     
     # Calculate response quality metrics
     response_text = result["response"]
+    
+    # Debug logging
+    logger.info(f"Model {model} response: {response_text[:200]}...")
+    logger.info(f"Response type: {type(response_text)}, Length: {len(response_text) if response_text else 0}")
+    
+    # Handle empty or None response
+    if not response_text or response_text.strip() == "":
+        return {
+            "model": model,
+            "success": False,
+            "error": "Empty response received",
+            "response_time": response_time,
+            "response": None,
+            "token_count": 0,
+            "word_count": 0,
+            "avg_word_length": 0
+        }
+    
     token_count = result.get("usage", {}).get("completion_tokens", len(response_text.split()))
     
     # Simple quality metrics
@@ -708,5 +760,24 @@ def get_models():
         "default_model": "mistral-small",
         "api_configured": validate_api_key()
     })
+
+@deepseek_chatbot_bp.route('/debug-qwen', methods=['POST'])
+def debug_qwen():
+    """Debug endpoint to test Qwen3 8B specifically"""
+    try:
+        messages = [{"role": "user", "content": "Hello, please respond with a simple test message."}]
+        result = call_free_api(messages, "qwen3-8b", 0.7, 100)
+        
+        return jsonify({
+            "success": True,
+            "result": result,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        })
 
  

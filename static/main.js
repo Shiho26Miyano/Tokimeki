@@ -1334,26 +1334,28 @@ window.fetchTweetVolatilityAnalysis = function() {
     const [activeTab, setActiveTab] = React.useState('chat');
 
     // Model Performance Comparison state
-    const [comparisonPrompt, setComparisonPrompt] = React.useState("Explain the concept of machine learning in simple terms");
+    const [comparisonPrompt, setComparisonPrompt] = React.useState("explain what is temperature in llm and how it impact model performance");
     const [selectedModels, setSelectedModels] = React.useState(["mistral-small", "deepseek-r1", "qwen3-8b"]);
     const [comparisonLoading, setComparisonLoading] = React.useState(false);
     const [comparisonResults, setComparisonResults] = React.useState(null);
     const [comparisonError, setComparisonError] = React.useState(null);
 
     const availableModels = [
-      { value: "mistral-small", label: "Mistral Small", description: "General conversation and analysis" },
-      { value: "deepseek-r1", label: "DeepSeek R1", description: "Specialized for coding and programming" },
-      { value: "qwen3-8b", label: "Qwen 3 8B", description: "Optimized for mathematical problems" },
-      { value: "gemma-3n", label: "Gemma 3N", description: "Google's efficient model" },
-      { value: "kimi-k2", label: "Kimi K2", description: "Moonshot's conversational model" }
+      { value: "mistral-small", label: "Mistral Small 3.2", description: "Strong reasoning & code generation", concept: "Mistral's latest 24B parameter model optimized for reasoning tasks, code generation, and multilingual content. Known for strong analytical capabilities and structured thinking." },
+      { value: "deepseek-r1", label: "DeepSeek R1", description: "Extremely long context & code expertise", concept: "DeepSeek's flagship model with 128K context window, specialized in code understanding and generation. Excels at complex programming tasks and long document analysis." },
+      { value: "deepseek-chat", label: "DeepSeek Chat V3", description: "Chat-optimized (recommended)", concept: "Chat-tuned version of DeepSeek's model, optimized for conversational AI. Better at maintaining context, following instructions, and providing helpful responses in dialogue format." },
+      { value: "qwen3-8b", label: "Qwen3 8B", description: "Fast inference & good performance", concept: "Alibaba's efficient 8B parameter model balancing speed and quality. Good for quick responses and resource-constrained environments while maintaining decent reasoning capabilities." },
+      { value: "gemma-3n", label: "Gemma 3N E2B", description: "Google's efficient & fast model", concept: "Google's latest 2B parameter model focused on efficiency and speed. Excellent for quick tasks, though with limited context window. Good for applications requiring fast responses." },
+      { value: "hunyuan", label: "Hunyuan A13B", description: "Tencent's Chinese language model", concept: "Tencent's 13B parameter model with strong Chinese language capabilities. Good for multilingual tasks and Chinese content generation, though may be slower than smaller models." }
     ];
 
     const models = [
-      { value: "mistral-small", label: "Mistral Small", description: "General conversation and analysis" },
-      { value: "deepseek-r1", label: "DeepSeek R1", description: "Specialized for coding and programming" },
-      { value: "qwen3-8b", label: "Qwen 3 8B", description: "Optimized for mathematical problems" },
-      { value: "gemma-3n", label: "Gemma 3N", description: "Google's efficient model" },
-      { value: "kimi-k2", label: "Kimi K2", description: "Moonshot's conversational model" }
+      { value: "mistral-small", label: "Mistral Small 3.2", description: "Strong reasoning & code generation", concept: "Mistral's latest 24B parameter model optimized for reasoning tasks, code generation, and multilingual content. Known for strong analytical capabilities and structured thinking." },
+      { value: "deepseek-r1", label: "DeepSeek R1", description: "Extremely long context & code expertise", concept: "DeepSeek's flagship model with 128K context window, specialized in code understanding and generation. Excels at complex programming tasks and long document analysis." },
+      { value: "deepseek-chat", label: "DeepSeek Chat V3", description: "Chat-optimized (recommended)", concept: "Chat-tuned version of DeepSeek's model, optimized for conversational AI. Better at maintaining context, following instructions, and providing helpful responses in dialogue format." },
+      { value: "qwen3-8b", label: "Qwen3 8B", description: "Fast inference & good performance", concept: "Alibaba's efficient 8B parameter model balancing speed and quality. Good for quick responses and resource-constrained environments while maintaining decent reasoning capabilities." },
+      { value: "gemma-3n", label: "Gemma 3N E2B", description: "Google's efficient & fast model", concept: "Google's latest 2B parameter model focused on efficiency and speed. Excellent for quick tasks, though with limited context window. Good for applications requiring fast responses." },
+      { value: "hunyuan", label: "Hunyuan A13B", description: "Tencent's Chinese language model", concept: "Tencent's 13B parameter model with strong Chinese language capabilities. Good for multilingual tasks and Chinese content generation, though may be slower than smaller models." }
     ];
 
     // Check API status and show demo on component mount
@@ -1467,6 +1469,11 @@ window.fetchTweetVolatilityAnalysis = function() {
       return model ? model.label : modelValue;
     };
 
+    const getModelConcept = (modelValue) => {
+      const model = availableModels.find(m => m.value === modelValue);
+      return model ? model.concept : "No concept available";
+    };
+
     const formatMessage = (content) => {
       // Simple markdown-like formatting
       return content
@@ -1519,6 +1526,51 @@ window.fetchTweetVolatilityAnalysis = function() {
         .comparison-table .table-danger { background-color: #fee2e2 !important; }
         .comparison-table .badge { font-size: 0.75rem; }
         .comparison-table .fw-bold { color: #183153; }
+        
+        /* Enhanced tooltip styles */
+        .response-preview {
+          position: relative;
+          transition: all 0.2s ease;
+        }
+        
+        .response-preview:hover {
+          background-color: #f8f9fa;
+          border-radius: 4px;
+          padding: 4px;
+        }
+        
+        /* Model concept cards */
+        .model-concept-card {
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .model-concept-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        /* Custom tooltip for better readability */
+        [title] {
+          position: relative;
+        }
+        
+        [title]:hover::after {
+          content: attr(title);
+          position: absolute;
+          bottom: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #1a202c;
+          color: white;
+          padding: 8px 12px;
+          border-radius: 6px;
+          font-size: 0.85rem;
+          white-space: pre-wrap;
+          max-width: 300px;
+          z-index: 1000;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+          pointer-events: none;
+        }
       `),
 
       // Header
@@ -1672,7 +1724,11 @@ window.fetchTweetVolatilityAnalysis = function() {
                   checked: selectedModels.includes(model.value),
                   onChange: () => toggleModel(model.value)
                 }),
-                e('label', { htmlFor: `model-${model.value}` }, model.label)
+                e('label', { 
+                  htmlFor: `model-${model.value}`,
+                  title: model.concept,
+                  style: { cursor: 'help' }
+                }, model.label)
               )
             )
           )
@@ -1737,6 +1793,37 @@ window.fetchTweetVolatilityAnalysis = function() {
             )
           ),
 
+          // Model Concepts Section
+          e('div', { className: 'mt-4' },
+            e('h4', { style: { marginBottom: '16px', color: '#1a202c' } }, '🧠 Model Concepts & Differences'),
+            e('div', { className: 'row' },
+              comparisonResults.results.filter(r => r.success).map((result, index) => 
+                e('div', { key: result.model, className: 'col-md-6 mb-3' },
+                  e('div', { 
+                    className: 'card h-100',
+                    style: { border: '1px solid #e2e8f0', borderRadius: '8px' }
+                  },
+                    e('div', { 
+                      className: 'card-header',
+                      style: { 
+                        background: '#f8f9fa', 
+                        borderBottom: '1px solid #e2e8f0',
+                        fontWeight: '600',
+                        color: '#1a202c'
+                      }
+                    }, getModelDisplayName(result.model)),
+                    e('div', { className: 'card-body' },
+                      e('p', { 
+                        className: 'mb-0',
+                        style: { fontSize: '0.9rem', lineHeight: '1.5', color: '#4a5568' }
+                      }, getModelConcept(result.model))
+                    )
+                  )
+                )
+              )
+            )
+          ),
+
           e('h4', { style: { marginBottom: '16px', color: '#1a202c' } }, '📋 Performance Comparison Table'),
 
           e('div', { className: 'table-responsive' },
@@ -1767,7 +1854,17 @@ window.fetchTweetVolatilityAnalysis = function() {
                     e('td', null, result.success ? result.avg_word_length.toFixed(1) : '-'),
                     e('td', { className: 'text-muted', style: { maxWidth: '300px' } },
                       result.success && result.response ? 
-                        (result.response.length > 100 ? 
+                        e('div', { 
+                          className: 'response-preview',
+                          title: result.response,
+                          style: { 
+                            cursor: 'help',
+                            maxWidth: '300px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }
+                        }, result.response.length > 100 ? 
                           `${result.response.substring(0, 100)}...` : 
                           result.response
                         ) : 
@@ -1861,4 +1958,241 @@ window.fetchTweetVolatilityAnalysis = function() {
         });
     }
 })();
-  
+
+// --- Model Comparison Functionality ---
+(function() {
+    let modelData = null;
+    let filteredModels = null;
+
+    // Initialize model comparison when the tab is shown
+    document.addEventListener('DOMContentLoaded', function() {
+        const aiPlatformTab = document.getElementById('ai-platform-comparables-tab');
+        if (aiPlatformTab) {
+            aiPlatformTab.addEventListener('shown.bs.tab', function() {
+                if (!modelData) {
+                    loadModelComparisonData();
+                }
+            });
+        }
+    });
+
+    async function loadModelComparisonData() {
+        try {
+            const response = await fetch('/api/model-comparison');
+            const data = await response.json();
+            modelData = data.models;
+            filteredModels = Object.keys(modelData);
+            populateModelTable();
+            createModelPerformanceChart();
+            setupModelFilters();
+        } catch (error) {
+            console.error('Error loading model comparison data:', error);
+        }
+    }
+
+    function populateModelTable() {
+        const tbody = document.getElementById('model-comparison-tbody');
+        if (!tbody || !modelData) return;
+
+        tbody.innerHTML = '';
+        
+        filteredModels.forEach(modelKey => {
+            const model = modelData[modelKey];
+            const row = document.createElement('tr');
+            
+            // Add category classes for filtering
+            const categories = getModelCategories(modelKey);
+            categories.forEach(cat => row.classList.add(`category-${cat}`));
+            
+            row.innerHTML = `
+                <td><strong>${model.name}</strong></td>
+                <td>${model.provider}</td>
+                <td><span class="badge bg-info">${model.context_window}</span></td>
+                <td><span class="badge bg-${getPerformanceColor(model.performance)}">${model.performance}</span></td>
+                <td>${model.model_size}</td>
+                <td>${model.best_for.join(', ')}</td>
+                <td>${model.strengths.join(', ')}</td>
+                <td>${model.note || '-'}</td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+    }
+
+    function getModelCategories(modelKey) {
+        const categories = {
+            "high_context": ["deepseek-r1", "deepseek-chat", "kimi-k2"],
+            "fast_inference": ["qwen3-8b", "gemma-3n"],
+            "multilingual": ["mistral-small", "kimi-k2", "hunyuan"],
+            "code_focused": ["mistral-small", "deepseek-r1"],
+            "chat_optimized": ["deepseek-chat"],
+            "experimental": ["quasar-alpha"]
+        };
+        
+        const modelCategories = [];
+        Object.entries(categories).forEach(([category, models]) => {
+            if (models.includes(modelKey)) {
+                modelCategories.push(category);
+            }
+        });
+        return modelCategories;
+    }
+
+    function getPerformanceColor(performance) {
+        const colors = {
+            "Very High": "success",
+            "High": "primary",
+            "Good": "warning",
+            "Experimental": "danger"
+        };
+        return colors[performance] || "secondary";
+    }
+
+    function setupModelFilters() {
+        const searchInput = document.getElementById('model-search');
+        const filterChips = document.querySelectorAll('#model-comparison-filters .filter-chip');
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', filterModels);
+        }
+        
+        filterChips.forEach(chip => {
+            chip.addEventListener('click', function() {
+                const category = this.dataset.category;
+                
+                // Toggle active state
+                if (this.classList.contains('active')) {
+                    this.classList.remove('active');
+                    filterModels();
+                } else {
+                    // Remove active from all chips
+                    filterChips.forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    filterModels(category);
+                }
+            });
+        });
+    }
+
+    function filterModels(selectedCategory = null) {
+        const searchQuery = document.getElementById('model-search')?.value.toLowerCase() || '';
+        
+        filteredModels = Object.keys(modelData).filter(modelKey => {
+            const model = modelData[modelKey];
+            const modelText = `${model.name} ${model.provider} ${model.best_for.join(' ')} ${model.strengths.join(' ')}`.toLowerCase();
+            const matchesSearch = modelText.includes(searchQuery);
+            
+            if (selectedCategory) {
+                const categories = getModelCategories(modelKey);
+                return matchesSearch && categories.includes(selectedCategory);
+            }
+            
+            return matchesSearch;
+        });
+        
+        populateModelTable();
+    }
+
+    function createModelPerformanceChart() {
+        const canvas = document.getElementById('model-performance-chart');
+        if (!canvas || !modelData || !window.Chart) return;
+
+        const ctx = canvas.getContext('2d');
+        
+        // Extract context window sizes and performance ratings
+        const chartData = filteredModels.map(modelKey => {
+            const model = modelData[modelKey];
+            const contextSize = parseInt(model.context_window.replace(/[^\d]/g, ''));
+            const performanceScore = getPerformanceScore(model.performance);
+            return {
+                model: model.name,
+                contextSize: contextSize,
+                performance: performanceScore,
+                color: getModelColor(modelKey)
+            };
+        });
+
+        // Sort by context size for better visualization
+        chartData.sort((a, b) => a.contextSize - b.contextSize);
+
+        new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Model Performance',
+                    data: chartData.map(d => ({
+                        x: d.contextSize,
+                        y: d.performance,
+                        model: d.model
+                    })),
+                    backgroundColor: chartData.map(d => d.color),
+                    borderColor: chartData.map(d => d.color),
+                    pointRadius: 8,
+                    pointHoverRadius: 12
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.raw.model}: ${context.raw.x}K context, ${context.raw.y}/5 performance`;
+                            }
+                        }
+                    },
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Context Window Size (K tokens)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + 'K';
+                            }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Performance Rating'
+                        },
+                        min: 0,
+                        max: 5,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function getPerformanceScore(performance) {
+        const scores = {
+            "Very High": 5,
+            "High": 4,
+            "Good": 3,
+            "Experimental": 2
+        };
+        return scores[performance] || 1;
+    }
+
+    function getModelColor(modelKey) {
+        const colors = {
+            "mistral-small": "#FF6B6B",
+            "deepseek-r1": "#4ECDC4",
+            "deepseek-chat": "#45B7D1",
+            "qwen3-8b": "#96CEB4",
+            "gemma-3n": "#FFEAA7",
+            "hunyuan": "#F7DC6F"
+        };
+        return colors[modelKey] || "#95A5A6";
+    }
+})();
