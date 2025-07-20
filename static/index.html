@@ -269,9 +269,8 @@
                         <a class="nav-link" id="investment-playbooks-tab" data-bs-toggle="pill" data-bs-target="#investment-playbooks-content" role="tab" aria-controls="investment-playbooks-content" aria-selected="false">📚 Investment Playbooks</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="monitoring-tab" data-bs-toggle="pill" data-bs-target="#monitoring-content" role="tab" aria-controls="monitoring-content" aria-selected="false">📊 Monitoring</a>
+                        <a class="nav-link" href="/monitoring" role="tab">📊 Monitoring</a>
                     </li>
-
                 </ul>
             </div>
 
@@ -704,43 +703,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="tab-pane fade" id="monitoring-content" role="tabpanel" aria-labelledby="monitoring-tab">
-                        <div class="card shadow-sm flex-fill d-flex flex-column">
-                            <div class="card-body d-flex flex-column">
-                                <div class="card-header-row">
-                                    <span class="card-title">📊 System Monitoring & Usage</span>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="card mb-3">
-                                            <div class="card-header">Usage Statistics</div>
-                                            <div class="card-body" id="usage-stats">
-                                                <div class="text-center">Loading...</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="card mb-3">
-                                            <div class="card-header">Cache Status</div>
-                                            <div class="card-body" id="cache-status">
-                                                <div class="text-center">Loading...</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-12">
-                                        <div class="card">
-                                            <div class="card-header">Cost Analysis</div>
-                                            <div class="card-body" id="cost-analysis">
-                                                <div class="text-center">Loading...</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+
                 </div>
             </div>
         </div>
@@ -925,6 +888,23 @@
                     if (modal) {
                         modal.hide();
                     }
+                });
+            });
+            
+            // Debug Bootstrap tabs
+            const tabLinks = document.querySelectorAll('#main-nav .nav-link');
+            tabLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    console.log('Tab clicked:', this.textContent);
+                    console.log('Target:', this.getAttribute('data-bs-target'));
+                });
+            });
+            
+            // Ensure Bootstrap tabs are working
+            const tabElements = document.querySelectorAll('[data-bs-toggle="pill"]');
+            tabElements.forEach(tab => {
+                tab.addEventListener('shown.bs.tab', function(e) {
+                    console.log('Tab shown:', e.target.textContent);
                 });
             });
         });

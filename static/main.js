@@ -1438,7 +1438,7 @@ window.fetchTweetVolatilityAnalysis = function() {
     };
 
     const handleSubmit = async (ev) => {
-      ev.preventDefault();
+      if (ev) ev.preventDefault();
       if (!message.trim() || loading) return;
 
       const userMessage = message.trim();
@@ -1492,7 +1492,7 @@ window.fetchTweetVolatilityAnalysis = function() {
 
     // Model Performance Comparison functions
     const handleCompare = async (ev) => {
-      ev.preventDefault();
+      if (ev) ev.preventDefault();
       if (!comparisonPrompt.trim() || selectedModels.length === 0) return;
 
       setComparisonLoading(true);
@@ -1554,6 +1554,134 @@ window.fetchTweetVolatilityAnalysis = function() {
         .replace(/`(.*?)`/g, '<code>$1</code>')
         .replace(/\n/g, '<br>');
     };
+
+    // Monitoring functions
+    const loadMonitoringData = async () => {
+      try {
+        // Load usage stats
+        const usageResponse = await fetch('/api/usage-stats');
+        const usageData = await usageResponse.json();
+        
+        const usageStatsElement = document.getElementById('usage-stats');
+        if (usageStatsElement) {
+          usageStatsElement.innerHTML = `
+            <div class="row text-center">
+              <div class="col-6">
+                <h4 class="text-primary">${usageData.requests}</h4>
+                <small class="text-muted">Requests Today</small>
+              </div>
+              <div class="col-6">
+                <h4 class="text-success">$${usageData.total_cost}</h4>
+                <small class="text-muted">Total Cost</small>
+              </div>
+            </div>
+            <div class="row text-center mt-3">
+              <div class="col-6">
+                <h4 class="text-info">${usageData.current_memory_percent}%</h4>
+                <small class="text-muted">Memory Usage</small>
+              </div>
+              <div class="col-6">
+                <h4 class="text-warning">${Math.floor(usageData.uptime_seconds / 3600)}h</h4>
+                <small class="text-muted">Uptime</small>
+              </div>
+            </div>
+          `;
+        }
+
+        // Load cache status
+        const cacheResponse = await fetch('/api/cache-status');
+        const cacheData = await cacheResponse.json();
+        
+        const cacheStatusElement = document.getElementById('cache-status');
+        if (cacheStatusElement) {
+          cacheStatusElement.innerHTML = `
+            <div class="alert alert-${cacheData.redis_connected ? 'success' : 'danger'}">
+              <strong>Redis Status:</strong> ${cacheData.redis_connected ? 'Connected' : 'Disconnected'}
+            </div>
+            <div class="alert alert-${cacheData.test_passed ? 'success' : 'danger'}">
+              <strong>Redis Test:</strong> ${cacheData.test_passed ? 'Passed' : 'Failed'}
+            </div>
+            <div class="text-muted">
+              <small>Cache TTL: ${cacheData.cache_ttl}s</small>
+            </div>
+          `;
+        }
+
+        // Load cost analysis
+        const costAnalysisElement = document.getElementById('cost-analysis');
+        if (costAnalysisElement && usageData.model_costs) {
+          const costItems = Object.entries(usageData.model_costs).map(([model, data]) => `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge bg-primary">${model}</span>
+              <span>${data.requests} requests - $${data.cost}</span>
+            </div>
+          `).join('');
+          
+          costAnalysisElement.innerHTML = `
+            <div class="mb-3">
+              <h6>Cost by Model:</h6>
+              ${costItems}
+            </div>
+            <div class="alert alert-info">
+              <strong>Total Spending:</strong> $${usageData.total_cost}
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading monitoring data:', error);
+      }
+    };
+
+    const testRedis = async () => {
+      try {
+        const response = await fetch('/api/test-redis');
+        const data = await response.json();
+        alert(data.success ? 'Redis test passed!' : 'Redis test failed: ' + data.error);
+        if (activeTab === 'monitoring') {
+          loadMonitoringData();
+        }
+      } catch (error) {
+        alert('Error testing Redis: ' + error.message);
+      }
+    };
+
+    const clearCache = async () => {
+      if (!confirm('Are you sure you want to clear all cache?')) return;
+      try {
+        const response = await fetch('/api/cache-clear', { method: 'POST' });
+        const data = await response.json();
+        alert(data.success ? 'Cache cleared successfully!' : 'Failed to clear cache');
+        if (activeTab === 'monitoring') {
+          loadMonitoringData();
+        }
+      } catch (error) {
+        alert('Error clearing cache: ' + error.message);
+      }
+    };
+
+    const resetStats = async () => {
+      if (!confirm('Are you sure you want to reset all usage statistics?')) return;
+      try {
+        const response = await fetch('/api/reset-stats', { method: 'POST' });
+        const data = await response.json();
+        alert(data.success ? 'Statistics reset successfully!' : 'Failed to reset statistics');
+        if (activeTab === 'monitoring') {
+          loadMonitoringData();
+        }
+      } catch (error) {
+        alert('Error resetting statistics: ' + error.message);
+      }
+    };
+
+    // Load monitoring data when monitoring tab is active
+    React.useEffect(() => {
+      if (activeTab === 'monitoring') {
+        loadMonitoringData();
+        // Refresh every 30 seconds
+        const interval = setInterval(loadMonitoringData, 30000);
+        return () => clearInterval(interval);
+      }
+    }, [activeTab]);
 
     return e('div', { className: 'deepseek-chatbot', style: { maxWidth: '1200px', margin: '0 auto' } },
       e('style', null, `
@@ -1655,6 +1783,8 @@ window.fetchTweetVolatilityAnalysis = function() {
       apiStatus === true && e('div', { className: 'api-status success' }, '✅ API Connected'),
       apiStatus === false && e('div', { className: 'api-status error' }, '❌ API Not Configured - Please set OPENROUTER_API_KEY'),
       apiStatus === null && e('div', { className: 'api-status warning' }, '⏳ Checking API Status...'),
+      
+
 
       // Tab Navigation
       e('div', { className: 'tab-nav' },
@@ -1947,7 +2077,9 @@ window.fetchTweetVolatilityAnalysis = function() {
               )
             )
           )
-        )
+        ),
+
+
       )
     );
   }
