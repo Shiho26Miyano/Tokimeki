@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📈 System Monitoring & Usage - Tokimeki</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', 'Roboto', Arial, sans-serif; 
+            background: #f8fafc; 
+            color: #183153; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .card { 
+            background: #fff; 
+            border: 1px solid #e0e0e0; 
+            box-shadow: 0 2px 16px rgba(16,26,43,0.07); 
+            border-radius: 14px; 
+            margin-bottom: 20px; 
+        }
+        .card-header { 
+            background: #f8f9fa; 
+            border-bottom: 1px solid #e0e0e0; 
+            border-radius: 14px 14px 0 0; 
+            padding: 15px 20px; 
+        }
+        .card-body { 
+            padding: 20px; 
+        }
+        .metric { 
+            text-align: center; 
+            padding: 15px; 
+        }
+        .metric-value { 
+            font-size: 2rem; 
+            font-weight: bold; 
+            color: #183153; 
+        }
+        .metric-label { 
+            font-size: 0.9rem; 
+            color: #6c757d; 
+            margin-top: 5px; 
+        }
+        .status-connected { 
+            color: #28a745; 
+        }
+        .status-disconnected { 
+            color: #dc3545; 
+        }
+        .btn-monitoring { 
+            background: #183153; 
+            color: #fff; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 6px; 
+            margin-right: 10px; 
+        }
+        .btn-monitoring:hover { 
+            background: #27457c; 
+            color: #fff; 
+        }
+        .nav-link { 
+            color: #183153; 
+            font-weight: 500; 
+            margin-bottom: 5px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+        }
+        .nav-link.active, .nav-link:hover { 
+            background-color: #183153; 
+            color: #fff; 
+        }
+        #left-nav-container { 
+            background-color: #f8f9fa; 
+            padding: 1rem; 
+            border-right: 1px solid #dee2e6; 
+            height: 100vh; 
+            position: sticky; 
+            top: 0; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Left Navigation -->
+            <div class="col-md-2" id="left-nav-container">
+                <div class="d-flex align-items-center mb-4">
+                    <img src="/static/img/cute.png" alt="Avatar" style="width: 30px; height: 30px; border-radius: 50%; margin-right: 10px;">
+                    <h4 class="mb-0">Tokimeki</h4>
+                    <img src="/static/img/handsome.png" alt="Avatar" style="width: 30px; height: 30px; border-radius: 50%; margin-left: 10px;">
+                </div>
+                <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" href="/" role="tab">🤖 Chatbot</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" href="/ai-platform-comparison" role="tab">🤖 AI Platform Comparables</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" href="#market-overtime-content" role="tab">📈 Market Overtime</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" href="#volatility-explorer-content" role="tab">📊 Volatility Explorer</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" href="#hf-signal-tool-content" role="tab">⚡ Trading Strategy Analyzer</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" href="#investment-playbooks-content" role="tab">📚 Investment Playbooks</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link active" href="/monitoring" role="tab">📊 Monitoring</a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10">
+                <div class="container">
+                    <h1 class="mb-4">📈 System Monitoring & Usage</h1>
+                    
+                    <div class="row">
+                        <!-- Usage Statistics Card -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">📊 Usage Statistics</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="metric">
+                                                <div class="metric-value" id="requests-today">-</div>
+                                                <div class="metric-label">Requests Today</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="metric">
+                                                <div class="metric-value" id="total-cost">-</div>
+                                                <div class="metric-label">Total Cost</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="metric">
+                                                <div class="metric-value" id="memory-usage">-</div>
+                                                <div class="metric-label">Memory Usage</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="metric">
+                                                <div class="metric-value" id="uptime">-</div>
+                                                <div class="metric-label">Uptime</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <h6>Limits:</h6>
+                                    <div id="limits-info">Loading...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cache Status Card -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">💾 Cache Status</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="metric">
+                                                <div class="metric-value" id="redis-status">-</div>
+                                                <div class="metric-label">Redis Status</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="metric">
+                                                <div class="metric-value" id="cache-ttl">-</div>
+                                                <div class="metric-label">Cache TTL</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="cache-test-result" class="mt-3"></div>
+                                    <div class="mt-3">
+                                        <button class="btn btn-monitoring" onclick="testRedis()">Test Redis</button>
+                                        <button class="btn btn-monitoring" onclick="clearCache()">Clear Cache</button>
+                                        <button class="btn btn-monitoring" onclick="resetStats()">Reset Stats</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cost Analysis Card -->
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">💰 Cost Analysis</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Model</th>
+                                                    <th>Requests</th>
+                                                    <th>Cost</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="cost-analysis-table">
+                                                <tr>
+                                                    <td colspan="3" class="text-center">Loading...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="text-end">
+                                        <strong>Total Cost: <span id="total-cost-summary">$0</span></strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Load monitoring data
+        async function loadMonitoringData() {
+            try {
+                // Load usage stats
+                const statsResponse = await fetch('/api/usage-stats');
+                const stats = await statsResponse.json();
+                
+                if (stats.success) {
+                    document.getElementById('requests-today').textContent = stats.requests_today || 0;
+                    document.getElementById('total-cost').textContent = `$${stats.total_cost || 0}`;
+                    document.getElementById('memory-usage').textContent = `${stats.memory_usage || 0}%`;
+                    document.getElementById('uptime').textContent = stats.uptime || '0h 0m';
+                    
+                    // Update limits
+                    const limitsHtml = `
+                        <div>Daily: ${stats.requests_today || 0}/1000</div>
+                        <div>Hourly: ${stats.requests_hour || 0}/100</div>
+                        <div>Monthly: ${stats.requests_month || 0}/10000</div>
+                    `;
+                    document.getElementById('limits-info').innerHTML = limitsHtml;
+                }
+
+                // Load cache status
+                const cacheResponse = await fetch('/api/cache-status');
+                const cacheStatus = await cacheResponse.json();
+                
+                if (cacheStatus.redis_connected) {
+                    document.getElementById('redis-status').textContent = 'Connected';
+                    document.getElementById('redis-status').className = 'metric-value status-connected';
+                } else {
+                    document.getElementById('redis-status').textContent = 'Disconnected';
+                    document.getElementById('redis-status').className = 'metric-value status-disconnected';
+                }
+                
+                document.getElementById('cache-ttl').textContent = `${cacheStatus.cache_ttl || 300}s`;
+                
+                // Update cost analysis
+                if (stats.success && stats.model_costs) {
+                    const tableBody = document.getElementById('cost-analysis-table');
+                    tableBody.innerHTML = '';
+                    
+                    Object.entries(stats.model_costs).forEach(([model, cost]) => {
+                        const row = tableBody.insertRow();
+                        row.innerHTML = `
+                            <td>${model}</td>
+                            <td>${stats.model_requests[model] || 0}</td>
+                            <td>$${cost || 0}</td>
+                        `;
+                    });
+                    
+                    document.getElementById('total-cost-summary').textContent = `$${stats.total_cost || 0}`;
+                }
+                
+            } catch (error) {
+                console.error('Error loading monitoring data:', error);
+            }
+        }
+
+        // Test Redis connection
+        async function testRedis() {
+            try {
+                const response = await fetch('/api/test-redis');
+                const result = await response.json();
+                
+                const resultDiv = document.getElementById('cache-test-result');
+                if (result.success) {
+                    resultDiv.innerHTML = '<div class="alert alert-success">✅ Test Passed</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger">❌ Test Failed: ' + (result.error || 'Unknown error') + '</div>';
+                }
+            } catch (error) {
+                document.getElementById('cache-test-result').innerHTML = '<div class="alert alert-danger">❌ Test Failed: ' + error.message + '</div>';
+            }
+        }
+
+        // Clear cache
+        async function clearCache() {
+            try {
+                const response = await fetch('/api/cache-clear', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Cache cleared successfully!');
+                    loadMonitoringData();
+                } else {
+                    alert('Failed to clear cache: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error clearing cache: ' + error.message);
+            }
+        }
+
+        // Reset stats
+        async function resetStats() {
+            if (confirm('Are you sure you want to reset all usage statistics?')) {
+                try {
+                    const response = await fetch('/api/reset-stats', { method: 'POST' });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        alert('Statistics reset successfully!');
+                        loadMonitoringData();
+                    } else {
+                        alert('Failed to reset stats: ' + (result.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    alert('Error resetting stats: ' + error.message);
+                }
+            }
+        }
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMonitoringData();
+            // Refresh data every 30 seconds
+            setInterval(loadMonitoringData, 30000);
+        });
+    </script>
+</body>
+</html> 

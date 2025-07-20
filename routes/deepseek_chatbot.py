@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import yfinance as yf
 import time
 import concurrent.futures
+from utils.usage_tracker import usage_tracker
 
 deepseek_chatbot_bp = Blueprint('deepseek_chatbot', __name__)
 
@@ -527,13 +528,16 @@ def test_single_model(model, prompt, temperature=0.7, max_tokens=1000):
 @deepseek_chatbot_bp.route('/compare_models', methods=['POST'])
 def compare_models():
     """Compare performance of multiple models"""
+    start_time = time.time()
     try:
         data = request.get_json()
         if not data:
+            usage_tracker.track_request('compare_models', success=False, error='No data provided')
             return jsonify({"error": "No data provided"}), 400
         
         prompt = data.get('prompt', '').strip()
         if not prompt:
+            usage_tracker.track_request('compare_models', success=False, error='Prompt is required')
             return jsonify({"error": "Prompt is required"}), 400
         
         # Get optional parameters
@@ -569,6 +573,11 @@ def compare_models():
         avg_response_time = sum(r['response_time'] for r in successful_results) / len(successful_results) if successful_results else 0
         avg_token_count = sum(r['token_count'] for r in successful_results) / len(successful_results) if successful_results else 0
         
+        response_time = time.time() - start_time
+        
+        # Track successful comparison request
+        usage_tracker.track_request('compare_models', 'multiple', response_time, success=True)
+        
         return jsonify({
             "success": True,
             "prompt": prompt,
@@ -601,13 +610,16 @@ def health_check():
 @deepseek_chatbot_bp.route('/chat', methods=['POST'])
 def chat():
     """Main chat endpoint"""
+    start_time = time.time()
     try:
         data = request.get_json()
         if not data:
+            usage_tracker.track_request('chat', success=False, error='No data provided')
             return jsonify({"error": "No data provided"}), 400
         
         message = data.get('message', '').strip()
         if not message:
+            usage_tracker.track_request('chat', success=False, error='Message is required')
             return jsonify({"error": "Message is required"}), 400
         
         # Get optional parameters
@@ -685,8 +697,14 @@ Always be respectful, accurate, and provide detailed, actionable information. Fo
         # Call the API
         result = call_free_api(messages, model, temperature, max_tokens)
         
+        response_time = time.time() - start_time
+        
         if "error" in result:
+            usage_tracker.track_request('chat', model, response_time, success=False, error=result.get('error', 'API error'))
             return jsonify(result), 500
+        
+        # Track successful request
+        usage_tracker.track_request('chat', model, response_time, success=True)
         
         return jsonify(result)
         
