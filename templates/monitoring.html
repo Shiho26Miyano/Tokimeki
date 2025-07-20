@@ -97,22 +97,22 @@
                 </div>
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" href="/" role="tab">🤖 Chatbot</a>
+                        <a class="nav-link" href="/" onclick="setActiveTab('deepseek-chatbot')" role="tab">🤖 Chatbot</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" href="/ai-platform-comparison" role="tab">🤖 AI Platform Comparables</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" href="/" role="tab">📈 Market Overtime</a>
+                        <a class="nav-link" href="/" onclick="setActiveTab('market-overtime')" role="tab">📈 Market Overtime</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" href="/" role="tab">📊 Volatility Explorer</a>
+                        <a class="nav-link" href="/" onclick="setActiveTab('volatility-explorer')" role="tab">📊 Volatility Explorer</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" href="/" role="tab">⚡ Trading Strategy Analyzer</a>
+                        <a class="nav-link" href="/" onclick="setActiveTab('hf-signal-tool')" role="tab">⚡ Trading Strategy Analyzer</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" href="/" role="tab">📚 Investment Playbooks</a>
+                        <a class="nav-link" href="/" onclick="setActiveTab('investment-playbooks')" role="tab">📚 Investment Playbooks</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link active" href="/monitoring" role="tab">📊 Monitoring</a>
@@ -343,6 +343,12 @@
                     alert('Error resetting stats: ' + error.message);
                 }
             }
+        }
+
+        // Function to set active tab when navigating from monitoring page
+        function setActiveTab(tabId) {
+            // Store the target tab in localStorage so main page can read it
+            localStorage.setItem('activeTab', tabId);
         }
 
         // Load data on page load
