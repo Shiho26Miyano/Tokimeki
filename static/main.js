@@ -1712,10 +1712,7 @@ window.fetchTweetVolatilityAnalysis = function() {
       apiStatus === false && e('div', { className: 'api-status error' }, '❌ API Not Configured - Please set OPENROUTER_API_KEY'),
       apiStatus === null && e('div', { className: 'api-status warning' }, '⏳ Checking API Status...'),
       
-      // Debug: Show current active tab
-      e('div', { style: { background: '#fff3cd', padding: '10px', borderRadius: '4px', marginBottom: '10px', fontSize: '12px' } },
-        `Debug: Current active tab is: ${activeTab}`
-      ),
+
 
       // Tab Navigation
       e('div', { className: 'tab-nav' },
@@ -1726,15 +1723,7 @@ window.fetchTweetVolatilityAnalysis = function() {
         e('button', {
           className: activeTab === 'comparison' ? 'active' : '',
           onClick: () => setActiveTab('comparison')
-        }, '🏁 Model Performance Comparison'),
-        e('button', {
-          className: activeTab === 'monitoring' ? 'active' : '',
-          onClick: () => {
-            console.log('Monitoring tab clicked!');
-            setActiveTab('monitoring');
-          },
-          style: { border: '2px solid red' }  // Make it very visible
-        }, '📊 Monitoring')
+        }, '🏁 Model Performance Comparison')
       ),
 
       // Chat Tab Content
@@ -2018,77 +2007,7 @@ window.fetchTweetVolatilityAnalysis = function() {
           )
         ),
 
-        // Monitoring Tab Content
-        activeTab === 'monitoring' && e('div', null,
-          console.log('Rendering monitoring tab content'),
-          e('div', { style: { background: '#f0f8ff', padding: '20px', borderRadius: '8px', marginBottom: '20px' } },
-            e('h3', { style: { color: '#183153' } }, '🎛️ Monitoring Dashboard is Working!'),
-            e('p', null, 'If you can see this message, the monitoring tab is rendering correctly.')
-          ),
-          e('div', { className: 'row g-4' },
-            // Usage Statistics Card
-            e('div', { className: 'col-md-6' },
-              e('div', { className: 'card h-100' },
-                e('div', { className: 'card-header' },
-                  e('h5', { className: 'card-title mb-0' }, '📈 Usage Statistics')
-                ),
-                e('div', { className: 'card-body' },
-                  e('div', { id: 'usage-stats', className: 'text-center' },
-                    e('div', { className: 'spinner-border text-primary', role: 'status' },
-                      e('span', { className: 'visually-hidden' }, 'Loading...')
-                    )
-                  )
-                )
-              )
-            ),
 
-            // Cache Status Card
-            e('div', { className: 'col-md-6' },
-              e('div', { className: 'card h-100' },
-                e('div', { className: 'card-header' },
-                  e('h5', { className: 'card-title mb-0' }, '💾 Cache Status')
-                ),
-                e('div', { className: 'card-body' },
-                  e('div', { id: 'cache-status', className: 'text-center' },
-                    e('div', { className: 'spinner-border text-primary', role: 'status' },
-                      e('span', { className: 'visually-hidden' }, 'Loading...')
-                    )
-                  ),
-                  e('div', { className: 'mt-3' },
-                    e('button', {
-                      className: 'btn btn-sm btn-outline-primary me-2',
-                      onClick: () => testRedis()
-                    }, 'Test Redis'),
-                    e('button', {
-                      className: 'btn btn-sm btn-outline-warning me-2',
-                      onClick: () => clearCache()
-                    }, 'Clear Cache'),
-                    e('button', {
-                      className: 'btn btn-sm btn-outline-danger',
-                      onClick: () => resetStats()
-                    }, 'Reset Stats')
-                  )
-                )
-              )
-            ),
-
-            // Cost Analysis Card
-            e('div', { className: 'col-12' },
-              e('div', { className: 'card' },
-                e('div', { className: 'card-header' },
-                  e('h5', { className: 'card-title mb-0' }, '💰 Cost Analysis')
-                ),
-                e('div', { className: 'card-body' },
-                  e('div', { id: 'cost-analysis', className: 'text-center' },
-                    e('div', { className: 'spinner-border text-primary', role: 'status' },
-                      e('span', { className: 'visually-hidden' }, 'Loading...')
-                    )
-                  )
-                )
-              )
-            )
-          )
-        )
       )
     );
   }
