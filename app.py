@@ -93,73 +93,7 @@ def monitoring():
 def test():
     return 'Hello, world!'
 
-# Monitoring endpoints
-@app.route('/api/usage-stats')
-def get_usage_stats():
-    """Get usage statistics"""
-    try:
-        stats = usage_tracker.get_usage_stats()
-        return jsonify(stats)
-    except Exception as e:
-        logger.error(f"Error getting usage stats: {e}")
-        return jsonify({"error": str(e)}), 500
 
-@app.route('/api/cache-status')
-def get_cache_status():
-    """Get cache status"""
-    try:
-        redis_connected = cache_manager.redis_client is not None and cache_manager.cache_enabled
-        test_passed = False
-        
-        if redis_connected:
-            try:
-                cache_manager.redis_client.ping()
-                test_passed = True
-            except:
-                test_passed = False
-        
-        return jsonify({
-            "redis_connected": redis_connected,
-            "test_passed": test_passed,
-            "cache_ttl": cache_manager.default_ttl,
-            "cache_enabled": cache_manager.cache_enabled
-        })
-    except Exception as e:
-        logger.error(f"Error getting cache status: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/test-redis')
-def test_redis():
-    """Test Redis connection"""
-    try:
-        if not cache_manager.redis_client:
-            return jsonify({"success": False, "error": "Redis client not initialized"})
-        
-        cache_manager.redis_client.ping()
-        return jsonify({"success": True})
-    except Exception as e:
-        logger.error(f"Redis test failed: {e}")
-        return jsonify({"success": False, "error": str(e)})
-
-@app.route('/api/cache-clear', methods=['POST'])
-def clear_cache():
-    """Clear all cache"""
-    try:
-        success = cache_manager.clear_all()
-        return jsonify({"success": success})
-    except Exception as e:
-        logger.error(f"Error clearing cache: {e}")
-        return jsonify({"success": False, "error": str(e)})
-
-@app.route('/api/reset-stats', methods=['POST'])
-def reset_stats():
-    """Reset usage statistics"""
-    try:
-        usage_tracker.reset_stats()
-        return jsonify({"success": True})
-    except Exception as e:
-        logger.error(f"Error resetting stats: {e}")
-        return jsonify({"success": False, "error": str(e)})
 
 @app.errorhandler(500)
 def handle_500(e):

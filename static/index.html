@@ -907,6 +907,29 @@
                     console.log('Tab shown:', e.target.textContent);
                 });
             });
+            
+            // Check if we should activate a specific tab (from monitoring page navigation)
+            const activeTab = localStorage.getItem('activeTab');
+            if (activeTab) {
+                const targetTab = document.querySelector(`[data-bs-target="#${activeTab}-content"]`);
+                if (targetTab) {
+                    // Remove active class from current tab
+                    document.querySelector('.nav-link.active').classList.remove('active');
+                    document.querySelector('.tab-pane.show.active').classList.remove('show', 'active');
+                    
+                    // Activate the target tab
+                    targetTab.classList.add('active');
+                    targetTab.setAttribute('aria-selected', 'true');
+                    
+                    // Show the target content
+                    const targetContent = document.getElementById(`${activeTab}-content`);
+                    if (targetContent) {
+                        targetContent.classList.add('show', 'active');
+                    }
+                }
+                // Clear the stored tab
+                localStorage.removeItem('activeTab');
+            }
         });
     </script>
 </body>
