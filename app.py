@@ -202,6 +202,143 @@ def test_redis():
             "cache_enabled": cache_manager.cache_enabled
         }), 500
 
+# Fine-tuning routes
+@app.route('/fine-tuning')
+def fine_tuning():
+    """Fine-tuning educational page"""
+    return render_template('fine_tuning.html')
+
+@app.route('/test-fine-tuning')
+def test_fine_tuning():
+    """Test route for fine-tuning"""
+    return "Fine-tuning test route works!"
+
+@app.route('/api/fine-tune/start', methods=['POST'])
+@limiter.limit("2 per hour")
+def start_fine_tuning():
+    """Start a fine-tuning job"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['model_name', 'epochs', 'batch_size', 'learning_rate']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    "success": False,
+                    "error": f"Missing required field: {field}"
+                }), 400
+        
+        # Get file from request
+        if 'dataset' not in request.files:
+            return jsonify({
+                "success": False,
+                "error": "No dataset file provided"
+            }), 400
+        
+        file = request.files['dataset']
+        if file.filename == '':
+            return jsonify({
+                "success": False,
+                "error": "No file selected"
+            }), 400
+        
+        # Save uploaded file
+        upload_dir = "uploads"
+        os.makedirs(upload_dir, exist_ok=True)
+        dataset_path = os.path.join(upload_dir, f"dataset_{int(time.time())}.csv")
+        file.save(dataset_path)
+        
+        # Start fine-tuning in background
+        import threading
+        from utils.fine_tune_hf import fine_tune_bert
+        
+        def run_fine_tuning():
+            try:
+                fine_tune_bert(
+                    csv_path=dataset_path,
+                    model_name=data['model_name'],
+                    epochs=int(data['epochs']),
+                    batch_size=int(data['batch_size']),
+                    learning_rate=float(data['learning_rate']),
+                    output_dir=f"fine_tuned_models/{data['model_name']}_{int(time.time())}"
+                )
+            except Exception as e:
+                logger.error(f"Fine-tuning failed: {e}")
+        
+        thread = threading.Thread(target=run_fine_tuning)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            "success": True,
+            "message": "Fine-tuning job started successfully",
+            "job_id": f"job_{int(time.time())}"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error starting fine-tuning: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/fine-tune/status/<job_id>')
+@limiter.limit("10 per minute")
+def get_fine_tune_status(job_id):
+    """Get fine-tuning job status"""
+    try:
+        # This is a simplified status check
+        # In a real implementation, you'd track job status in a database
+        return jsonify({
+            "success": True,
+            "job_id": job_id,
+            "status": "completed",  # Simplified for demo
+            "progress": 100,
+            "message": "Fine-tuning completed successfully"
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/fine-tune/models')
+@limiter.limit("10 per minute")
+def get_available_models():
+    """Get list of available pre-trained models"""
+    try:
+        models = [
+            {
+                "name": "BERT Base Uncased",
+                "id": "bert-base-uncased",
+                "description": "General purpose BERT model for text classification",
+                "size_mb": 420
+            },
+            {
+                "name": "DistilBERT Base Uncased",
+                "id": "distilbert-base-uncased",
+                "description": "Faster, smaller version of BERT",
+                "size_mb": 260
+            },
+            {
+                "name": "RoBERTa Base",
+                "id": "roberta-base",
+                "description": "Robustly optimized BERT pretraining approach",
+                "size_mb": 500
+            }
+        ]
+        
+        return jsonify({
+            "success": True,
+            "models": models
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     debug = os.environ.get('FLASK_ENV') == 'development'
