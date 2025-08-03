@@ -50,7 +50,5 @@ FREE_MODELS = {
     "mistral-small": "mistralai/mistral-small-3.2-24b-instruct:free",
     "deepseek-r1": "deepseek/deepseek-r1-0528:free",
     "deepseek-chat": "deepseek/deepseek-chat-v3-0324:free",
-    "qwen3-8b": "qwen/qwen3-8b:free",
-    "gemma-3n": "google/gemma-3n-e2b-it:free",
-    "hunyuan": "tencent/hunyuan-a13b-instruct:free"
+    "llama-3.1-405b": "meta-llama/llama-3.1-405b-instruct:free"
 } 

@@ -1470,27 +1470,23 @@ window.fetchTweetVolatilityAnalysis = function() {
 
     // Model Performance Comparison state
     const [comparisonPrompt, setComparisonPrompt] = React.useState("explain what is temperature in llm and how it impact model performance");
-    const [selectedModels, setSelectedModels] = React.useState(["mistral-small", "deepseek-r1", "qwen3-8b"]);
+    const [selectedModels, setSelectedModels] = React.useState(["mistral-small", "deepseek-r1", "llama-3.1-405b"]);
     const [comparisonLoading, setComparisonLoading] = React.useState(false);
     const [comparisonResults, setComparisonResults] = React.useState(null);
     const [comparisonError, setComparisonError] = React.useState(null);
 
     const availableModels = [
       { value: "mistral-small", label: "Mistral Small 3.2", description: "Strong reasoning & code generation", concept: "Mistral's latest 24B parameter model optimized for reasoning tasks, code generation, and multilingual content. Known for strong analytical capabilities and structured thinking." },
-      { value: "deepseek-r1", label: "DeepSeek R1", description: "Extremely long context & code expertise", concept: "DeepSeek's flagship model with 128K context window, specialized in code understanding and generation. Excels at complex programming tasks and long document analysis." },
-      { value: "deepseek-chat", label: "DeepSeek Chat V3", description: "Chat-optimized (recommended)", concept: "Chat-tuned version of DeepSeek's model, optimized for conversational AI. Better at maintaining context, following instructions, and providing helpful responses in dialogue format." },
-      { value: "qwen3-8b", label: "Qwen3 8B", description: "Fast inference & good performance", concept: "Alibaba's efficient 8B parameter model balancing speed and quality. Good for quick responses and resource-constrained environments while maintaining decent reasoning capabilities." },
-      { value: "gemma-3n", label: "Gemma 3N E2B", description: "Google's efficient & fast model", concept: "Google's latest 2B parameter model focused on efficiency and speed. Excellent for quick tasks, though with limited context window. Good for applications requiring fast responses." },
-      { value: "hunyuan", label: "Hunyuan A13B", description: "Tencent's Chinese language model", concept: "Tencent's 13B parameter model with strong Chinese language capabilities. Good for multilingual tasks and Chinese content generation, though may be slower than smaller models." }
+      { value: "deepseek-r1", label: "DeepSeek R1", description: "671B params / 37B active", concept: "DeepSeek's flagship model with 671B parameters (37B active) offering high performance and open reasoning details. Excellent for complex analytical tasks and detailed explanations." },
+      { value: "deepseek-chat", label: "DeepSeek Chat V3", description: "V3 reasoning-optimized", concept: "DeepSeek's V3 reasoning-optimized model with excellent quality and moderate latency. Optimized for conversational AI with strong reasoning capabilities." },
+      { value: "llama-3.1-405b", label: "Llama 3.1 405B", description: "Frontier 405B parameter model", concept: "Meta's flagship 405B parameter model with 128K context window. Demonstrates strong performance compared to leading closed-source models including GPT-4o and Claude 3.5 Sonnet." }
     ];
 
     const models = [
       { value: "mistral-small", label: "Mistral Small 3.2", description: "Strong reasoning & code generation", concept: "Mistral's latest 24B parameter model optimized for reasoning tasks, code generation, and multilingual content. Known for strong analytical capabilities and structured thinking." },
-      { value: "deepseek-r1", label: "DeepSeek R1", description: "Extremely long context & code expertise", concept: "DeepSeek's flagship model with 128K context window, specialized in code understanding and generation. Excels at complex programming tasks and long document analysis." },
-      { value: "deepseek-chat", label: "DeepSeek Chat V3", description: "Chat-optimized (recommended)", concept: "Chat-tuned version of DeepSeek's model, optimized for conversational AI. Better at maintaining context, following instructions, and providing helpful responses in dialogue format." },
-      { value: "qwen3-8b", label: "Qwen3 8B", description: "Fast inference & good performance", concept: "Alibaba's efficient 8B parameter model balancing speed and quality. Good for quick responses and resource-constrained environments while maintaining decent reasoning capabilities." },
-      { value: "gemma-3n", label: "Gemma 3N E2B", description: "Google's efficient & fast model", concept: "Google's latest 2B parameter model focused on efficiency and speed. Excellent for quick tasks, though with limited context window. Good for applications requiring fast responses." },
-      { value: "hunyuan", label: "Hunyuan A13B", description: "Tencent's Chinese language model", concept: "Tencent's 13B parameter model with strong Chinese language capabilities. Good for multilingual tasks and Chinese content generation, though may be slower than smaller models." }
+      { value: "deepseek-r1", label: "DeepSeek R1", description: "671B params / 37B active", concept: "DeepSeek's flagship model with 671B parameters (37B active) offering high performance and open reasoning details. Excellent for complex analytical tasks and detailed explanations." },
+      { value: "deepseek-chat", label: "DeepSeek Chat V3", description: "V3 reasoning-optimized", concept: "DeepSeek's V3 reasoning-optimized model with excellent quality and moderate latency. Optimized for conversational AI with strong reasoning capabilities." },
+      { value: "llama-3.1-405b", label: "Llama 3.1 405B", description: "Frontier 405B parameter model", concept: "Meta's flagship 405B parameter model with 128K context window. Demonstrates strong performance compared to leading closed-source models including GPT-4o and Claude 3.5 Sonnet." }
     ];
 
     // Check API status and show demo on component mount
@@ -1585,7 +1581,27 @@ window.fetchTweetVolatilityAnalysis = function() {
       const newConversation = [...conversation, { role: "user", content: userMessage }];
       setConversation(newConversation);
 
+      // Start timing
+      const startTime = Date.now();
+      let timingInterval;
+
       try {
+        // Add timing indicator
+        timingInterval = setInterval(() => {
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          const statusElement = document.getElementById('chat-status');
+          if (statusElement) {
+            let statusMessage = `⏳ Processing... (${elapsed}s)`;
+            if (elapsed > 15) {
+              statusMessage += ' - Taking longer than usual, please be patient';
+            }
+            if (elapsed > 30) {
+              statusMessage += ' - Model may be experiencing high load';
+            }
+            statusElement.innerHTML = statusMessage;
+          }
+        }, 1000);
+
         const response = await fetch('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1598,6 +1614,8 @@ window.fetchTweetVolatilityAnalysis = function() {
           })
         });
 
+        clearInterval(timingInterval);
+        
         const data = await response.json();
         
         if (!response.ok) {
@@ -1609,6 +1627,11 @@ window.fetchTweetVolatilityAnalysis = function() {
           }
         }
 
+        // Calculate and log performance metrics
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        console.log(`Chat response completed in ${duration}ms`);
+
         // Add AI response to conversation
         setConversation(prev => [...prev, { role: "assistant", content: data.response }]);
       } catch (err) {
@@ -1616,6 +1639,9 @@ window.fetchTweetVolatilityAnalysis = function() {
         // Remove the user message if there was an error
         setConversation(prev => prev.slice(0, -1));
       } finally {
+        if (timingInterval) {
+          clearInterval(timingInterval);
+        }
         setLoading(false);
       }
     };
@@ -1625,7 +1651,7 @@ window.fetchTweetVolatilityAnalysis = function() {
       setError(null);
     };
 
-    // Model Performance Comparison functions
+    // Model Performance Comparison functions - Optimized
     const handleCompare = async (ev) => {
       if (ev) ev.preventDefault();
       if (!comparisonPrompt.trim() || selectedModels.length === 0) return;
@@ -1634,7 +1660,31 @@ window.fetchTweetVolatilityAnalysis = function() {
       setComparisonError(null);
       setComparisonResults(null);
 
+      // Show immediate feedback
+      const startTime = Date.now();
+      
       try {
+        // Add timeout to the fetch request with increased tolerance
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 90000); // Increased from 35s to 90s timeout
+        
+        // Add timing indicator with better messaging
+        const startTime = Date.now();
+        const timingInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const statusElement = document.getElementById('comparison-status');
+            if (statusElement) {
+                let statusMessage = `⏳ Comparing Models... (${elapsed}s)`;
+                if (elapsed > 30) {
+                    statusMessage += ' - Models are taking longer than usual, please be patient';
+                }
+                if (elapsed > 60) {
+                    statusMessage += ' - Some models may be experiencing high load';
+                }
+                statusElement.innerHTML = statusMessage;
+            }
+        }, 1000);
+        
         const response = await fetch('/compare_models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1643,9 +1693,13 @@ window.fetchTweetVolatilityAnalysis = function() {
             models: selectedModels,
             temperature: temperature,
             max_tokens: maxTokens
-          })
+          }),
+          signal: controller.signal
         });
 
+        clearTimeout(timeoutId);
+        clearInterval(timingInterval);
+        
         const data = await response.json();
         if (!response.ok) {
           if (response.status === 429) {
@@ -1655,9 +1709,19 @@ window.fetchTweetVolatilityAnalysis = function() {
             throw new Error(data.error || 'Comparison failed');
           }
         }
+        
+        // Calculate and log performance metrics
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        console.log(`Model comparison completed in ${duration}ms`);
+        
         setComparisonResults(data);
       } catch (err) {
-        setComparisonError(err.message);
+        if (err.name === 'AbortError') {
+          setComparisonError('Request timed out after 90 seconds. Please try again with a shorter prompt or fewer models.');
+        } else {
+          setComparisonError(err.message);
+        }
       } finally {
         setComparisonLoading(false);
       }
@@ -1690,133 +1754,7 @@ window.fetchTweetVolatilityAnalysis = function() {
         .replace(/\n/g, '<br>');
     };
 
-    // Monitoring functions
-    const loadMonitoringData = async () => {
-      try {
-        // Load usage stats
-        const usageResponse = await fetch('/api/usage-stats');
-        const usageData = await usageResponse.json();
-        
-        const usageStatsElement = document.getElementById('usage-stats');
-        if (usageStatsElement) {
-          usageStatsElement.innerHTML = `
-            <div class="row text-center">
-              <div class="col-6">
-                <h4 class="text-primary">${usageData.requests}</h4>
-                <small class="text-muted">Requests Today</small>
-              </div>
-              <div class="col-6">
-                <h4 class="text-success">$${usageData.total_cost}</h4>
-                <small class="text-muted">Total Cost</small>
-              </div>
-            </div>
-            <div class="row text-center mt-3">
-              <div class="col-6">
-                <h4 class="text-info">${usageData.current_memory_percent}%</h4>
-                <small class="text-muted">Memory Usage</small>
-              </div>
-              <div class="col-6">
-                <h4 class="text-warning">${Math.floor(usageData.uptime_seconds / 3600)}h</h4>
-                <small class="text-muted">Uptime</small>
-              </div>
-            </div>
-          `;
-        }
 
-        // Load cache status
-        const cacheResponse = await fetch('/api/cache-status');
-        const cacheData = await cacheResponse.json();
-        
-        const cacheStatusElement = document.getElementById('cache-status');
-        if (cacheStatusElement) {
-          cacheStatusElement.innerHTML = `
-            <div class="alert alert-${cacheData.redis_connected ? 'success' : 'danger'}">
-              <strong>Redis Status:</strong> ${cacheData.redis_connected ? 'Connected' : 'Disconnected'}
-            </div>
-            <div class="alert alert-${cacheData.test_passed ? 'success' : 'danger'}">
-              <strong>Redis Test:</strong> ${cacheData.test_passed ? 'Passed' : 'Failed'}
-            </div>
-            <div class="text-muted">
-              <small>Cache TTL: ${cacheData.cache_ttl}s</small>
-            </div>
-          `;
-        }
-
-        // Load cost analysis
-        const costAnalysisElement = document.getElementById('cost-analysis');
-        if (costAnalysisElement && usageData.model_costs) {
-          const costItems = Object.entries(usageData.model_costs).map(([model, data]) => `
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <span class="badge bg-primary">${model}</span>
-              <span>${data.requests} requests - $${data.cost}</span>
-            </div>
-          `).join('');
-          
-          costAnalysisElement.innerHTML = `
-            <div class="mb-3">
-              <h6>Cost by Model:</h6>
-              ${costItems}
-            </div>
-            <div class="alert alert-info">
-              <strong>Total Spending:</strong> $${usageData.total_cost}
-            </div>
-          `;
-        }
-      } catch (error) {
-        console.error('Error loading monitoring data:', error);
-      }
-    };
-
-    const testRedis = async () => {
-      try {
-        const response = await fetch('/api/test-redis');
-        const data = await response.json();
-        alert(data.success ? 'Redis test passed!' : 'Redis test failed: ' + data.error);
-        if (activeTab === 'monitoring') {
-          loadMonitoringData();
-        }
-      } catch (error) {
-        alert('Error testing Redis: ' + error.message);
-      }
-    };
-
-    const clearCache = async () => {
-      if (!confirm('Are you sure you want to clear all cache?')) return;
-      try {
-        const response = await fetch('/api/cache-clear', { method: 'POST' });
-        const data = await response.json();
-        alert(data.success ? 'Cache cleared successfully!' : 'Failed to clear cache');
-        if (activeTab === 'monitoring') {
-          loadMonitoringData();
-        }
-      } catch (error) {
-        alert('Error clearing cache: ' + error.message);
-      }
-    };
-
-    const resetStats = async () => {
-      if (!confirm('Are you sure you want to reset all usage statistics?')) return;
-      try {
-        const response = await fetch('/api/reset-stats', { method: 'POST' });
-        const data = await response.json();
-        alert(data.success ? 'Statistics reset successfully!' : 'Failed to reset statistics');
-        if (activeTab === 'monitoring') {
-          loadMonitoringData();
-        }
-      } catch (error) {
-        alert('Error resetting statistics: ' + error.message);
-      }
-    };
-
-    // Load monitoring data when monitoring tab is active
-    React.useEffect(() => {
-      if (activeTab === 'monitoring') {
-        loadMonitoringData();
-        // Refresh every 30 seconds
-        const interval = setInterval(loadMonitoringData, 30000);
-        return () => clearInterval(interval);
-      }
-    }, [activeTab]);
 
     return e('div', { className: 'deepseek-chatbot', style: { maxWidth: '1200px', margin: '0 auto' } },
       e('style', null, `
@@ -2005,7 +1943,29 @@ window.fetchTweetVolatilityAnalysis = function() {
             )
           ),
         loading && e('div', { className: 'message assistant', style: { textAlign: 'left' } },
-          e('div', { className: 'message-content' }, '🤔 Thinking...')
+          e('div', { className: 'message-content' },
+            e('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } },
+              e('span', null, '🤔'),
+              e('span', null, 'Thinking...'),
+              e('span', { className: 'badge bg-info' }, 'Processing')
+            ),
+            e('div', { 
+              id: 'chat-status',
+              style: { 
+                fontSize: '0.85rem', 
+                color: '#666',
+                fontStyle: 'italic',
+                marginTop: '8px'
+              }
+            }, '⏳ Processing... (0s)'),
+            e('div', { 
+              style: { 
+                fontSize: '0.8rem', 
+                color: '#888',
+                marginTop: '4px'
+              }
+            }, 'Please wait while the AI generates a response...')
+          )
         )
       ),
 
@@ -2103,7 +2063,42 @@ window.fetchTweetVolatilityAnalysis = function() {
           className: 'btn btn-primary',
           onClick: handleCompare,
           disabled: comparisonLoading || selectedModels.length === 0 || !comparisonPrompt.trim()
-        }, comparisonLoading ? '🔄 Comparing Models...' : '🏁 Start Comparison'),
+        }, comparisonLoading ? '⏳ Comparing Models (Patient Mode)...' : '🏁 Start Comparison'),
+
+        // Performance indicator with timing
+        comparisonLoading && e('div', { 
+          className: 'alert alert-info mt-3',
+          style: { fontSize: '0.9rem' }
+        }, 
+          e('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } },
+            e('span', null, '⏳'),
+            e('span', null, 'Comparing models with increased timeout tolerance'),
+            e('span', { className: 'badge bg-warning' }, 'Patient Mode')
+          ),
+          e('div', { 
+            id: 'comparison-status',
+            style: { 
+              fontSize: '0.85rem', 
+              color: '#666',
+              fontStyle: 'italic',
+              marginTop: '8px'
+            }
+          }, '⏳ Comparing Models... (0s)'),
+          e('div', { 
+            style: { 
+              fontSize: '0.8rem', 
+              color: '#888',
+              marginTop: '8px',
+              padding: '8px',
+              background: '#f8f9fa',
+              borderRadius: '4px',
+              border: '1px solid #e9ecef'
+            }
+          }, 
+            e('strong', null, '💡 What\'s happening: '),
+            'Models are being tested concurrently with 60-second timeouts. Some models may take longer due to server load or complexity.'
+          )
+        ),
 
         comparisonError && e('div', { className: 'alert alert-danger mt-3' }, comparisonError),
 
@@ -2536,226 +2531,7 @@ window.fetchTweetVolatilityAnalysis = function() {
     }
 })();
 
-// --- Monitoring Dashboard Functionality ---
-(function() {
-    let monitoringInterval = null;
 
-    // Initialize monitoring when the tab is shown
-    document.addEventListener('DOMContentLoaded', function() {
-        const monitoringTab = document.getElementById('monitoring-tab');
-        if (monitoringTab) {
-            monitoringTab.addEventListener('shown.bs.tab', function() {
-                loadMonitoringData();
-                startMonitoringUpdates();
-            });
-            
-            monitoringTab.addEventListener('hidden.bs.tab', function() {
-                stopMonitoringUpdates();
-            });
-        }
-    });
-
-    async function loadMonitoringData() {
-        try {
-            // Load usage statistics
-            const usageResponse = await fetch('/api/usage-stats?period=today');
-            if (usageResponse.status === 429) {
-                window.showRateLimitWarning('Usage stats rate limit exceeded. Please wait before trying again.');
-                return;
-            }
-            const usageData = await usageResponse.json();
-            updateUsageStats(usageData);
-
-            // Load cache status
-            const cacheResponse = await fetch('/api/cache-status');
-            if (cacheResponse.status === 429) {
-                window.showRateLimitWarning('Cache status rate limit exceeded. Please wait before trying again.');
-                return;
-            }
-            const cacheData = await cacheResponse.json();
-            updateCacheStatus(cacheData);
-
-            // Load cost analysis
-            updateCostAnalysis(usageData);
-        } catch (error) {
-            console.error('Error loading monitoring data:', error);
-        }
-    }
-
-    function updateUsageStats(data) {
-        const container = document.getElementById('usage-stats');
-        if (!container) return;
-
-        const uptimeHours = Math.floor(data.uptime_seconds / 3600);
-        const uptimeMinutes = Math.floor((data.uptime_seconds % 3600) / 60);
-
-        container.innerHTML = `
-            <div class="row text-center">
-                <div class="col-6">
-                    <div class="h4 text-primary">${data.requests}</div>
-                    <small class="text-muted">Requests Today</small>
-                </div>
-                <div class="col-6">
-                    <div class="h4 text-success">$${data.total_cost}</div>
-                    <small class="text-muted">Total Cost</small>
-                </div>
-            </div>
-            <hr>
-            <div class="row text-center">
-                <div class="col-6">
-                    <div class="h5">${data.current_memory_percent}%</div>
-                    <small class="text-muted">Memory Usage</small>
-                </div>
-                <div class="col-6">
-                    <div class="h5">${uptimeHours}h ${uptimeMinutes}m</div>
-                    <small class="text-muted">Uptime</small>
-                </div>
-            </div>
-            <hr>
-            <div class="small">
-                <strong>Limits:</strong><br>
-                Daily: ${data.requests}/${data.limits.daily}<br>
-                Hourly: ${data.limits.hourly}<br>
-                Monthly: ${data.limits.monthly}
-            </div>
-        `;
-    }
-
-    function updateCacheStatus(data) {
-        const container = document.getElementById('cache-status');
-        if (!container) return;
-
-        const statusClass = data.redis_connected && data.redis_test ? 'text-success' : 'text-danger';
-        const statusText = data.redis_connected && data.redis_test ? 'Connected' : 'Disconnected';
-        const testStatus = data.redis_test ? '✅ Test Passed' : '❌ Test Failed';
-
-        container.innerHTML = `
-            <div class="row text-center">
-                <div class="col-6">
-                    <div class="h5 ${statusClass}">${statusText}</div>
-                    <small class="text-muted">Redis Status</small>
-                </div>
-                <div class="col-6">
-                    <div class="h5">${data.default_ttl}s</div>
-                    <small class="text-muted">Cache TTL</small>
-                </div>
-            </div>
-            <hr>
-            <div class="row text-center">
-                <div class="col-12">
-                    <div class="small">${testStatus}</div>
-                    <div class="small text-muted">Cache Enabled: ${data.cache_enabled ? 'Yes' : 'No'}</div>
-                </div>
-            </div>
-            <hr>
-            <div class="text-center">
-                <button class="btn btn-sm btn-outline-primary" onclick="clearCache()">
-                    Clear Cache
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="resetStats()">
-                    Reset Stats
-                </button>
-                <button class="btn btn-sm btn-outline-info" onclick="testRedis()">
-                    Test Redis
-                </button>
-            </div>
-        `;
-    }
-
-    function updateCostAnalysis(data) {
-        const container = document.getElementById('cost-analysis');
-        if (!container) return;
-
-        let modelCostsHtml = '';
-        for (const [model, info] of Object.entries(data.model_costs)) {
-            modelCostsHtml += `
-                <div class="row mb-2">
-                    <div class="col-6">${model}</div>
-                    <div class="col-3">${info.requests}</div>
-                    <div class="col-3">$${info.cost}</div>
-                </div>
-            `;
-        }
-
-        container.innerHTML = `
-            <div class="row mb-3">
-                <div class="col-6"><strong>Model</strong></div>
-                <div class="col-3"><strong>Requests</strong></div>
-                <div class="col-3"><strong>Cost</strong></div>
-            </div>
-            ${modelCostsHtml}
-            <hr>
-            <div class="row">
-                <div class="col-6"><strong>Total Cost:</strong></div>
-                <div class="col-6"><strong>$${data.total_cost}</strong></div>
-            </div>
-        `;
-    }
-
-    function startMonitoringUpdates() {
-        if (monitoringInterval) {
-            clearInterval(monitoringInterval);
-        }
-        monitoringInterval = setInterval(loadMonitoringData, 30000); // Update every 30 seconds
-    }
-
-    function stopMonitoringUpdates() {
-        if (monitoringInterval) {
-            clearInterval(monitoringInterval);
-            monitoringInterval = null;
-        }
-    }
-
-    // Global functions for buttons
-    window.clearCache = async function() {
-        try {
-            const response = await fetch('/api/cache-clear', { method: 'POST' });
-            const result = await response.json();
-            if (response.status === 429) {
-                window.showRateLimitWarning('Cache clear rate limit exceeded. Please wait before trying again.');
-            } else {
-                alert(result.message);
-            }
-            loadMonitoringData();
-        } catch (error) {
-            alert('Error clearing cache: ' + error.message);
-        }
-    };
-
-    window.resetStats = async function() {
-        if (confirm('Are you sure you want to reset all usage statistics?')) {
-            try {
-                const response = await fetch('/api/reset-stats', { method: 'POST' });
-                const result = await response.json();
-                if (response.status === 429) {
-                    window.showRateLimitWarning('Reset stats rate limit exceeded. Please wait before trying again.');
-                } else {
-                    alert(result.message);
-                }
-                loadMonitoringData();
-            } catch (error) {
-                alert('Error resetting stats: ' + error.message);
-            }
-        }
-    };
-
-    window.testRedis = async function() {
-        try {
-            const response = await fetch('/api/test-redis');
-            const result = await response.json();
-            if (response.status === 429) {
-                window.showRateLimitWarning('Redis test rate limit exceeded. Please wait before trying again.');
-            } else if (result.success) {
-                alert('✅ Redis test successful!\n\n' + result.message);
-            } else {
-                alert('❌ Redis test failed:\n\n' + result.error);
-            }
-            loadMonitoringData();
-        } catch (error) {
-            alert('Error testing Redis: ' + error.message);
-        }
-    };
-})();
 
 // Global rate limit warning function for use across the application
 window.showRateLimitWarning = function(message) {
