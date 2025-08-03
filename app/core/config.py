@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     port: int = 8080
     
     # API settings
-    openrouter_api_key: Optional[str] = None
+    openrouter_api_key: Optional[str] = os.getenv("OPENROUTER_API_KEY")
     openrouter_api_url: str = "https://openrouter.ai/api/v1/chat/completions"
     
     # Redis settings
@@ -39,6 +39,11 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+# Debug: Print API key status
+api_key = os.getenv("OPENROUTER_API_KEY")
+print(f"Environment API key: {'Set' if api_key else 'Not set'}")
+print(f"Settings API key: {'Set' if settings.openrouter_api_key else 'Not set'}")
 
 # Free model configuration
 FREE_MODELS = {
