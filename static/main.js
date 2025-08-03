@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded, initializing components...');
     // --- Time Range Slider for Stock Price Trends ---
     const timeRangeSlider = document.getElementById('time-range-slider');
-    if (timeRangeSlider) {
+    if (timeRangeSlider && typeof noUiSlider !== 'undefined') {
         console.log('Initializing time range slider...');
         const today = new Date();
         const oneYearAgo = new Date();
@@ -17,29 +17,44 @@ document.addEventListener('DOMContentLoaded', function() {
             oneMonthAgo.setFullYear(oneMonthAgo.getFullYear() - 1);
             oneMonthAgo.setMonth(12 + oneMonthAgo.getMonth());
         }
-        noUiSlider.create(timeRangeSlider, {
-            start: [oneMonthAgo.getTime(), today.getTime()],
-            connect: true,
-            range: {
-                'min': oneYearAgo.getTime(),
-                'max': today.getTime()
-            },
-            step: 24 * 60 * 60 * 1000,
-            tooltips: [
-                { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
-                { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
-            ]
-        });
-        timeRangeSlider.noUiSlider.on('update', function(values) {
-            document.getElementById('time-range-start').textContent = 'Start: ' + new Date(parseInt(values[0])).toISOString().split('T')[0];
-            document.getElementById('time-range-end').textContent = 'End: ' + new Date(parseInt(values[1])).toISOString().split('T')[0];
-        });
-        // Set initial label values
-        document.getElementById('time-range-start').textContent = 'Start: ' + oneMonthAgo.toISOString().split('T')[0];
-        document.getElementById('time-range-end').textContent = 'End: ' + today.toISOString().split('T')[0];
-        console.log(`Initial stock trends date range: ${oneMonthAgo.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`);
+        
+        try {
+            noUiSlider.create(timeRangeSlider, {
+                start: [oneMonthAgo.getTime(), today.getTime()],
+                connect: true,
+                range: {
+                    'min': oneYearAgo.getTime(),
+                    'max': today.getTime()
+                },
+                step: 24 * 60 * 60 * 1000,
+                tooltips: [
+                    { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
+                    { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
+                ]
+            });
+            timeRangeSlider.noUiSlider.on('update', function(values) {
+                const startLabel = document.getElementById('time-range-start');
+                const endLabel = document.getElementById('time-range-end');
+                if (startLabel) startLabel.textContent = 'Start: ' + new Date(parseInt(values[0])).toISOString().split('T')[0];
+                if (endLabel) endLabel.textContent = 'End: ' + new Date(parseInt(values[1])).toISOString().split('T')[0];
+            });
+            // Set initial label values
+            const startLabel = document.getElementById('time-range-start');
+            const endLabel = document.getElementById('time-range-end');
+            if (startLabel) startLabel.textContent = 'Start: ' + oneMonthAgo.toISOString().split('T')[0];
+            if (endLabel) endLabel.textContent = 'End: ' + today.toISOString().split('T')[0];
+            console.log(`Initial stock trends date range: ${oneMonthAgo.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`);
+        } catch (error) {
+            console.error('Error initializing time range slider:', error);
+        }
     } else {
-        console.warn('Stock trends slider not initialized properly');
+        if (!timeRangeSlider) {
+            console.warn('Stock trends slider element not found');
+        } else if (typeof noUiSlider === 'undefined') {
+            console.warn('noUiSlider library not loaded');
+        } else {
+            console.warn('Stock trends slider not initialized properly');
+        }
     }
 
     // --- Populate Stock Stability Explorer select ---
@@ -359,34 +374,47 @@ function renderD3StockHistoryChart(data, startIdx, endIdx) {
 
 function setupMarketOvertimeSlider(dates, onChange) {
     const marketSlider = document.getElementById('market-slider');
+    if (!marketSlider || typeof noUiSlider === 'undefined') {
+        console.warn('Market slider not available or noUiSlider not loaded');
+        return;
+    }
+    
     if (marketSlider.noUiSlider) {
         marketSlider.noUiSlider.destroy();
     }
     d3.select('#market-slider').selectAll('*').remove();
     if (!dates || dates.length === 0) return;
-    const minTime = new Date(dates[0]).getTime();
-    const maxTime = new Date(dates[dates.length-1]).getTime();
-    const defaultStart = new Date(dates[Math.max(0, dates.length-22)]).getTime(); // ~1 month
-    const defaultEnd = maxTime;
-    noUiSlider.create(marketSlider, {
-        start: [defaultStart, defaultEnd],
-        connect: true,
-        range: { min: minTime, max: maxTime },
-        step: 24 * 60 * 60 * 1000,
-        tooltips: [
-            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
-            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
-        ]
-    });
-    marketSlider.noUiSlider.on('update', function(values) {
-        const startIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[0]));
-        const endIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[1]));
-        onChange(startIdx, endIdx === -1 ? dates.length-1 : endIdx);
-    });
-    // Initial call
-    const startIdx = dates.findIndex(d => new Date(d).getTime() >= defaultStart);
-    const endIdx = dates.length-1;
-    onChange(startIdx, endIdx);
+    
+    try {
+        const minTime = new Date(dates[0]).getTime();
+        const maxTime = new Date(dates[dates.length-1]).getTime();
+        const defaultStart = new Date(dates[Math.max(0, dates.length-22)]).getTime(); // ~1 month
+        const defaultEnd = maxTime;
+        
+        noUiSlider.create(marketSlider, {
+            start: [defaultStart, defaultEnd],
+            connect: true,
+            range: { min: minTime, max: maxTime },
+            step: 24 * 60 * 60 * 1000,
+            tooltips: [
+                { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
+                { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
+            ]
+        });
+        
+        marketSlider.noUiSlider.on('update', function(values) {
+            const startIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[0]));
+            const endIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[1]));
+            onChange(startIdx, endIdx === -1 ? dates.length-1 : endIdx);
+        });
+        
+        // Initial call
+        const startIdx = dates.findIndex(d => new Date(d).getTime() >= defaultStart);
+        const endIdx = dates.length-1;
+        onChange(startIdx, endIdx);
+    } catch (error) {
+        console.error('Error setting up market overtime slider:', error);
+    }
 }
 
 window.resetStockTrendsSection = function() {
