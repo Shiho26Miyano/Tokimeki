@@ -129,9 +129,15 @@ async def test_comprehensive_stock_data():
             print(f"❌ Error fetching data for {symbol}: {e}")
 
 if __name__ == "__main__":
-    # Set API key
+    # Check if API key is set in environment
     import os
-    os.environ['OPENROUTER_API_KEY'] = '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'
+    if not os.environ.get('OPENROUTER_API_KEY'):
+        print("❌ OPENROUTER_API_KEY not set in environment!")
+        print("   Please set it before running tests:")
+        print("   export OPENROUTER_API_KEY='your-api-key-here'")
+        exit(1)
+    
+    print("✅ API key found in environment")
     
     # Run tests
     asyncio.run(test_enhanced_stock_analysis())
