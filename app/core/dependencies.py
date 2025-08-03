@@ -38,19 +38,20 @@ async def get_usage_service():
     from ..services.usage_service import AsyncUsageService
     return AsyncUsageService()
 
-# AI service dependency
-async def get_ai_service(
-    http_client: httpx.AsyncClient = Depends(get_http_client),
-    cache_service = Depends(get_cache_service)
-):
-    """Dependency for AI service"""
-    from ..services.ai_service import AsyncAIService
-    return AsyncAIService(http_client, cache_service)
-
 # Stock service dependency
 async def get_stock_service(
     cache_service = Depends(get_cache_service)
 ):
     """Dependency for stock service"""
     from ..services.stock_service import AsyncStockService
-    return AsyncStockService(cache_service) 
+    return AsyncStockService(cache_service)
+
+# AI service dependency
+async def get_ai_service(
+    http_client: httpx.AsyncClient = Depends(get_http_client),
+    cache_service = Depends(get_cache_service),
+    stock_service = Depends(get_stock_service)
+):
+    """Dependency for AI service"""
+    from ..services.ai_service import AsyncAIService
+    return AsyncAIService(http_client, cache_service, stock_service) 

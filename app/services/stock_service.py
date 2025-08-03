@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
 import numpy as np
+import pandas as pd
 from .cache_service import AsyncCacheService
 
 logger = logging.getLogger(__name__)
@@ -324,6 +325,117 @@ class AsyncStockService:
                 }
         
         return processed_results
+    
+    async def get_comprehensive_stock_data(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Get comprehensive stock data including all yfinance information"""
+        
+        cache_key = f"comprehensive_stock_data:{symbol}"
+        cached_data = await self.cache_service.get(cache_key)
+        if cached_data:
+            logger.info(f"Cache hit for comprehensive stock data: {symbol}")
+            return cached_data
+        
+        try:
+            loop = asyncio.get_event_loop()
+            ticker = await loop.run_in_executor(
+                self.executor,
+                lambda: yf.Ticker(symbol)
+            )
+            
+            # Fetch only reliable yfinance data
+            tasks = [
+                loop.run_in_executor(self.executor, lambda: ticker.info),
+                loop.run_in_executor(self.executor, lambda: ticker.fast_info),
+                loop.run_in_executor(self.executor, lambda: ticker.history(period="1y")),
+                loop.run_in_executor(self.executor, lambda: ticker.dividends),
+                loop.run_in_executor(self.executor, lambda: ticker.splits),
+            ]
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Process results
+            info, fast_info, history, dividends, splits = results
+            
+            # Basic company info
+            company_info = {
+                "symbol": symbol,
+                "name": info.get("longName", "") if not isinstance(info, Exception) else "",
+                "sector": info.get("sector", "") if not isinstance(info, Exception) else "",
+                "industry": info.get("industry", "") if not isinstance(info, Exception) else "",
+                "website": info.get("website", "") if not isinstance(info, Exception) else "",
+                "employees": info.get("fullTimeEmployees", 0) if not isinstance(info, Exception) else 0,
+                "description": info.get("longBusinessSummary", "") if not isinstance(info, Exception) else "",
+            }
+            
+            # Market data
+            market_data = {
+                "current_price": fast_info.get("lastPrice", 0) if not isinstance(fast_info, Exception) else 0,
+                "market_cap": fast_info.get("marketCap", 0) if not isinstance(fast_info, Exception) else 0,
+                "shares_outstanding": fast_info.get("sharesOutstanding", 0) if not isinstance(fast_info, Exception) else 0,
+                "pe_ratio": info.get("trailingPE", 0) if not isinstance(info, Exception) else 0,
+                "dividend_yield": info.get("dividendYield", 0) if not isinstance(info, Exception) else 0,
+                "beta": info.get("beta", 0) if not isinstance(info, Exception) else 0,
+                "volume": fast_info.get("volume", 0) if not isinstance(fast_info, Exception) else 0,
+            }
+            
+            # Historical data
+            historical_data = {}
+            if not isinstance(history, Exception) and not history.empty:
+                historical_data = {
+                    "period": "1y",
+                    "data_points": len(history),
+                    "start_price": float(history['Close'].iloc[0]),
+                    "end_price": float(history['Close'].iloc[-1]),
+                    "min_price": float(history['Close'].min()),
+                    "max_price": float(history['Close'].max()),
+                    "avg_price": float(history['Close'].mean()),
+                    "total_volume": int(history['Volume'].sum()),
+                    "price_change": float(history['Close'].iloc[-1] - history['Close'].iloc[0]),
+                    "percent_change": float(((history['Close'].iloc[-1] / history['Close'].iloc[0]) - 1) * 100),
+                    "volatility": float(history['Close'].pct_change().std() * np.sqrt(252) * 100),
+                }
+            
+            # Dividends and splits
+            dividend_data = {
+                "dividends": dividends.to_dict() if not isinstance(dividends, Exception) and hasattr(dividends, 'empty') and not dividends.empty else {},
+                "splits": splits.to_dict() if not isinstance(splits, Exception) and hasattr(splits, 'empty') and not splits.empty else {},
+            }
+            
+            # Financial data (simplified)
+            financial_data = {
+                "available": "Basic data only - financial statements require premium access"
+            }
+            
+            # Analyst data (simplified)
+            analyst_data = {
+                "available": "Basic data only - analyst data requires premium access"
+            }
+            
+            # Additional data (simplified)
+            additional_data = {
+                "available": "Basic data only - additional data requires premium access"
+            }
+            
+            comprehensive_data = {
+                "company_info": company_info,
+                "market_data": market_data,
+                "historical_data": historical_data,
+                "dividend_data": dividend_data,
+                "financial_data": financial_data,
+                "analyst_data": analyst_data,
+                "additional_data": additional_data,
+                "last_updated": datetime.now().isoformat(),
+            }
+            
+            # Cache for 30 minutes (comprehensive data)
+            await self.cache_service.set(cache_key, comprehensive_data, ttl=1800)
+            
+            logger.info(f"Successfully fetched comprehensive data for {symbol}")
+            return comprehensive_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching comprehensive stock data for {symbol}: {e}")
+            return None
     
     async def get_stock_info(self, symbol: str) -> Optional[Dict[str, Any]]:
         """Get basic stock information"""

@@ -1,5 +1,6 @@
 import os
 import logging
+import numpy as np
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -39,6 +40,11 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Add favicon route
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse("static/favicon.ico")
 
 # Error handlers
 @app.exception_handler(500)
@@ -207,6 +213,10 @@ async def analyze_stock_endpoint(
 @app.get("/volatility_event_correlation")
 async def get_volatility_event_correlation(
     symbol: str,
+    start_date: str = None,
+    end_date: str = None,
+    window: int = 30,
+    years: int = 2,
     stock_service: AsyncStockService = Depends(get_stock_service),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
@@ -214,44 +224,183 @@ async def get_volatility_event_correlation(
     start_time = time.time()
     
     try:
-        data = await stock_service.get_stock_data(symbol, 365)
+        # Set default dates if not provided
+        if not start_date or not end_date:
+            from datetime import datetime, timedelta
+            end = datetime.now()
+            start = end - timedelta(days=years*365)
+            start_date = start.strftime('%Y-%m-%d')
+            end_date = end.strftime('%Y-%m-%d')
         
-        if data is None:
+        # Get stock data
+        stock_data = await stock_service.get_stock_data(symbol, 365)
+        
+        if not stock_data or not stock_data.get('data'):
             raise HTTPException(status_code=404, detail=f"No data available for {symbol}")
         
-        # Calculate volatility (simplified)
-        prices = [day['Close'] for day in data['data']]
+        # Extract dates and prices
+        dates = []
+        for day in stock_data['data']:
+            if hasattr(day['Date'], 'strftime'):
+                dates.append(day['Date'].strftime('%Y-%m-%d'))
+            else:
+                # Handle ISO format dates
+                date_str = str(day['Date'])
+                if 'T' in date_str:
+                    dates.append(date_str.split('T')[0])
+                else:
+                    dates.append(date_str)
+        prices = [day['Close'] for day in stock_data['data']]
+        
+        if len(prices) < window:
+            raise HTTPException(status_code=400, detail=f"Not enough data for rolling volatility (need at least {window} days)")
+        
+        # Calculate returns
         returns = []
         for i in range(1, len(prices)):
             returns.append((prices[i] - prices[i-1]) / prices[i-1])
         
-        volatility = sum(returns) / len(returns) if returns else 0
+        # Calculate rolling volatility
+        rolling_vol = []
+        for i in range(window-1, len(returns)):
+            window_returns = returns[i-window+1:i+1]
+            vol = np.std(window_returns) * np.sqrt(252) * 100
+            rolling_vol.append(vol)
+        
+        # Pad with None values for the first window-1 days
+        volatility = [None] * (window-1) + rolling_vol
+        
+        # Find minimum volatility period
+        valid_start = int(len(volatility) * 0.1)
+        valid_vols = [v for v in volatility[valid_start:] if v is not None]
+        valid_dates = dates[valid_start:]
+        
+        min_vol = None
+        min_vol_date = None
+        if valid_vols:
+            min_vol = min(valid_vols)
+            min_idx = volatility[valid_start:].index(min_vol) + valid_start
+            min_vol_date = dates[min_idx]
+        
+        # Create event titles (empty for now)
+        event_titles = [[] for _ in dates]
         
         response_time = time.time() - start_time
         await usage_service.track_request(
-            endpoint="volatility_analysis",
+            endpoint="volatility_event_correlation",
             response_time=response_time,
             success=True
         )
         
         return {
-            "success": True,
-            "symbol": symbol,
+            "dates": dates,
             "volatility": volatility,
-            "data_points": len(data['data']),
-            "response_time": response_time
+            "event_titles": event_titles,
+            "min_vol": min_vol,
+            "min_vol_date": min_vol_date
         }
         
     except Exception as e:
+        logger.error(f"Volatility event correlation error: {e}")
         response_time = time.time() - start_time
         await usage_service.track_request(
-            endpoint="volatility_analysis",
+            endpoint="volatility_event_correlation",
             response_time=response_time,
-            success=False,
-            error=str(e)
+            success=False
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/volatility_regime/analyze")
+async def analyze_volatility_regime(
+    request: Request,
+    stock_service: AsyncStockService = Depends(get_stock_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Analyze volatility regime for a stock"""
+    start_time = time.time()
+    
+    try:
+        # Parse request data
+        data = await request.json()
+        symbol = data.get("symbol", "AAPL")
+        period = data.get("period", "1y")
+        window = data.get("window", 30)
+        
+        logger.info(f"Volatility regime analysis request: symbol={symbol}, period={period}, window={window}")
+        
+        # Get stock data
+        stock_data = await stock_service.get_stock_data(symbol, 365)
+        
+        if not stock_data or not stock_data.get('data'):
+            logger.warning(f"No stock data available for {symbol}")
+            raise HTTPException(status_code=404, detail=f"No data available for {symbol}")
+        
+        logger.info(f"Retrieved {len(stock_data['data'])} data points for {symbol}")
+        
+        # Calculate volatility metrics
+        prices = [day['Close'] for day in stock_data['data']]
+        returns = []
+        for i in range(1, len(prices)):
+            returns.append((prices[i] - prices[i-1]) / prices[i-1])
+        
+        # Calculate rolling volatility
+        import numpy as np
+        rolling_vol = []
+        for i in range(window, len(returns)):
+            window_returns = returns[i-window:i]
+            vol = np.std(window_returns) * np.sqrt(252) * 100
+            rolling_vol.append(vol)
+        
+        # Determine regime
+        avg_vol = np.mean(rolling_vol)
+        current_vol = rolling_vol[-1] if rolling_vol else 0
+        
+        if current_vol > avg_vol * 1.5:
+            regime = "High Volatility"
+        elif current_vol < avg_vol * 0.7:
+            regime = "Low Volatility"
+        else:
+            regime = "Normal Volatility"
+        
+        # Calculate regime statistics
+        high_vol_periods = sum(1 for vol in rolling_vol if vol > avg_vol * 1.5)
+        low_vol_periods = sum(1 for vol in rolling_vol if vol < avg_vol * 0.7)
+        normal_vol_periods = len(rolling_vol) - high_vol_periods - low_vol_periods
+        
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="volatility_regime_analyze",
+            response_time=response_time,
+            success=True
         )
         
-        logger.error(f"Volatility analysis error: {e}")
+        response_data = {
+            "success": True,
+            "symbol": symbol,
+            "regime": regime,
+            "current_volatility": round(current_vol, 2),
+            "average_volatility": round(avg_vol, 2),
+            "volatility_trend": "Increasing" if current_vol > avg_vol else "Decreasing",
+            "regime_distribution": {
+                "high_volatility_periods": high_vol_periods,
+                "low_volatility_periods": low_vol_periods,
+                "normal_volatility_periods": normal_vol_periods
+            },
+            "rolling_volatility": [round(v, 2) for v in rolling_vol[-50:]],  # Last 50 points
+            "response_time": response_time
+        }
+        
+        logger.info(f"Volatility regime response: {response_data}")
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"Volatility regime analysis error: {e}")
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="volatility_regime_analyze",
+            response_time=response_time,
+            success=False
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 # Chat endpoints to match original Flask app
@@ -286,8 +435,8 @@ async def chat_endpoint(
         if not message:
             raise HTTPException(status_code=400, detail="Message is required")
         
-        # Make async API call
-        result = await ai_service.chat(
+        # Make async API call with enhanced stock analysis
+        result = await ai_service.chat_with_stock_analysis(
             message=message,
             model=model,
             temperature=temperature,
@@ -303,13 +452,20 @@ async def chat_endpoint(
             success=True
         )
         
-        return {
+        response_data = {
             "success": True,
             "response": result["response"],
             "model": result["model"],
             "usage": result["usage"],
             "response_time": response_time
         }
+        
+        # Add stock analysis data if available
+        if "stock_analysis" in result:
+            response_data["stock_analysis"] = result["stock_analysis"]
+            response_data["symbol_analyzed"] = result.get("symbol_analyzed")
+        
+        return response_data
         
     except Exception as e:
         # Track failed request
@@ -334,12 +490,23 @@ async def compare_models_endpoint(
     start_time = time.time()
     
     try:
-        # Parse form data
-        form_data = await request.form()
-        prompt = form_data.get("prompt", "")
-        models = form_data.get("models", "").split(",") if form_data.get("models") else None
-        temperature = float(form_data.get("temperature", 0.7))
-        max_tokens = int(form_data.get("max_tokens", 1000))
+        # Check content type
+        content_type = request.headers.get("content-type", "")
+        
+        if "application/json" in content_type:
+            # Handle JSON request
+            body = await request.json()
+            prompt = body.get("prompt", "")
+            models = body.get("models", []) if body.get("models") else None
+            temperature = float(body.get("temperature", 0.7))
+            max_tokens = int(body.get("max_tokens", 1000))
+        else:
+            # Handle form data
+            form_data = await request.form()
+            prompt = form_data.get("prompt", "")
+            models = form_data.get("models", "").split(",") if form_data.get("models") else None
+            temperature = float(form_data.get("temperature", 0.7))
+            max_tokens = int(form_data.get("max_tokens", 1000))
         
         if not prompt:
             raise HTTPException(status_code=400, detail="Prompt is required")
@@ -528,133 +695,8 @@ async def get_model_comparison():
         "models": models
     }
 
-@app.post("/analyze_playbook")
-async def analyze_playbook_endpoint(
-    request: Request,
-    stock_service: AsyncStockService = Depends(get_stock_service),
-    usage_service: AsyncUsageService = Depends(get_usage_service)
-):
-    """Analyze stock using investment playbooks"""
-    start_time = time.time()
-    
-    try:
-        # Check content type
-        content_type = request.headers.get("content-type", "")
-        
-        if "application/json" in content_type:
-            # Handle JSON request
-            body = await request.json()
-            symbol = body.get("symbol", "").upper()
-            playbook_name = body.get("playbook_name", "Value Investing")
-        else:
-            # Handle form data
-            form_data = await request.form()
-            symbol = form_data.get("symbol", "").upper()
-            playbook_name = form_data.get("playbook_name", "Value Investing")
-        
-        if not symbol:
-            raise HTTPException(status_code=400, detail="Symbol is required")
-        
-        # Get stock data
-        data = await stock_service.get_stock_data(symbol, 365)
-        if not data:
-            raise HTTPException(status_code=404, detail=f"No data available for {symbol}")
-        
-        # Get stock info
-        stock_info = await stock_service.get_stock_info(symbol)
-        
-        # Simple playbook analysis
-        decision = "HOLD"
-        reasons = []
-        
-        if playbook_name == "Value Investing":
-            if stock_info and stock_info.get("pe_ratio", 0) < 15:
-                decision = "BUY"
-                reasons.append("Low P/E ratio indicates undervaluation")
-            else:
-                decision = "HOLD"
-                reasons.append("P/E ratio is not in value territory")
-                
-        elif playbook_name == "Growth Investing":
-            # Simple growth analysis based on price momentum
-            prices = [day['Close'] for day in data['data']]
-            recent_return = ((prices[-1] / prices[-30]) - 1) * 100 if len(prices) >= 30 else 0
-            
-            if recent_return > 10:
-                decision = "BUY"
-                reasons.append("Strong recent price momentum")
-            else:
-                decision = "HOLD"
-                reasons.append("Moderate growth momentum")
-                
-        elif playbook_name == "Dividend Investing":
-            if stock_info and stock_info.get("dividend_yield", 0) > 3:
-                decision = "BUY"
-                reasons.append("High dividend yield")
-            else:
-                decision = "HOLD"
-                reasons.append("Dividend yield below threshold")
-        
-        # Track usage
-        response_time = time.time() - start_time
-        await usage_service.track_request(
-            endpoint="analyze_playbook",
-            response_time=response_time,
-            success=True
-        )
-        
-        return {
-            "success": True,
-            "symbol": symbol,
-            "playbook": {
-                "name": playbook_name,
-                "role": f"{playbook_name} Analyst",
-                "philosophy": f"Apply {playbook_name} principles to evaluate {symbol}"
-            },
-            "decision": decision,
-            "reasons": reasons,
-            "stock_data": stock_info or {},
-            "response_time": response_time
-        }
-        
-    except Exception as e:
-        # Track failed request
-        response_time = time.time() - start_time
-        await usage_service.track_request(
-            endpoint="analyze_playbook",
-            response_time=response_time,
-            success=False,
-            error=str(e)
-        )
-        
-        logger.error(f"Playbook analysis error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/playbooks")
-async def get_playbooks():
-    """Get investment playbooks"""
-    playbooks = [
-        {
-            "name": "Value Investing",
-            "description": "Find undervalued stocks with strong fundamentals",
-            "criteria": ["Low P/E ratio", "High dividend yield", "Strong balance sheet"],
-            "confidence": 0.85
-        },
-        {
-            "name": "Growth Investing",
-            "description": "Invest in companies with high growth potential",
-            "criteria": ["High revenue growth", "Strong market position", "Innovation focus"],
-            "confidence": 0.78
-        },
-        {
-            "name": "Dividend Investing",
-            "description": "Focus on stocks with consistent dividend payments",
-            "criteria": ["High dividend yield", "Dividend growth history", "Stable earnings"],
-            "confidence": 0.92
-        }
-    ]
-    
-    return playbooks
+
 
 # Root endpoint - serve the main HTML page
 @app.get("/")
