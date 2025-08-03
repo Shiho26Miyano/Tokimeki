@@ -2,6 +2,7 @@ import httpx
 import asyncio
 import logging
 import re
+import os
 from typing import Dict, Any, List, Optional
 from ..core.config import settings, FREE_MODELS
 from .cache_service import AsyncCacheService
@@ -14,7 +15,8 @@ class AsyncAIService:
         self.http_client = http_client
         self.cache_service = cache_service
         self.stock_service = stock_service
-        self.api_key = settings.openrouter_api_key
+        # Try to get API key from settings first, then environment variable
+        self.api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
         self.api_url = settings.openrouter_api_url
         
         logger.info(f"AI Service initialized with API key: {self.api_key[:20] + '...' if self.api_key else 'None'}")
@@ -60,6 +62,13 @@ class AsyncAIService:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
+        
+        # Debug: Log the headers being sent
+        logger.info(f"API Key being used: {self.api_key[:20] + '...' if self.api_key else 'None'}")
+        logger.info(f"Authorization header: Bearer {self.api_key[:20] + '...' if self.api_key else 'None'}")
+        logger.info(f"Full headers: {headers}")
+        logger.info(f"Request URL: {self.api_url}")
+        logger.info(f"Request payload: {payload}")
         
         try:
             logger.info(f"Making API call to {model}")

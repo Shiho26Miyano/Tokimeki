@@ -4,7 +4,7 @@ console.log('main.js loaded');
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded, initializing components...');
     // --- Time Range Slider for Stock Price Trends ---
-    const timeRangeSlider = document.getElementById('time-range-slider');
+    const timeRangeSlider = document.getElementById('market-slider');
     if (timeRangeSlider && typeof noUiSlider !== 'undefined') {
         console.log('Initializing time range slider...');
         const today = new Date();

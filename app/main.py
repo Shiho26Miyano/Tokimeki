@@ -413,6 +413,10 @@ async def chat_endpoint(
     """Main chat endpoint - handles both JSON and form data"""
     start_time = time.time()
     
+    # Debug: Check API key status
+    logger.info(f"Chat endpoint - API key configured: {bool(ai_service.api_key)}")
+    logger.info(f"Chat endpoint - API key length: {len(ai_service.api_key) if ai_service.api_key else 0}")
+    
     try:
         # Check content type
         content_type = request.headers.get("content-type", "")
@@ -470,15 +474,27 @@ async def chat_endpoint(
     except Exception as e:
         # Track failed request
         response_time = time.time() - start_time
-        await usage_service.track_request(
-            endpoint="chat",
-            response_time=response_time,
-            success=False,
-            error=str(e)
-        )
+        try:
+            await usage_service.track_request(
+                endpoint="chat",
+                response_time=response_time,
+                success=False,
+                error=str(e)
+            )
+        except Exception as track_error:
+            logger.error(f"Failed to track usage: {track_error}")
         
         logger.error(f"Chat error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        
+        # Provide more helpful error messages
+        if "OpenRouter API key not configured" in str(e):
+            error_detail = "OpenRouter API key is not configured. Please set the OPENROUTER_API_KEY environment variable."
+        elif "API call failed" in str(e):
+            error_detail = f"AI service error: {str(e)}"
+        else:
+            error_detail = str(e)
+        
+        raise HTTPException(status_code=500, detail=error_detail)
 
 @app.post("/compare_models")
 async def compare_models_endpoint(
@@ -559,7 +575,11 @@ async def get_models_endpoint(
         }
     except Exception as e:
         logger.error(f"Error getting models: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "success": False,
+            "error": str(e),
+            "api_key_configured": bool(settings.openrouter_api_key)
+        }
 
 @app.post("/analyze_tweet")
 async def analyze_tweet_endpoint(
@@ -708,13 +728,47 @@ async def root():
 async def health_check():
     return {
         "status": "healthy",
-        "timestamp": time.time()
+        "timestamp": time.time(),
+        "app_name": settings.app_name,
+        "debug": settings.debug,
+        "api_key_configured": bool(settings.openrouter_api_key)
     }
 
 # Test endpoint
 @app.get("/test")
 async def test():
-    return {"message": "Hello, FastAPI world!"}
+    return {
+        "message": "Hello, FastAPI world!",
+        "api_key_configured": bool(settings.openrouter_api_key),
+        "api_key_length": len(settings.openrouter_api_key) if settings.openrouter_api_key else 0,
+        "debug_mode": settings.debug,
+        "app_name": settings.app_name
+    }
+
+@app.get("/test-api")
+async def test_api(
+    ai_service: AsyncAIService = Depends(get_ai_service)
+):
+    """Test API call directly"""
+    try:
+        # Test a simple API call
+        result = await ai_service.call_api(
+            messages=[{"role": "user", "content": "Hello"}],
+            model="mistral-small",
+            temperature=0.7,
+            max_tokens=50
+        )
+        return {
+            "success": True,
+            "result": result
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "api_key_configured": bool(ai_service.api_key),
+            "api_key_length": len(ai_service.api_key) if ai_service.api_key else 0
+        }
 
 # Serve monitoring page
 @app.get("/monitoring")
