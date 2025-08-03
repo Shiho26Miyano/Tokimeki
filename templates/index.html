@@ -68,6 +68,6 @@
             checkElements();
         });
     </script>
-    <script src="{{ url_for('static', filename='main.js') }}" type="text/babel"></script>
+    <script src="{{ url_for('static', filename='main.js') }}?v={{ range(1, 10000) | random }}" type="text/babel"></script>
 </body>
 </html> 

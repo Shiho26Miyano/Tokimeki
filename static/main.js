@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded, initializing components...');
     // --- Time Range Slider for Stock Price Trends ---
     const timeRangeSlider = document.getElementById('time-range-slider');
-    if (timeRangeSlider) {
+    if (timeRangeSlider && typeof noUiSlider !== 'undefined') {
         console.log('Initializing time range slider...');
         const today = new Date();
         const oneYearAgo = new Date();
@@ -17,29 +17,44 @@ document.addEventListener('DOMContentLoaded', function() {
             oneMonthAgo.setFullYear(oneMonthAgo.getFullYear() - 1);
             oneMonthAgo.setMonth(12 + oneMonthAgo.getMonth());
         }
-        noUiSlider.create(timeRangeSlider, {
-            start: [oneMonthAgo.getTime(), today.getTime()],
-            connect: true,
-            range: {
-                'min': oneYearAgo.getTime(),
-                'max': today.getTime()
-            },
-            step: 24 * 60 * 60 * 1000,
-            tooltips: [
-                { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
-                { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
-            ]
-        });
-        timeRangeSlider.noUiSlider.on('update', function(values) {
-            document.getElementById('time-range-start').textContent = 'Start: ' + new Date(parseInt(values[0])).toISOString().split('T')[0];
-            document.getElementById('time-range-end').textContent = 'End: ' + new Date(parseInt(values[1])).toISOString().split('T')[0];
-        });
-        // Set initial label values
-        document.getElementById('time-range-start').textContent = 'Start: ' + oneMonthAgo.toISOString().split('T')[0];
-        document.getElementById('time-range-end').textContent = 'End: ' + today.toISOString().split('T')[0];
-        console.log(`Initial stock trends date range: ${oneMonthAgo.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`);
+        
+        try {
+            noUiSlider.create(timeRangeSlider, {
+                start: [oneMonthAgo.getTime(), today.getTime()],
+                connect: true,
+                range: {
+                    'min': oneYearAgo.getTime(),
+                    'max': today.getTime()
+                },
+                step: 24 * 60 * 60 * 1000,
+                tooltips: [
+                    { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
+                    { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
+                ]
+            });
+            timeRangeSlider.noUiSlider.on('update', function(values) {
+                const startLabel = document.getElementById('time-range-start');
+                const endLabel = document.getElementById('time-range-end');
+                if (startLabel) startLabel.textContent = 'Start: ' + new Date(parseInt(values[0])).toISOString().split('T')[0];
+                if (endLabel) endLabel.textContent = 'End: ' + new Date(parseInt(values[1])).toISOString().split('T')[0];
+            });
+            // Set initial label values
+            const startLabel = document.getElementById('time-range-start');
+            const endLabel = document.getElementById('time-range-end');
+            if (startLabel) startLabel.textContent = 'Start: ' + oneMonthAgo.toISOString().split('T')[0];
+            if (endLabel) endLabel.textContent = 'End: ' + today.toISOString().split('T')[0];
+            console.log(`Initial stock trends date range: ${oneMonthAgo.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`);
+        } catch (error) {
+            console.error('Error initializing time range slider:', error);
+        }
     } else {
-        console.warn('Stock trends slider not initialized properly');
+        if (!timeRangeSlider) {
+            console.warn('Stock trends slider element not found');
+        } else if (typeof noUiSlider === 'undefined') {
+            console.warn('noUiSlider library not loaded');
+        } else {
+            console.warn('Stock trends slider not initialized properly');
+        }
     }
 
     // --- Populate Stock Stability Explorer select ---
@@ -359,34 +374,47 @@ function renderD3StockHistoryChart(data, startIdx, endIdx) {
 
 function setupMarketOvertimeSlider(dates, onChange) {
     const marketSlider = document.getElementById('market-slider');
+    if (!marketSlider || typeof noUiSlider === 'undefined') {
+        console.warn('Market slider not available or noUiSlider not loaded');
+        return;
+    }
+    
     if (marketSlider.noUiSlider) {
         marketSlider.noUiSlider.destroy();
     }
     d3.select('#market-slider').selectAll('*').remove();
     if (!dates || dates.length === 0) return;
-    const minTime = new Date(dates[0]).getTime();
-    const maxTime = new Date(dates[dates.length-1]).getTime();
-    const defaultStart = new Date(dates[Math.max(0, dates.length-22)]).getTime(); // ~1 month
-    const defaultEnd = maxTime;
-    noUiSlider.create(marketSlider, {
-        start: [defaultStart, defaultEnd],
-        connect: true,
-        range: { min: minTime, max: maxTime },
-        step: 24 * 60 * 60 * 1000,
-        tooltips: [
-            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
-            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
-        ]
-    });
-    marketSlider.noUiSlider.on('update', function(values) {
-        const startIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[0]));
-        const endIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[1]));
-        onChange(startIdx, endIdx === -1 ? dates.length-1 : endIdx);
-    });
-    // Initial call
-    const startIdx = dates.findIndex(d => new Date(d).getTime() >= defaultStart);
-    const endIdx = dates.length-1;
-    onChange(startIdx, endIdx);
+    
+    try {
+        const minTime = new Date(dates[0]).getTime();
+        const maxTime = new Date(dates[dates.length-1]).getTime();
+        const defaultStart = new Date(dates[Math.max(0, dates.length-22)]).getTime(); // ~1 month
+        const defaultEnd = maxTime;
+        
+        noUiSlider.create(marketSlider, {
+            start: [defaultStart, defaultEnd],
+            connect: true,
+            range: { min: minTime, max: maxTime },
+            step: 24 * 60 * 60 * 1000,
+            tooltips: [
+                { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
+                { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
+            ]
+        });
+        
+        marketSlider.noUiSlider.on('update', function(values) {
+            const startIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[0]));
+            const endIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[1]));
+            onChange(startIdx, endIdx === -1 ? dates.length-1 : endIdx);
+        });
+        
+        // Initial call
+        const startIdx = dates.findIndex(d => new Date(d).getTime() >= defaultStart);
+        const endIdx = dates.length-1;
+        onChange(startIdx, endIdx);
+    } catch (error) {
+        console.error('Error setting up market overtime slider:', error);
+    }
 }
 
 window.resetStockTrendsSection = function() {
@@ -432,6 +460,7 @@ function fetchAndRenderVolatilityCorrelation() {
         return;
     }
     const symbol = stockSelect.value;
+    
     // Get window and years from UI
     const windowInput = document.getElementById('vol-window');
     const yearsInput = document.getElementById('vol-years');
@@ -451,16 +480,41 @@ function fetchAndRenderVolatilityCorrelation() {
     
     // Fetch volatility data
     fetch(`/volatility_event_correlation?symbol=${symbol}&start_date=${start_date}&end_date=${end_date}&window=${windowSize}`)
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            return res.json();
+        })
         .then(data => {
+            console.log('Received volatility data:', data);
+            
+            // Validate the response data
+            if (!data || !data.dates || !Array.isArray(data.dates) || data.dates.length === 0) {
+                throw new Error('Invalid volatility data received from server');
+            }
+            
+            if (!data.volatility || !Array.isArray(data.volatility)) {
+                throw new Error('Invalid volatility values received from server');
+            }
+            
+            console.log('Data validation passed, rendering chart...');
             chartDiv.innerHTML = '';
             window._volatilityChartState.data = data;
+            
             // Initialize slider to full range
             if (data.dates && data.dates.length > 0) {
                 setupVolatilityRangeSlider(data.dates);
                 window._volatilityChartState.range = [0, data.dates.length - 1];
             }
-            renderVolatilityCorrelationChart(data);
+            
+            try {
+                renderVolatilityCorrelationChart(data);
+                console.log('Chart rendered successfully');
+            } catch (chartError) {
+                console.error('Error rendering chart:', chartError);
+                chartDiv.innerHTML = '<div class="alert alert-danger">Error rendering volatility chart. Please try again.</div>';
+            }
             
             // Now fetch regime analysis
             return fetch('/volatility_regime/analyze', {
@@ -473,17 +527,65 @@ function fetchAndRenderVolatilityCorrelation() {
                 })
             });
         })
-        .then(res => res.json())
-        .then(regimeData => {
-            if (regimeData.error) {
-                console.warn('Regime analysis error:', regimeData.error);
-                return;
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
             }
-            displayRegimeAnalysis(regimeData);
+            return res.json();
+        })
+        .then(regimeData => {
+            console.log('Received regime data:', regimeData);
+            try {
+                if (regimeData.error) {
+                    console.warn('Regime analysis error:', regimeData.error);
+                    return;
+                }
+                
+                // Validate regime data
+                if (!regimeData || typeof regimeData !== 'object') {
+                    console.warn('Invalid regime data received:', regimeData);
+                    return;
+                }
+                
+                // Additional safety check for null/undefined
+                if (regimeData === null || regimeData === undefined) {
+                    console.warn('Regime data is null or undefined');
+                    return;
+                }
+                
+                // Ensure all required fields exist - map backend structure to frontend expectations
+                const safeRegimeData = {
+                    symbol: regimeData.symbol || 'Unknown',
+                    regime: regimeData.regime || 'Unknown', // Backend returns regime
+                    current_volatility: regimeData.current_volatility || 0,
+                    average_volatility: regimeData.average_volatility || 0,
+                    volatility_trend: regimeData.volatility_trend || 'Unknown',
+                    regime_distribution: regimeData.regime_distribution || {}, // Backend returns regime_distribution
+                    rolling_volatility: regimeData.rolling_volatility || [], // Backend returns rolling_volatility
+                    rolling_window: regimeData.rolling_window || 'Unknown',
+                    analysis_period: regimeData.analysis_period || 'Unknown'
+                };
+                
+                console.log('Safe regime data created:', safeRegimeData);
+                
+                        console.log('Regime data validation passed, displaying analysis...');
+        try {
+            displayRegimeAnalysis(safeRegimeData);
+            console.log('Regime analysis displayed successfully');
+        } catch (displayError) {
+            console.error('Error in displayRegimeAnalysis:', displayError);
+            const resultsDiv = document.getElementById('regime-analysis-results');
+            if (resultsDiv) {
+                resultsDiv.innerHTML = '<div class="alert alert-danger">Error displaying regime analysis. Please try again.</div>';
+            }
+        }
+            } catch (error) {
+                console.error('Error processing regime data:', error);
+            }
         })
         .catch((err) => {
             console.error('Error:', err);
-            chartDiv.innerHTML = 'Error fetching data.';
+            chartDiv.innerHTML = `Error fetching data: ${err.message}`;
         });
 }
 
@@ -491,104 +593,227 @@ function setupVolatilityRangeSlider(dates) {
     const slider = document.getElementById('volatility-range-slider');
     if (slider.noUiSlider) slider.noUiSlider.destroy();
     d3.select('#volatility-range-slider').selectAll('*').remove();
-    if (!dates || dates.length === 0) return;
-    const minTime = new Date(dates[0]).getTime();
-    const maxTime = new Date(dates[dates.length-1]).getTime();
-    noUiSlider.create(slider, {
-        start: [minTime, maxTime],
-        connect: true,
-        range: { min: minTime, max: maxTime },
-        step: 24 * 60 * 60 * 1000,
-        tooltips: [
-            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
-            { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
-        ]
-    });
-    slider.noUiSlider.on('update', function(values) {
-        const startIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[0]));
-        let endIdx = dates.findIndex(d => new Date(d).getTime() >= parseInt(values[1]));
-        if (endIdx === -1) endIdx = dates.length - 1;
-        window._volatilityChartState.range = [startIdx, endIdx];
-        document.getElementById('volatility-range-start').textContent = 'Start: ' + dates[startIdx];
-        document.getElementById('volatility-range-end').textContent = 'End: ' + dates[endIdx];
-        renderVolatilityCorrelationChart(window._volatilityChartState.data);
-    });
-    // Set initial label values
-    document.getElementById('volatility-range-start').textContent = 'Start: ' + dates[0];
-    document.getElementById('volatility-range-end').textContent = 'End: ' + dates[dates.length-1];
+    
+    if (!dates || dates.length === 0) {
+        console.warn('No valid dates for volatility range slider');
+        return;
+    }
+    
+    // Filter out invalid dates
+    const validDates = dates.filter(d => isValidDate(d));
+    
+    if (validDates.length < 2) {
+        console.warn('Not enough valid dates for volatility range slider');
+        return;
+    }
+    
+    const minTime = new Date(validDates[0]).getTime();
+    const maxTime = new Date(validDates[validDates.length-1]).getTime();
+    
+    if (!isValidNumber(minTime) || !isValidNumber(maxTime)) {
+        console.warn('Invalid time values for volatility range slider');
+        return;
+    }
+    
+    try {
+        noUiSlider.create(slider, {
+            start: [minTime, maxTime],
+            connect: true,
+            range: { min: minTime, max: maxTime },
+            step: 24 * 60 * 60 * 1000,
+            tooltips: [
+                { to: v => new Date(parseInt(v)).toISOString().split('T')[0] },
+                { to: v => new Date(parseInt(v)).toISOString().split('T')[0] }
+            ]
+        });
+        
+        slider.noUiSlider.on('update', function(values) {
+            const startIdx = validDates.findIndex(d => new Date(d).getTime() >= parseInt(values[0]));
+            let endIdx = validDates.findIndex(d => new Date(d).getTime() >= parseInt(values[1]));
+            if (endIdx === -1) endIdx = validDates.length - 1;
+            
+            // Map back to original dates array indices
+            const originalStartIdx = dates.findIndex(d => d === validDates[startIdx]);
+            const originalEndIdx = dates.findIndex(d => d === validDates[endIdx]);
+            
+            if (originalStartIdx !== -1 && originalEndIdx !== -1) {
+                window._volatilityChartState.range = [originalStartIdx, originalEndIdx];
+                document.getElementById('volatility-range-start').textContent = 'Start: ' + validDates[startIdx];
+                document.getElementById('volatility-range-end').textContent = 'End: ' + validDates[endIdx];
+                renderVolatilityCorrelationChart(window._volatilityChartState.data);
+            }
+        });
+        
+        // Set initial label values
+        document.getElementById('volatility-range-start').textContent = 'Start: ' + validDates[0];
+        document.getElementById('volatility-range-end').textContent = 'End: ' + validDates[validDates.length-1];
+        
+    } catch (e) {
+        console.error('Error creating volatility range slider:', e);
+    }
 }
 
 function renderVolatilityCorrelationChart(data) {
-    d3.select('#volatility-correlation-chart').selectAll('*').remove();
-    if (!data || !data.dates || data.dates.length === 0) return;
+    try {
+        d3.select('#volatility-correlation-chart').selectAll('*').remove();
+        
+        // Enhanced validation for data
+        if (!data) {
+            console.warn('No data provided to renderVolatilityCorrelationChart');
+            return;
+        }
+        
+        if (typeof data !== 'object') {
+            console.warn('Invalid data type provided to renderVolatilityCorrelationChart:', typeof data);
+            return;
+        }
+        
+        if (!data.dates || !Array.isArray(data.dates) || data.dates.length === 0) {
+            console.warn('Invalid or missing dates in data:', data);
+            return;
+        }
+    
+    // Validate data arrays
+    const dates = data.dates || [];
+    const vol = data.volatility || [];
+    const eventTitles = data.event_titles || [];
+    
+    if (dates.length === 0 || vol.length === 0) {
+        console.warn('Invalid data for volatility chart:', data);
+        return;
+    }
+    
     const margin = {top: 30, right: 60, bottom: 60, left: 70};
     const chartDiv = document.getElementById('volatility-correlation-chart');
     const fullWidth = chartDiv.clientWidth || 700;
     const fullHeight = chartDiv.clientHeight || 340;
     const width = fullWidth - margin.left - margin.right;
     const height = fullHeight - margin.top - margin.bottom;
+    
     const svg = d3.select('#volatility-correlation-chart')
         .append('svg')
         .attr('width', '100%')
         .attr('height', '100%')
         .attr('viewBox', `0 0 ${fullWidth} ${fullHeight}`);
+    
     svg.append('rect')
         .attr('x', 0)
         .attr('y', 0)
         .attr('width', fullWidth)
         .attr('height', fullHeight)
         .attr('fill', '#fff');
+    
     const g = svg.append('g')
         .attr('transform', `translate(${margin.left},${margin.top})`);
+    
     // Use slider range if set
     let range = window._volatilityChartState.range;
-    let startIdx = 0, endIdx = data.dates.length - 1;
+    let startIdx = 0, endIdx = dates.length - 1;
     if (range && Array.isArray(range)) {
         startIdx = Math.max(0, range[0]);
-        endIdx = Math.min(data.dates.length - 1, range[1]);
+        endIdx = Math.min(dates.length - 1, range[1]);
     }
-    // Slice data for visible range
-    const dates = data.dates.slice(startIdx, endIdx + 1).map(d3.timeParse('%Y-%m-%d'));
-    const vol = data.volatility.slice(startIdx, endIdx + 1);
-    const eventTitles = (data.event_titles || []).slice(startIdx, endIdx + 1);
+    
+    // Slice data for visible range and validate
+    const visibleDates = dates.slice(startIdx, endIdx + 1);
+    const visibleVol = vol.slice(startIdx, endIdx + 1);
+    const visibleEventTitles = eventTitles.slice(startIdx, endIdx + 1);
+    
+    // Filter out invalid data points
+    const validData = [];
+    const validDates = [];
+    const validVol = [];
+    
+    for (let i = 0; i < visibleDates.length; i++) {
+        const date = visibleDates[i];
+        const volValue = visibleVol[i];
+        
+        if (isValidDate(date) && isValidNumber(volValue)) {
+            validData.push({ date, vol: volValue });
+            validDates.push(date);
+            validVol.push(volValue);
+        }
+    }
+    
+    if (validData.length === 0) {
+        console.warn('No valid data points for volatility chart');
+        chartDiv.innerHTML = '<div class="alert alert-warning">No valid data available for the selected time range.</div>';
+        return;
+    }
+    
+    // Parse dates safely
+    const parsedDates = validDates.map(d => {
+        try {
+            const parsed = d3.timeParse('%Y-%m-%d')(d);
+            return parsed && !isNaN(parsed.getTime()) ? parsed : null;
+        } catch (e) {
+            console.warn('Invalid date format:', d);
+            return null;
+        }
+    }).filter(d => d !== null);
+    
+    if (parsedDates.length === 0) {
+        console.warn('No valid parsed dates for volatility chart');
+        chartDiv.innerHTML = '<div class="alert alert-warning">Invalid date format in data.</div>';
+        return;
+    }
+    
     // X scale
     const x = d3.scaleTime()
-        .domain(d3.extent(dates))
+        .domain(d3.extent(parsedDates))
         .range([0, width]);
-    // Y scale for volatility
+    
+    // Y scale for volatility - ensure we have valid values
+    const maxVol = d3.max(validVol);
+    const minVol = d3.min(validVol);
+    
+    if (!isValidNumber(maxVol) || !isValidNumber(minVol)) {
+        console.warn('Invalid volatility values for chart:', { maxVol, minVol });
+        chartDiv.innerHTML = '<div class="alert alert-warning">Invalid volatility data received.</div>';
+        return;
+    }
+    
     const yLeft = d3.scaleLinear()
-        .domain([0, d3.max(vol.filter(v => v !== null)) * 1.2])
+        .domain([0, maxVol * 1.2])
         .range([height, 0]);
+    
     // Draw full volatility line in blue
     const line = d3.line()
-        .defined((d, i) => vol[i] !== null)
-        .x((d, i) => x(dates[i]))
-        .y((d, i) => yLeft(vol[i]));
+        .defined((d, i) => isValidNumber(validVol[i]))
+        .x((d, i) => x(parsedDates[i]))
+        .y((d, i) => yLeft(validVol[i]));
+    
     g.append('path')
-        .datum(vol)
+        .datum(validVol)
         .attr('fill', 'none')
         .attr('stroke', '#183153')
         .attr('stroke-width', 2.5)
         .attr('d', line);
-    // Overlay highlight segment for lowest volatility window (same thickness as main line)
+    
+    // Overlay highlight segment for lowest volatility window
     let highlightStart = -1, highlightEnd = -1, highlightDates = [], highlightVols = [];
     let highlightLabelX, highlightLabelY, highlightLabelText;
     let highlightStartDate, highlightEndDate;
-    if (data.min_vol_date && data.volatility && data.dates) {
-        const windowSize = (data.volatility.length - data.volatility.filter(v => v === null).length) > 0 ? (data.volatility.findIndex(v => v !== null) + 1) : 10;
-        const minIdx = data.dates.findIndex(d => d === data.min_vol_date);
+    
+    if (data.min_vol_date && validVol.length > 0) {
+        const windowSize = Math.min(10, Math.floor(validVol.length * 0.1));
+        const minIdx = validDates.findIndex(d => d === data.min_vol_date);
+        
         if (minIdx !== -1 && windowSize > 1) {
-            highlightStart = Math.max(startIdx, minIdx - windowSize + 1);
-            highlightEnd = Math.min(endIdx, minIdx);
+            highlightStart = Math.max(0, minIdx - windowSize + 1);
+            highlightEnd = Math.min(validDates.length - 1, minIdx);
+            
             if (highlightEnd >= highlightStart) {
-                highlightVols = vol.slice(highlightStart - startIdx, highlightEnd - startIdx + 1);
-                highlightDates = dates.slice(highlightStart - startIdx, highlightEnd - startIdx + 1);
-                highlightStartDate = data.dates[highlightStart];
-                highlightEndDate = data.dates[highlightEnd];
+                highlightVols = validVol.slice(highlightStart, highlightEnd + 1);
+                highlightDates = parsedDates.slice(highlightStart, highlightEnd + 1);
+                highlightStartDate = validDates[highlightStart];
+                highlightEndDate = validDates[highlightEnd];
+                
                 const highlightLine = d3.line()
-                    .defined((d, i) => highlightVols[i] !== null)
+                    .defined((d, i) => isValidNumber(highlightVols[i]))
                     .x((d, i) => x(highlightDates[i]))
                     .y((d, i) => yLeft(highlightVols[i]));
+                
                 g.append('path')
                     .datum(highlightVols)
                     .attr('fill', 'none')
@@ -596,6 +821,7 @@ function renderVolatilityCorrelationChart(data) {
                     .attr('stroke-width', 2.5)
                     .attr('opacity', 0.95)
                     .attr('d', highlightLine);
+                
                 // Find the horizontal center and highest point of the highlight segment
                 let minY = highlightVols[0];
                 let maxY = highlightVols[0];
@@ -603,16 +829,18 @@ function renderVolatilityCorrelationChart(data) {
                     if (highlightVols[i] < minY) minY = highlightVols[i];
                     if (highlightVols[i] > maxY) maxY = highlightVols[i];
                 }
+                
                 // Center X between start and end of highlight segment
                 let centerIdx = Math.floor((highlightDates.length - 1) / 2);
                 let labelX = x(highlightDates[centerIdx]);
-                let labelY = yLeft(maxY) - 40; // 40px above the highest point of the orange line
-                labelX = Math.max(labelX, 60); // Clamp to left
-                labelX = Math.min(labelX, width - 100); // Clamp to right
-                labelY = Math.max(labelY, 20); // Clamp to top
+                let labelY = yLeft(maxY) - 40;
+                labelX = Math.max(labelX, 60);
+                labelX = Math.min(labelX, width - 100);
+                labelY = Math.max(labelY, 20);
                 highlightLabelX = labelX;
                 highlightLabelY = labelY;
                 highlightLabelText = 'Lowest Volatility';
+                
                 // Draw background rectangle for label
                 const textPadding = 4;
                 const tempText = g.append('text')
@@ -622,9 +850,11 @@ function renderVolatilityCorrelationChart(data) {
                     .attr('font-weight', 700)
                     .attr('fill', '#ff9800')
                     .text(highlightLabelText);
+                
                 const textWidth = tempText.node().getBBox().width;
                 const textHeight = tempText.node().getBBox().height;
                 tempText.remove();
+                
                 g.append('rect')
                     .attr('x', highlightLabelX - textPadding)
                     .attr('y', highlightLabelY - textHeight + textPadding)
@@ -633,6 +863,7 @@ function renderVolatilityCorrelationChart(data) {
                     .attr('fill', '#fff')
                     .attr('opacity', 0.85)
                     .lower();
+                
                 g.append('text')
                     .attr('x', highlightLabelX)
                     .attr('y', highlightLabelY)
@@ -643,10 +874,12 @@ function renderVolatilityCorrelationChart(data) {
             }
         }
     }
+    
     // Axes
     g.append('g')
         .attr('transform', `translate(0,${height})`)
         .call(d3.axisBottom(x).tickSizeOuter(0));
+    
     g.append('g')
         .call(d3.axisLeft(yLeft).ticks(6))
         .append('text')
@@ -657,7 +890,8 @@ function renderVolatilityCorrelationChart(data) {
         .attr('font-size', '1rem')
         .attr('font-weight', 600)
         .text('Volatility');
-    // --- Tooltip logic ---
+    
+    // Tooltip logic
     const tooltip = d3.select('#volatility-correlation-chart')
         .append('div')
         .attr('class', 'd3-tooltip')
@@ -671,6 +905,7 @@ function renderVolatilityCorrelationChart(data) {
         .style('color', '#183153')
         .style('box-shadow', '0 2px 8px rgba(24,49,83,0.13)')
         .style('display', 'none');
+    
     // Add invisible rect for mouse tracking
     svg.append('rect')
         .attr('x', margin.left)
@@ -682,35 +917,42 @@ function renderVolatilityCorrelationChart(data) {
         .on('mousemove', function(event) {
             const [mx] = d3.pointer(event, this);
             const x0 = x.invert(mx - margin.left);
-            let idx = d3.bisector(d => d).left(dates, x0, 1) - 1;
-            idx = Math.max(0, Math.min(idx, dates.length - 1));
-            if (!dates[idx]) return;
+            let idx = d3.bisector(d => d).left(parsedDates, x0, 1) - 1;
+            idx = Math.max(0, Math.min(idx, parsedDates.length - 1));
+            
+            if (!parsedDates[idx] || !isValidNumber(validVol[idx])) return;
+            
             // Highlight point
             g.selectAll('.hover-dot').remove();
             g.append('circle')
                 .attr('class', 'hover-dot')
-                .attr('cx', x(dates[idx]))
-                .attr('cy', yLeft(vol[idx]))
+                .attr('cx', x(parsedDates[idx]))
+                .attr('cy', yLeft(validVol[idx]))
                 .attr('r', 6)
                 .attr('fill', '#ff9800')
                 .attr('stroke', '#183153')
                 .attr('stroke-width', 2);
+            
             // Tooltip content
-            let html = `<b>${d3.timeFormat('%Y-%m-%d')(dates[idx])}</b><br>`;
-            html += `Volatility: <b>${vol[idx] !== null ? vol[idx].toFixed(4) : 'N/A'}</b><br>`;
+            let html = `<b>${d3.timeFormat('%Y-%m-%d')(parsedDates[idx])}</b><br>`;
+            html += `Volatility: <b>${isValidNumber(validVol[idx]) ? validVol[idx].toFixed(4) : 'N/A'}</b><br>`;
+            
             // Always show the lowest volatility window date range
             if (highlightStartDate && highlightEndDate) {
                 html += `<span style='color:#ff9800'><b>Lowest Volatility Window:</b><br>${highlightStartDate} to ${highlightEndDate}</span><br>`;
             }
+            
             // Always show news titles for this date
-            if (eventTitles && eventTitles[idx] && eventTitles[idx].length > 0) {
+            const eventIdx = startIdx + idx;
+            if (visibleEventTitles && visibleEventTitles[idx] && Array.isArray(visibleEventTitles[idx]) && visibleEventTitles[idx].length > 0) {
                 html += '<hr style="margin:4px 0;">';
                 html += '<b>News headlines:</b><ul style="margin:0 0 0 1em;padding:0;">';
-                eventTitles[idx].slice(0,3).forEach(title => {
+                visibleEventTitles[idx].slice(0,3).forEach(title => {
                     html += `<li>${title}</li>`;
                 });
                 html += '</ul>';
             }
+            
             tooltip.html(html)
                 .style('left', (event.offsetX + 30) + 'px')
                 .style('top', (event.offsetY - 30) + 'px')
@@ -720,15 +962,47 @@ function renderVolatilityCorrelationChart(data) {
             tooltip.style('display', 'none');
             g.selectAll('.hover-dot').remove();
         });
+    } catch (error) {
+        console.error('Error in renderVolatilityCorrelationChart:', error);
+        const chartDiv = document.getElementById('volatility-correlation-chart');
+        if (chartDiv) {
+            chartDiv.innerHTML = '<div class="alert alert-danger">Error rendering volatility chart. Please try again.</div>';
+        }
+    }
 }
 
 // Function to display regime analysis results
 function displayRegimeAnalysis(regimeData) {
-    const resultsDiv = document.getElementById('regime-analysis-results');
-    const statsDiv = document.getElementById('regime-statistics');
-    const periodsDiv = document.getElementById('regime-periods');
+    console.log('displayRegimeAnalysis called with:', regimeData);
     
-    if (!resultsDiv || !statsDiv || !periodsDiv) return;
+    try {
+        const resultsDiv = document.getElementById('regime-analysis-results');
+        const statsDiv = document.getElementById('regime-statistics');
+        const periodsDiv = document.getElementById('regime-periods');
+        
+        if (!resultsDiv || !statsDiv || !periodsDiv) {
+            console.warn('Required DOM elements not found for regime analysis display');
+            return;
+        }
+        
+        // Check if regimeData is valid
+        if (!regimeData || typeof regimeData !== 'object') {
+            console.warn('Invalid regime data received:', regimeData);
+            return;
+        }
+        
+        // Additional safety check for null/undefined values
+        if (regimeData === null || regimeData === undefined) {
+            console.warn('Regime data is null or undefined');
+            return;
+        }
+        
+        console.log('Regime data validation passed, processing...');
+        
+        // Log all properties of regimeData to debug
+        console.log('RegimeData properties:', Object.keys(regimeData));
+        console.log('RegimeData.regime_distribution:', regimeData.regime_distribution);
+        console.log('RegimeData.regime_distribution type:', typeof regimeData.regime_distribution);
     
     resultsDiv.style.display = 'block';
     
@@ -736,85 +1010,94 @@ function displayRegimeAnalysis(regimeData) {
     const currentInfo = document.createElement('div');
     currentInfo.className = 'alert alert-info mb-3';
     currentInfo.innerHTML = `
-        <strong>${regimeData.symbol} - Current Regime: </strong>
-        <span class="badge bg-primary">${regimeData.current_regime}</span><br>
-        <small>Current Volatility: ${regimeData.current_volatility}% | Window: ${regimeData.rolling_window} days | Period: ${regimeData.analysis_period}</small>
+        <strong>${regimeData.symbol || 'Unknown'} - Current Regime: </strong>
+        <span class="badge bg-primary">${regimeData.regime || 'Unknown'}</span><br>
+        <small>Current Volatility: ${regimeData.current_volatility || 0}% | Average Volatility: ${regimeData.average_volatility || 0}% | Trend: ${regimeData.volatility_trend || 'Unknown'}</small>
     `;
     resultsDiv.insertBefore(currentInfo, resultsDiv.firstChild);
     
-    // Display regime statistics
+    // Display regime statistics - handle the actual response structure from the backend
     statsDiv.innerHTML = '';
-    Object.entries(regimeData.regime_statistics).forEach(([regime, stats]) => {
-        const getRegimeColor = (regime) => {
-            switch (regime) {
-                case 'Low Volatility': return '#10b981';
-                case 'Medium Volatility': return '#f59e0b';
-                case 'High Volatility': return '#ef4444';
-                case 'Extreme Volatility': return '#7c3aed';
-                default: return '#6b7280';
-            }
-        };
-        
-        const card = document.createElement('div');
-        card.className = 'col-md-6 col-lg-3 mb-3';
-        card.innerHTML = `
-            <div class="card h-100" style="border-left: 4px solid ${getRegimeColor(regime)}">
-                <div class="card-body">
-                    <h6 class="card-title">${regime}</h6>
-                    <div class="row">
-                        <div class="col-6">
-                            <small class="text-muted">Count</small>
-                            <div class="fw-bold">${stats.count}</div>
+    
+    // Handle the actual response structure from the backend
+    const regimeDistribution = regimeData.regime_distribution || {};
+    console.log('Regime distribution:', regimeDistribution);
+    
+    // Additional safety check for regime distribution
+    if (!regimeDistribution || typeof regimeDistribution !== 'object') {
+        console.warn('Invalid regime distribution data:', regimeDistribution);
+        return;
+    }
+    
+    // Use the actual backend data structure
+    const safeRegimeDistribution = {
+        high_volatility_periods: regimeDistribution.high_volatility_periods || 0,
+        low_volatility_periods: regimeDistribution.low_volatility_periods || 0,
+        normal_volatility_periods: regimeDistribution.normal_volatility_periods || 0
+    };
+    
+    const regimes = [
+        { name: 'High Volatility', count: safeRegimeDistribution.high_volatility_periods, color: '#ef4444' },
+        { name: 'Normal Volatility', count: safeRegimeDistribution.normal_volatility_periods, color: '#f59e0b' },
+        { name: 'Low Volatility', count: safeRegimeDistribution.low_volatility_periods, color: '#10b981' }
+    ];
+    
+    regimes.forEach(regime => {
+        try {
+            const card = document.createElement('div');
+            card.className = 'col-md-6 col-lg-3 mb-3';
+            card.innerHTML = `
+                <div class="card h-100" style="border-left: 4px solid ${regime.color}">
+                    <div class="card-body">
+                        <h6 class="card-title">${regime.name}</h6>
+                        <div class="row">
+                            <div class="col-12">
+                                <small class="text-muted">Periods</small>
+                                <div class="fw-bold">${regime.count}</div>
+                            </div>
                         </div>
-                        <div class="col-6">
-                            <small class="text-muted">Avg Vol</small>
-                            <div class="fw-bold">${stats.avg_volatility}%</div>
-                        </div>
-                    </div>
-                    <div class="row mt-2">
-                        <div class="col-6">
-                            <small class="text-muted">Min-Max</small>
-                            <div class="fw-bold">${stats.min_volatility}%-${stats.max_volatility}%</div>
-                        </div>
-                        <div class="col-6">
-                            <small class="text-muted">Time %</small>
-                            <div class="fw-bold">${stats.percentage_of_time}%</div>
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <small class="text-muted">Current Volatility</small>
+                                <div class="fw-bold">${regimeData.current_volatility || 0}%</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
-        statsDiv.appendChild(card);
+            `;
+            statsDiv.appendChild(card);
+        } catch (error) {
+            console.error('Error creating regime card:', error);
+        }
     });
     
-    // Display regime periods
-    periodsDiv.innerHTML = `
-        <h6 class="mb-3">Regime Periods</h6>
-        <div class="table-responsive">
-            <table class="table table-sm">
-                <thead>
-                    <tr>
-                        <th>Start Date</th>
-                        <th>End Date</th>
-                        <th>Regime</th>
-                        <th>Avg Volatility</th>
-                        <th>Duration (days)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${regimeData.regime_periods.map(period => `
-                        <tr>
-                            <td>${period.start_date}</td>
-                            <td>${period.end_date}</td>
-                            <td>${period.regime}</td>
-                            <td>${period.avg_volatility}%</td>
-                            <td>${period.duration_days}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
-    `;
+    // Display additional metrics if available
+    try {
+        if (regimeData.rolling_volatility && Array.isArray(regimeData.rolling_volatility) && regimeData.rolling_volatility.length > 0) {
+            periodsDiv.innerHTML = `
+                <h6 class="mb-3">Recent Volatility Trend (Last ${regimeData.rolling_volatility.length} periods)</h6>
+                <div class="alert alert-secondary">
+                    <strong>Latest Volatility Values:</strong><br>
+                    ${regimeData.rolling_volatility.slice(-10).map(v => v.toFixed(2)).join('%, ')}%
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">Total periods analyzed: ${regimeData.rolling_volatility.length}</small>
+                </div>
+            `;
+        } else {
+            periodsDiv.innerHTML = '<p class="text-muted">No additional volatility data available.</p>';
+        }
+    } catch (error) {
+        console.error('Error displaying rolling volatility:', error);
+        periodsDiv.innerHTML = '<p class="text-muted">Error displaying volatility data.</p>';
+    }
+    } catch (error) {
+        console.error('Error in displayRegimeAnalysis:', error);
+        const resultsDiv = document.getElementById('regime-analysis-results');
+        if (resultsDiv) {
+            resultsDiv.innerHTML = '<div class="alert alert-danger">Error displaying regime analysis. Please try again.</div>';
+        }
+    }
 }
 
 window.fetchTweetVolatilityAnalysis = function() {
@@ -1167,162 +1450,14 @@ window.fetchTweetVolatilityAnalysis = function() {
   }
 })();
 
-// Investment Playbooks Tool Component
-(function() {
-  const e = React.createElement;
 
-  function InvestmentPlaybooksTool() {
-    const [playbooks, setPlaybooks] = React.useState([]);
-    const [companies, setCompanies] = React.useState([]);
-    const [selectedPlaybook, setSelectedPlaybook] = React.useState('');
-    const [symbol, setSymbol] = React.useState('');
-    const [loading, setLoading] = React.useState(false);
-    const [result, setResult] = React.useState(null);
-    const [error, setError] = React.useState(null);
-
-    React.useEffect(() => {
-      fetch('/playbooks')
-        .then(res => {
-          if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-          return res.json();
-        })
-        .then(data => {
-          if (Array.isArray(data)) {
-            setPlaybooks(data);
-            if (data.length > 0) setSelectedPlaybook(data[0].name);
-          } else {
-            throw new Error('Received invalid playbook data from server.');
-          }
-        })
-        .catch(err => {
-          console.error("Error fetching playbooks:", err);
-          setError('Could not fetch playbooks. Please ensure the server is running and the route is available.');
-        });
-
-      fetch('/available_companies')
-        .then(res => {
-            if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-            return res.json();
-        })
-        .then(data => {
-            if (Array.isArray(data)) {
-                setCompanies(data);
-                if (data.length > 0) setSymbol(data[0].symbol);
-            } else {
-                throw new Error('Received invalid company data from server.');
-            }
-        })
-        .catch(err => {
-            console.error("Error fetching companies:", err);
-            setError(prev => prev ? `${prev} And could not fetch companies.` : 'Could not fetch companies.');
-        });
-    }, []);
-
-    const handleAnalyze = async (ev) => {
-      if (ev) ev.preventDefault();
-      if (!symbol || !selectedPlaybook) return;
-
-      setLoading(true);
-      setError(null);
-      setResult(null);
-
-      try {
-        const resp = await fetch('/analyze_playbook', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol: symbol.toUpperCase(), playbook_name: selectedPlaybook })
-        });
-        
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'Analysis failed');
-        setResult(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const currentPlaybook = playbooks.find(p => p.name === selectedPlaybook);
-
-    const metricExplanations = {
-      "debt_to_equity": "Debt-to-Equity: This ratio compares a company's total liabilities to its shareholder equity. A high value can be a sign of high risk.",
-      "eps_growth": "EPS Growth: This is the quarter-over-quarter growth in the company's Earnings Per Share. A positive value shows that the company's profitability is growing.",
-      "operating_cash_flow": "Operating Cash Flow: This is the cash generated from the company's core business operations. A large, positive number is a strong sign of financial health.",
-      "pe_ratio": "P/E Ratio: The Price-to-Earnings ratio compares the company's stock price to its earnings per share. A high P/E suggests that investors have high expectations for future growth.",
-      "profit_margin": "Profit Margin: This shows how much profit the company makes for every dollar of revenue. A high profit margin indicates a very profitable business.",
-      "roe": "ROE (Return on Equity): This measures how effectively the company uses shareholder investments to generate profit. A high ROE signals efficient management."
-    };
-
-    return e('div', { className: 'investment-agent-tool', style: { maxWidth: '800px', margin: '0 auto' } },
-      e('form', { className: 'row g-3 align-items-end mb-4', onSubmit: handleAnalyze },
-        e('div', { className: 'col-md-5' },
-          e('label', { htmlFor: 'playbook-select', className: 'form-label' }, 'Select Playbook'),
-          e('select', { id: 'playbook-select', className: 'form-select', value: selectedPlaybook, onChange: ev => setSelectedPlaybook(ev.target.value) },
-            playbooks.map(playbook => e('option', { key: playbook.name, value: playbook.name }, playbook.name))
-          )
-        ),
-        e('div', { className: 'col-md-4' },
-          e('label', { htmlFor: 'agent-symbol', className: 'form-label' }, 'Stock Symbol'),
-          e('select', { id: 'agent-symbol', className: 'form-select', value: symbol, onChange: ev => setSymbol(ev.target.value) },
-            companies.map(company => e('option', { key: company.symbol, value: company.symbol }, `${company.name} (${company.symbol})`))
-          )
-        ),
-        e('div', { className: 'col-md-3' },
-          e('button', { type: 'submit', className: 'btn btn-primary w-100', disabled: loading || !symbol || !selectedPlaybook }, loading ? 'Analyzing...' : 'Analyze')
-        )
-      ),
-
-      currentPlaybook && e('div', { className: 'card bg-light mb-4' },
-        e('div', { className: 'card-body' },
-          e('h5', { className: 'card-title' }, currentPlaybook.name),
-          e('h6', { className: 'card-subtitle mb-2 text-muted' }, currentPlaybook.role),
-          e('p', { className: 'card-text' }, e('strong', null, 'Philosophy: '), currentPlaybook.philosophy)
-        )
-      ),
-
-      error && e('div', { className: 'alert alert-danger' }, error),
-
-      loading && e('div', { className: 'text-center p-5' }, e('div', { className: 'spinner-border', role: 'status' })),
-
-      result && e('div', { className: 'card' },
-        e('div', { className: 'card-header' }, `Analysis for ${symbol} by ${result.playbook.name}`),
-        e('div', { className: 'card-body' },
-          e('h5', { className: 'card-title' }, `Decision: ${result.decision}`),
-          e('p', { className: 'card-text' }, e('strong', null, 'Reasons:')),
-          e('ul', { className: 'list-group list-group-flush' },
-            result.reasons.map((reason, i) => e('li', { key: i, className: 'list-group-item' }, reason))
-          ),
-          e('hr'),
-          e('p', { className: 'card-text mt-3' }, e('strong', null, 'Key Metrics:')),
-          e('ul', { className: 'list-group list-group-flush' },
-            Object.entries(result.stock_data).map(([key, value]) => 
-              e('li', { key: key, className: 'list-group-item' },
-                e('div', { className: 'tooltip-container' },
-                  `${key.replace(/_/g, ' ')}:`,
-                  e('span', { className: 'tooltip-text' }, metricExplanations[key])
-                ),
-                ` ${value !== null ? parseFloat(value).toFixed(2) : 'N/A'}`
-              )
-            )
-          )
-        )
-      )
-    );
-  }
-
-  const root = document.getElementById('react-investment-playbooks-tool');
-  if (root && window.React && window.ReactDOM) {
-    ReactDOM.createRoot(root).render(React.createElement(InvestmentPlaybooksTool));
-  }
-})();
 
 // DeepSeek Chatbot Component
 (function() {
   const e = React.createElement;
 
   function DeepSeekChatbot() {
-    const [message, setMessage] = React.useState("Show Apple stock's performance by checking how much return it gave for the risk taken and how much it fell from its highest point with specific days performance");
+    const [message, setMessage] = React.useState("How would you use Monte Carlo simulation to estimate the probability that Tesla's stock price will exceed $1,000 in the next 12 months?");
     const [conversation, setConversation] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
@@ -1367,7 +1502,7 @@ window.fetchTweetVolatilityAnalysis = function() {
           // Show demo if API is configured and we haven't shown it yet
           if (data.api_configured && !hasShownDemo) {
             setTimeout(() => {
-              handleSubmit(null, "Show Apple stock's performance by checking how much return it gave for the risk taken and how much it fell from its highest point with specific days performance");
+              handleSubmit(null, "How would you use Monte Carlo simulation to estimate the probability that Tesla's stock price will exceed $1,000 in the next 12 months?");
               setHasShownDemo(true);
             }, 1000);
           }
@@ -1881,7 +2016,7 @@ window.fetchTweetVolatilityAnalysis = function() {
       e('div', { className: 'chat-input' },
         e('textarea', {
           className: 'form-control',
-          placeholder: 'Type your message here...',
+                          placeholder: 'Ask me about any stock! Try: "Analyze AAPL performance and risk metrics" or "What is the current valuation of MSFT?"',
           value: message,
           onChange: ev => setMessage(ev.target.value),
           onKeyPress: ev => ev.key === 'Enter' && !ev.shiftKey && handleSubmit(ev)
@@ -2681,3 +2816,24 @@ window.showRateLimitWarning = function(message) {
         }
     }, 10000);
 };
+
+// Initialize volatility chart state
+window._volatilityChartState = {
+    data: null,
+    range: [0, 0]
+};
+
+// Add validation helper function
+function isValidNumber(value) {
+    return value !== null && value !== undefined && !isNaN(value) && isFinite(value);
+}
+
+function isValidDate(dateStr) {
+    if (!dateStr) return false;
+    try {
+        const date = new Date(dateStr);
+        return !isNaN(date.getTime());
+    } catch (e) {
+        return false;
+    }
+}
