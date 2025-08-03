@@ -9,6 +9,7 @@ slowapi==0.1.9
 pydantic-settings==2.1.0
 redis==5.0.1
 psutil==5.9.8
+python-dotenv==1.0.0
 
 # Existing dependencies
 yfinance==0.2.63
