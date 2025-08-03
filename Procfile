@@ -1,1 +1,1 @@
-web: gunicorn main:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --worker-class gthread --timeout 300 --keep-alive 5 --max-requests 1000 --max-requests-jitter 50 --log-level info 
+web: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2 --timeout-keep-alive 300 --log-level info 
