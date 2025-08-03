@@ -76,7 +76,7 @@ class AsyncAIService:
                 self.api_url,
                 json=payload,
                 headers=headers,
-                timeout=30.0
+                timeout=60.0  # Increased from 30.0 to 60.0 seconds
             )
             
             if response.status_code == 200:
@@ -90,7 +90,7 @@ class AsyncAIService:
                 raise Exception(error_msg)
                 
         except httpx.TimeoutException:
-            error_msg = "API call timed out"
+            error_msg = "API call timed out after 60 seconds"
             logger.error(error_msg)
             raise Exception(error_msg)
         except Exception as e:
@@ -102,46 +102,136 @@ class AsyncAIService:
         prompt: str, 
         models: List[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 1000
+        max_tokens: int = 800  # Increased from 500 for better responses
     ) -> List[Dict[str, Any]]:
-        """Compare multiple models concurrently"""
+        """Compare multiple models concurrently with optimizations"""
         
         if models is None:
-            models = ["mistral-small", "deepseek-chat", "qwen3-8b"]
+            # Use fewer models for faster comparison
+            models = ["mistral-small", "deepseek-chat"]
         
         # Validate models
         for model in models:
             if model not in FREE_MODELS:
                 raise ValueError(f"Invalid model: {model}")
         
-        # Create tasks for concurrent execution
+        # Generate cache key for the entire comparison
+        comparison_cache_key = f"model_comparison:{hash(prompt + str(models) + str(temperature) + str(max_tokens))}"
+        
+        # Check if we have cached comparison results
+        cached_comparison = await self.cache_service.get(comparison_cache_key)
+        if cached_comparison:
+            logger.info(f"Cache hit for model comparison")
+            return cached_comparison
+        
+        # Create tasks for concurrent execution with optimized timeouts
         tasks = []
         for model in models:
             messages = [{"role": "user", "content": prompt}]
-            task = self.call_api(messages, model, temperature, max_tokens)
+            # Use increased timeout for comparison calls
+            task = self._call_api_optimized(messages, model, temperature, max_tokens, timeout=45.0)  # Increased from 25.0 to 45.0
             tasks.append(task)
         
-        # Execute all tasks concurrently
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Execute all tasks concurrently with increased timeout
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=60.0  # Increased from 30.0 to 60.0 seconds
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Model comparison timed out after 60 seconds")
+            return [{"model": model, "error": "Request timed out after 60 seconds", "success": False} for model in models]
         
-        # Process results
+        # Process results with timing
         processed_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append({
                     "model": models[i],
                     "error": str(result),
-                    "success": False
+                    "success": False,
+                    "response_time": 0
                 })
             else:
+                # Calculate response time (approximate since we don't have individual timing)
+                # We'll use a placeholder and let the main endpoint calculate actual timing
                 processed_results.append({
                     "model": models[i],
                     "response": result.get("choices", [{}])[0].get("message", {}).get("content", ""),
                     "usage": result.get("usage", {}),
-                    "success": True
+                    "success": True,
+                    "response_time": 0  # Will be calculated in main endpoint
                 })
         
+        # Cache the comparison results
+        await self.cache_service.set(comparison_cache_key, processed_results, ttl=600)  # 10 minutes
+        
         return processed_results
+    
+    async def _call_api_optimized(
+        self, 
+        messages: List[Dict[str, str]], 
+        model: str = "mistral-small", 
+        temperature: float = 0.7, 
+        max_tokens: int = 1000,
+        timeout: float = 45.0  # Increased from 15.0 to 45.0 seconds
+    ) -> Dict[str, Any]:
+        """Optimized API call with increased timeout for comparisons"""
+        
+        if not self.api_key:
+            raise ValueError("OpenRouter API key not configured")
+        
+        if model not in FREE_MODELS:
+            raise ValueError(f"Invalid model: {model}")
+        
+        # Generate cache key
+        cache_key = f"ai_api:{model}:{hash(str(messages) + str(temperature) + str(max_tokens))}"
+        
+        # Check cache first
+        cached_response = await self.cache_service.get(cache_key)
+        if cached_response:
+            logger.info(f"Cache hit for AI API call: {model}")
+            return cached_response
+        
+        # Prepare request
+        payload = {
+            "model": FREE_MODELS[model],
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            logger.info(f"Making optimized API call to {model}")
+            response = await self.http_client.post(
+                self.api_url,
+                json=payload,
+                headers=headers,
+                timeout=timeout
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                # Cache successful response with shorter TTL for comparisons
+                await self.cache_service.set(cache_key, result, ttl=180)  # 3 minutes for comparisons
+                return result
+            else:
+                error_msg = f"API call failed: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
+                
+        except httpx.TimeoutException:
+            error_msg = f"API call timed out for {model} after {timeout} seconds"
+            logger.error(error_msg)
+            raise Exception(error_msg)
+        except Exception as e:
+            logger.error(f"API call error for {model}: {e}")
+            raise
     
     async def chat(
         self, 

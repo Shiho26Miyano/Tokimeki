@@ -64,7 +64,7 @@ async def chat(
             max_tokens = int(form_data.get("max_tokens", 1000))
         
         # Validate model
-        if model not in ["mistral-small", "deepseek-chat", "qwen3-8b", "gemma-3n"]:
+        if model not in ["mistral-small", "deepseek-chat", "deepseek-r1", "llama-3.1-405b"]:
             raise HTTPException(status_code=400, detail="Invalid model specified")
         
         if not message:
@@ -142,7 +142,7 @@ async def compare_models(
         # Validate models if provided
         if models:
             for model in models:
-                if model not in ["mistral-small", "deepseek-chat", "qwen3-8b", "gemma-3n"]:
+                if model not in ["mistral-small", "deepseek-chat", "deepseek-r1", "llama-3.1-405b"]:
                     raise HTTPException(status_code=400, detail=f"Invalid model: {model}")
         
         if not prompt:

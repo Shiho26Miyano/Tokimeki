@@ -1,7 +1,9 @@
 # FastAPI Migration Dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-httpx==0.25.2
+gunicorn==21.2.0
+httpx[http2]==0.25.2
+h2==4.2.0
 python-multipart==0.0.6
 slowapi==0.1.9
 pydantic-settings==2.1.0

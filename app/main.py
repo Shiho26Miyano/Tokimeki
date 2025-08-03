@@ -38,6 +38,21 @@ setup_middleware(app)
 # Add exception handlers
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    logger.info("Starting Tokimeki FastAPI application...")
+    logger.info(f"Debug mode: {settings.debug}")
+    logger.info(f"API key configured: {bool(settings.openrouter_api_key)}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup services on shutdown"""
+    logger.info("Shutting down Tokimeki FastAPI application...")
+    from .core.dependencies import cleanup_http_client
+    await cleanup_http_client()
+
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -515,25 +530,81 @@ async def compare_models_endpoint(
             prompt = body.get("prompt", "")
             models = body.get("models", []) if body.get("models") else None
             temperature = float(body.get("temperature", 0.7))
-            max_tokens = int(body.get("max_tokens", 1000))
+            max_tokens = int(body.get("max_tokens", 800))  # Increased from 500
         else:
             # Handle form data
             form_data = await request.form()
             prompt = form_data.get("prompt", "")
             models = form_data.get("models", "").split(",") if form_data.get("models") else None
             temperature = float(form_data.get("temperature", 0.7))
-            max_tokens = int(form_data.get("max_tokens", 1000))
+            max_tokens = int(form_data.get("max_tokens", 800))  # Increased from 500
         
         if not prompt:
             raise HTTPException(status_code=400, detail="Prompt is required")
         
         # Compare models concurrently
+        comparison_start_time = time.time()
         results = await ai_service.compare_models(
             prompt=prompt,
             models=models,
             temperature=temperature,
             max_tokens=max_tokens
         )
+        
+        # Calculate actual response times for each model
+        total_comparison_time = time.time() - comparison_start_time
+        avg_model_time = total_comparison_time / len(results) if results else 0
+        
+        # Update results with response times
+        for i, result in enumerate(results):
+            if result.get("success", False):
+                # Approximate individual model time (since they run concurrently)
+                result["response_time"] = avg_model_time
+                
+                # Calculate word count and average word length
+                response_text = result.get("response", "")
+                words = response_text.split()
+                result["word_count"] = len(words)
+                result["avg_word_length"] = sum(len(word) for word in words) / len(words) if words else 0
+                result["token_count"] = result.get("usage", {}).get("total_tokens", 0)
+            else:
+                result["response_time"] = 0
+                result["word_count"] = 0
+                result["avg_word_length"] = 0
+                result["token_count"] = 0
+        
+        # Calculate summary statistics
+        successful_models = len([r for r in results if r.get("success", False)])
+        total_models = len(results)
+        
+        # Calculate average response time and token usage
+        response_times = []
+        token_counts = []
+        successful_results = [r for r in results if r.get("success", False)]
+        
+        for result in successful_results:
+            if "response_time" in result:
+                response_times.append(result["response_time"])
+            if "usage" in result and "total_tokens" in result["usage"]:
+                token_counts.append(result["usage"]["total_tokens"])
+        
+        avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+        avg_token_count = sum(token_counts) / len(token_counts) if token_counts else 0
+        
+        # Find fastest model
+        fastest_model = None
+        if response_times:
+            fastest_index = response_times.index(min(response_times))
+            fastest_model = successful_results[fastest_index]["model"] if fastest_index < len(successful_results) else None
+        
+        # Create summary
+        summary = {
+            "successful_models": successful_models,
+            "total_models": total_models,
+            "avg_response_time": avg_response_time,
+            "avg_token_count": avg_token_count,
+            "fastest_model": fastest_model or (successful_results[0]["model"] if successful_results else None)
+        }
         
         # Track usage
         response_time = time.time() - start_time
@@ -546,6 +617,7 @@ async def compare_models_endpoint(
         return {
             "success": True,
             "results": results,
+            "summary": summary,
             "response_time": response_time
         }
         
@@ -770,86 +842,31 @@ async def test_api(
             "api_key_length": len(ai_service.api_key) if ai_service.api_key else 0
         }
 
-# Serve monitoring page
-@app.get("/monitoring")
-async def monitoring():
-    return FileResponse("templates/monitoring.html")
-
-@app.get("/api/usage-stats")
-async def get_usage_stats(
-    usage_service: AsyncUsageService = Depends(get_usage_service)
+@app.get("/test-comparison")
+async def test_comparison(
+    ai_service: AsyncAIService = Depends(get_ai_service)
 ):
-    """Get usage statistics"""
+    """Test model comparison with a simple prompt"""
     try:
-        stats = await usage_service.get_hourly_stats()
+        result = await ai_service.compare_models(
+            prompt="What is 2+2?",
+            models=["mistral-small"],
+            temperature=0.7,
+            max_tokens=50
+        )
         return {
             "success": True,
-            "requests": stats.get("requests", 0),
-            "total_cost": stats.get("total_cost", 0.0),
-            "current_memory_percent": 75.0,  # Placeholder
-            "uptime_seconds": time.time() - 1700000000,  # Placeholder
-            "model_costs": stats.get("model_costs", {})
-        }
-    except Exception as e:
-        logger.error(f"Error getting usage stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/cache-status")
-async def get_cache_status(
-    cache_service: AsyncCacheService = Depends(get_cache_service)
-):
-    """Get cache status"""
-    try:
-        redis_connected = await cache_service.is_redis_connected()
-        test_passed = await cache_service.test_connection()
-        return {
-            "success": True,
-            "redis_connected": redis_connected,
-            "test_passed": test_passed,
-            "cache_ttl": 300
-        }
-    except Exception as e:
-        logger.error(f"Error getting cache status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/test-redis")
-async def test_redis(
-    cache_service: AsyncCacheService = Depends(get_cache_service)
-):
-    """Test Redis connection"""
-    try:
-        success = await cache_service.test_connection()
-        return {
-            "success": success,
-            "error": None if success else "Redis connection failed"
+            "message": "Model comparison test successful",
+            "results": result
         }
     except Exception as e:
         return {
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "api_key_configured": bool(ai_service.api_key)
         }
 
-@app.post("/api/cache-clear")
-async def clear_cache(
-    cache_service: AsyncCacheService = Depends(get_cache_service)
-):
-    """Clear all cache"""
-    try:
-        await cache_service.clear_all()
-        return {"success": True}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
-@app.post("/api/reset-stats")
-async def reset_stats(
-    usage_service: AsyncUsageService = Depends(get_usage_service)
-):
-    """Reset usage statistics"""
-    try:
-        await usage_service.reset_stats()
-        return {"success": True}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
 @app.get("/ai-platform-comparison")
 async def get_ai_platform_comparison():

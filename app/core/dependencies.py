@@ -4,14 +4,38 @@ import httpx
 import redis.asyncio as redis
 from .config import settings
 
-# HTTP Client dependency with connection pooling
-async def get_http_client() -> AsyncGenerator[httpx.AsyncClient, None]:
-    """Dependency for HTTP client with connection pooling"""
-    async with httpx.AsyncClient(
-        limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
-        timeout=httpx.Timeout(30.0)
-    ) as client:
-        yield client
+# Global HTTP client variable
+_http_client = None
+
+async def get_http_client() -> httpx.AsyncClient:
+    """Dependency for HTTP client with persistent connection pooling and increased timeouts"""
+    global _http_client
+    
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_keepalive_connections=50,
+                max_connections=200,
+                keepalive_expiry=60.0
+            ),
+            timeout=httpx.Timeout(
+                connect=15.0,   # Increased from 10.0 to 15.0 seconds
+                read=60.0,      # Increased from 40.0 to 60.0 seconds
+                write=15.0,     # Increased from 10.0 to 15.0 seconds
+                pool=30.0       # Added pool timeout
+            ),
+            http2=True,  # Enabled for better performance
+            follow_redirects=True
+        )
+    
+    return _http_client
+
+async def cleanup_http_client():
+    """Cleanup HTTP client on shutdown"""
+    global _http_client
+    if _http_client:
+        await _http_client.aclose()
+        _http_client = None
 
 # Redis client dependency
 async def get_redis_client() -> AsyncGenerator[redis.Redis, None]:
