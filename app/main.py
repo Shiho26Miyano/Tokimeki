@@ -551,6 +551,7 @@ async def compare_models_endpoint(
             max_tokens=max_tokens
         )
         
+        
         # Calculate actual response times for each model
         total_comparison_time = time.time() - comparison_start_time
         avg_model_time = total_comparison_time / len(results) if results else 0
