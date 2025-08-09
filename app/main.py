@@ -53,8 +53,18 @@ async def shutdown_event():
     from .core.dependencies import cleanup_http_client
     await cleanup_http_client()
 
-# Mount static files
+# Mount static files with cache busting
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Add middleware to prevent caching of static files
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 # Add favicon route
 @app.get("/favicon.ico")
@@ -384,7 +394,11 @@ async def get_stock_symbols_endpoint():
 # Root endpoint - serve the main HTML page
 @app.get("/")
 async def root():
-    return FileResponse("static/index.html")
+    response = FileResponse("static/index.html")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # Add missing root-level endpoints for backward compatibility
 @app.post("/analyze")
