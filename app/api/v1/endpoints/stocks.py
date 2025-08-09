@@ -38,6 +38,7 @@ async def analyze_stock(
     try:
         # Validate symbol
         symbol = request.symbol.upper()
+        logger.info(f"Starting stock analysis for {symbol} with strategy {request.strategy}")
         
         # Get stock data and perform analysis
         result = await stock_service.analyze_stock(
@@ -45,6 +46,12 @@ async def analyze_stock(
             strategy=request.strategy,
             period=request.period
         )
+        
+        if not result:
+            logger.error(f"No result returned from stock service for {symbol}")
+            raise HTTPException(status_code=500, detail="Stock analysis failed - no result returned")
+        
+        logger.info(f"Stock analysis completed for {symbol}: {result}")
         
         # Track usage
         response_time = time.time() - start_time
@@ -74,8 +81,17 @@ async def analyze_stock(
             error=str(e)
         )
         
-        logger.error(f"Stock analysis error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Stock analysis error for {request.symbol}: {e}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error details: {str(e)}")
+        
+        # Return a more detailed error response
+        if "No data available" in str(e):
+            raise HTTPException(status_code=404, detail=f"No stock data available for {request.symbol}")
+        elif "yfinance" in str(e).lower():
+            raise HTTPException(status_code=503, detail="Stock data service temporarily unavailable")
+        else:
+            raise HTTPException(status_code=500, detail=f"Stock analysis failed: {str(e)}")
 
 @router.get("/history")
 async def get_stock_history(

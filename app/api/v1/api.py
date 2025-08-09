@@ -27,6 +27,68 @@ async def api_info():
             "stocks": "/stocks", 
             "sentiment": "/sentiment",
             "speech": "/speech",
-            "monitoring": "/monitoring"
+            "monitoring": "/monitoring",
+            "rag": "/rag"
+        }
+    }
+
+# Add model comparison endpoint
+@api_router.get("/model-comparison")
+async def get_model_comparison():
+    """Get model comparison data"""
+    models = [
+        {
+            "name": "Mistral Small",
+            "provider": "Mistral AI",
+            "context_window": "32K",
+            "performance": "High",
+            "model_size": "7B",
+            "best_for": ["General purpose"],
+            "strengths": ["Fast", "efficient", "good reasoning"],
+            "note": "Excellent balance of speed and capability",
+            "notes": "Excellent balance of speed and capability"
+        },
+        {
+            "name": "DeepSeek Chat",
+            "provider": "DeepSeek",
+            "context_window": "128K",
+            "performance": "Very High",
+            "model_size": "67B",
+            "best_for": ["Complex reasoning"],
+            "strengths": ["Strong reasoning", "long context"],
+            "note": "Best for complex tasks",
+            "notes": "Best for complex tasks"
+        },
+        {
+            "name": "Qwen 3 8B",
+            "provider": "Alibaba",
+            "context_window": "32K",
+            "performance": "High",
+            "model_size": "8B",
+            "best_for": ["Code and reasoning"],
+            "strengths": ["Good coding", "efficient"],
+            "note": "Strong for technical tasks",
+            "notes": "Strong for technical tasks"
+        }
+    ]
+    
+    return {
+        "success": True,
+        "models": models
+    }
+
+# Add test endpoint to verify API is working
+@api_router.get("/test")
+async def test_api():
+    """Test endpoint to verify API is working"""
+    return {
+        "success": True,
+        "message": "API is working",
+        "timestamp": "2025-01-01",
+        "endpoints": {
+            "stocks": "/api/v1/stocks",
+            "chat": "/api/v1/chat",
+            "rag": "/api/v1/rag",
+            "monitoring": "/api/v1/monitoring"
         }
     } 
