@@ -2642,3 +2642,329 @@ function isValidDate(dateStr) {
         return false;
     }
 }
+
+// --- RAG Business Intelligence Tab (mount on demand and on load) ---
+(function() {
+  if (!(window.React && window.ReactDOM)) return;
+  const e = React.createElement;
+
+  function RAGBI() {
+    const [corpusId, setCorpusId] = React.useState('demo');
+    const [question, setQuestion] = React.useState('What were the key technological, scientific, and societal impacts of the Apollo 11 Moon landing?');
+    const [ingestText, setIngestText] = React.useState('The Apollo 11 Moon landing in July 1969 marked a monumental technological breakthrough—it required the development of the Saturn V rocket, a powerful multi-stage launch vehicle, precise guidance systems, and a complex rendezvous and docking procedure in lunar orbit. Scientifically, the mission brought back 47.5 lb (21.5 kg) of lunar rocks and soil, deployed instruments like the laser retroreflector and seismometer, and enabled groundbreaking insights into lunar geology, the Earth–Moon system’s formation, and solar wind interaction with unshielded surfaces. Socially, the mission captivated approximately 600 million viewers worldwide, symbolized Cold War-era technological leadership, inspired generations of scientists and engineers, and left a lasting cultural legacy embedded in media, education, and collective human aspirations.');
+    const [loading, setLoading] = React.useState(false);
+    const [answer, setAnswer] = React.useState('');
+    const [error, setError] = React.useState('');
+    const [insights, setInsights] = React.useState([]);
+    const [risks, setRisks] = React.useState([]);
+    const [nextSteps, setNextSteps] = React.useState([]);
+    const [sources, setSources] = React.useState([]);
+    const [timings, setTimings] = React.useState({});
+    const [graph, setGraph] = React.useState(null);
+    const [ingested, setIngested] = React.useState(false);
+    const [health, setHealth] = React.useState(null);
+    const [elapsedSec, setElapsedSec] = React.useState(0);
+    const timerRef = React.useRef(null);
+    const [urlBusy, setUrlBusy] = React.useState(false);
+    const [urlMsg, setUrlMsg] = React.useState('');
+
+    React.useEffect(() => {
+      fetch('/api/v1/rag/health').then(r => r.json()).then(d => setHealth(d)).catch(() => setHealth({ success: false }));
+      fetch('/api/v1/rag/graph').then(r => r.json()).then(d => {
+        if (d && d.graph) {
+          setGraph(d.graph);
+          setTimeout(() => renderGraph(d.graph, null), 0);
+        }
+      }).catch(() => {});
+    }, []);
+
+    async function handleIngest() {
+      if (!ingestText.trim()) { setError('Please paste some documents to ingest.'); return; }
+      setLoading(true);
+      try {
+        const res = await fetch('/api/v1/rag/ingest', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ corpus_id: corpusId, texts: ingestText.split('\n\n') })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data?.detail || 'Ingest failed');
+          setIngested(false);
+          return false;
+        } else {
+          setError('');
+          setIngested(true);
+          return true;
+        }
+      } catch (e) { setError(String(e)); return false; }
+      finally { setLoading(false); }
+    }
+
+    async function handleAsk() {
+      setLoading(true);
+      try {
+        if (!ingested && (ingestText || '').trim()) {
+          const ok = await handleIngest();
+          if (!ok) return; // stop if ingest failed
+        }
+        // start timer
+        const started = Date.now();
+        if (timerRef.current) clearInterval(timerRef.current);
+        setElapsedSec(0);
+        timerRef.current = setInterval(() => {
+          setElapsedSec(((Date.now() - started) / 1000));
+        }, 100);
+        const res = await fetch('/api/v1/rag/ask', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ corpus_id: corpusId, question })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data?.detail || 'Ask failed');
+          setAnswer(''); setInsights([]); setRisks([]); setNextSteps([]); setSources([]); setTimings({}); setGraph(null);
+          return;
+        }
+        setError('');
+        setAnswer(data.answer || '');
+        setInsights(data.insights || []);
+        setRisks(data.risks || []);
+        setNextSteps(data.next_steps || []);
+        setSources(data.sources || []);
+        setTimings(data.timings || {});
+        setGraph(data.graph || null);
+        setTimeout(() => renderGraph(data.graph, data.timings || {}), 0);
+      } catch (e) { setError(String(e)); }
+      finally { setLoading(false); }
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    }
+
+    function renderGraph(g, t) {
+      if (!g || !window.d3) return;
+      const container = d3.select('#rag-graph');
+      container.html('');
+      const bb = container.node() ? container.node().getBoundingClientRect() : { width: 1200 };
+      const width = Math.max(1200, Math.floor(bb.width || 1200));
+      const height = 360;
+      const y = Math.floor(height / 2);
+      container.style('min-height', `${height + 20}px`);
+      const svg = container.append('svg')
+        .attr('width', '100%')
+        .attr('height', `${height}px`)
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .style('overflow', 'visible');
+      // Shorten labels for compactness
+      const nodes = (g.nodes || []).map(n => ({ id: n.id, label: (n.label || '').replace('Query Preprocessing','Preprocess').replace('Retriever (Hybrid)','Retrieve').replace('Augment + LLM','Augment+LLM').replace('Postprocess','Response') }));
+      const edges = g.edges || [];
+      const x = d3.scalePoint().domain(nodes.map(n => n.id)).range([60, width - 60]).padding(0.6);
+      const defs = svg.append('defs');
+      defs.append('marker').attr('id', 'rag-arrow').attr('viewBox', '0 0 10 10')
+        .attr('refX', 8).attr('refY', 5).attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto-start-reverse')
+        .append('path').attr('d', 'M 0 0 L 10 5 L 0 10 z').attr('fill', '#183153');
+      // base line
+      svg.selectAll('line.base').data(edges).enter().append('line')
+        .attr('class','base')
+        .attr('x1', d => x(d.from)).attr('y1', y)
+        .attr('x2', d => x(d.to)).attr('y2', y)
+        .attr('stroke', '#183153').attr('stroke-width', 5).attr('marker-end', 'url(#rag-arrow)');
+      // progress overlay path with draw animation
+      const overlay = svg.append('line')
+        .attr('x1', x(nodes[0].id)).attr('y1', y)
+        .attr('x2', x(nodes[0].id)).attr('y2', y)
+        .attr('stroke', '#27457c').attr('stroke-width', 7).attr('opacity', 0.6);
+
+      // squares with labels inside
+      const size = 64;
+      const squares = svg.selectAll('rect.node').data(nodes).enter().append('rect')
+        .attr('class', 'node')
+        .attr('x', d => x(d.id) - size/2)
+        .attr('y', y - size/2)
+        .attr('width', size)
+        .attr('height', size)
+        .attr('rx', 10)
+        .attr('fill', '#f8f9fa')
+        .attr('stroke', '#183153').attr('stroke-width', 3);
+      svg.selectAll('text.node-label').data(nodes).enter().append('text')
+        .attr('class', 'node-label')
+        .attr('x', d => x(d.id))
+        .attr('y', y - (size/2) - 12)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 16).attr('font-weight', 600).attr('fill', '#183153')
+        .text(d => d.label);
+
+      // Animate when timings are available
+      if (t) {
+        const times = nodes.map(n => Number(t[n.id] || 0));
+        const total = times.reduce((a,b)=>a+b,0) || 1;
+        const cumulative = [];
+        times.reduce((acc, cur, i) => { cumulative[i] = acc + cur; return acc + cur; }, 0);
+
+        // Animate overlay line to final node proportionally
+        const lastX = x(nodes[nodes.length-1].id);
+        overlay.transition().duration(Math.min(2000 + total*400, 8000)).ease(d3.easeCubicOut)
+          .attr('x2', lastX);
+
+        // Pulse completed nodes sequentially and colorize
+        squares.each(function(d, i){
+          const delay = Math.min(2000 + (cumulative[i] / total) * 4000, 8000);
+          d3.select(this)
+            .transition().delay(delay).duration(400)
+            .attr('fill', '#183153')
+            .transition().duration(400)
+            .attr('width', size + 8).attr('height', size + 8)
+            .attr('x', d => x(d.id) - (size + 8)/2)
+            .attr('y', y - (size + 8)/2)
+            .transition().duration(300)
+            .attr('width', size).attr('height', size)
+            .attr('x', d => x(d.id) - size/2)
+            .attr('y', y - size/2);
+        });
+
+        // durations under nodes
+        svg.selectAll('text.duration').data(nodes).enter().append('text')
+          .attr('class', 'duration')
+          .attr('x', d => x(d.id)).attr('y', y + (size/2) + 24).attr('text-anchor', 'middle')
+          .attr('font-size', 14).attr('fill', '#27457c')
+          .text(d => (t[d.id] ? `${t[d.id]}s` : ''));
+      }
+    }
+
+    return e('div', { className: 'card shadow-sm flex-fill d-flex flex-column' },
+      e('div', { className: 'card-body d-flex flex-column' }, [
+        e('div', { className: 'card-header-row mb-2', key: 'hdr' }, e('span', { className: 'card-title' }, '📚 RAG Business Intelligence')),
+        e('div', { className: 'row g-3 mb-2', key: 'row1' }, [
+          e('div', { className: 'col-md-4', key: 'c1' }, [
+            e('label', { className: 'form-label mb-1' }, 'Corpus ID'),
+            e('input', { className: 'form-control', value: corpusId, onChange: ev => setCorpusId(ev.target.value), placeholder: 'Corpus ID (e.g., demo)' }),
+            e('div', { className: 'small text-muted mt-1' }, 'Choose a name for your document set (re-use to query later).')
+          ]),
+          e('div', { className: 'col-md-8', key: 'c2' }, [
+            e('label', { className: 'form-label mb-1' }, 'Business Question'),
+            e('input', { className: 'form-control', value: question, onChange: ev => setQuestion(ev.target.value), placeholder: 'Enter a business question (e.g., Go-to-market plan?)' }),
+            e('div', { className: 'small text-muted mt-1' }, 'Ask what you want answered from the ingested context.')
+          ])
+        ]),
+        health && health.langchain_available === false ? e('div', { className: 'alert alert-warning py-2 px-3 mb-2', role: 'alert', key: 'warn' }, 'RAG dependencies are not installed on server.') : null,
+        error ? e('div', { className: 'alert alert-danger py-2 px-3 mb-2', role: 'alert', key: 'err' }, String(error)) : null,
+        e('label', { className: 'form-label mb-1' }, 'Documents'),
+        e('textarea', { className: 'form-control mb-2', rows: 8, value: ingestText, onChange: ev => setIngestText(ev.target.value), key: 'txt', placeholder: 'Paste documents here. Separate multiple docs with a blank line.' }),
+        e('div', { className: 'small text-muted mb-2' }, 'Tip: Paste notes, strategy briefs, or transcripts. Separate items with a blank line. You can also ingest from URLs below.'),
+        e('div', { className: 'input-group mb-2' }, [
+          e('span', { className: 'input-group-text' }, 'URLs'),
+          e('input', { id: 'rag-url-input', className: 'form-control', placeholder: 'https://example.com/article, https://nasa.gov/…', defaultValue: 'https://www.nasa.gov/mission/apollo-11/?utm_source' })
+        ]),
+        e('div', { className: 'mb-2' }, [
+          e('label', { className: 'form-label mb-1' }, 'Or upload PDF'),
+          e('input', { id: 'rag-file-input', type: 'file', accept: '.pdf,.txt', className: 'form-control', onChange: async (ev) => {
+              const file = ev.target.files?.[0];
+              if (!file) return;
+              setUrlBusy(true);
+              setUrlMsg('Uploading & parsing file…');
+              setError('');
+              try {
+                const form = new FormData();
+                form.append('corpus_id', corpusId);
+                form.append('file', file);
+                const res = await fetch('/api/v1/rag/ingest_file', { method: 'POST', body: form });
+                const data = await res.json();
+                if (!res.ok) {
+                  setError(data?.detail || 'File ingest failed');
+                  setUrlMsg('File ingest failed');
+                } else {
+                  setIngested(true);
+                  setUrlMsg(`Ingested ${data.chunks_indexed ?? 'unknown'} chunk(s) from file.`);
+                }
+              } catch (e) { setError(String(e)); setUrlMsg('File ingest error'); }
+              finally { setUrlBusy(false); }
+            } })
+        ]),
+        urlMsg ? e('div', { className: 'small', style: { color: urlBusy ? '#6c757d' : '#27457c' } }, urlMsg) : null,
+        e('div', { className: 'd-flex align-items-center gap-2 mb-1', key: 'actions' }, [
+          e('button', { key: 'run-btn', className: 'btn btn-dark-bbg', onClick: async () => {
+              setLoading(true);
+              setError('');
+              setUrlMsg('');
+              try {
+                // Ingest from textarea and URL if provided
+                const urlVal = (document.getElementById('rag-url-input')?.value || '').trim();
+                const urls = urlVal ? urlVal.split(',').map(s => s.trim()).filter(Boolean) : [];
+                if ((ingestText || '').trim() || urls.length) {
+                  const payload = { corpus_id: corpusId, only_html: true };
+                  if ((ingestText || '').trim()) payload.texts = ingestText.split('\n\n');
+                  if (urls.length) payload.urls = urls;
+                  const t0 = Date.now();
+                  const resIng = await fetch('/api/v1/rag/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                  const dataIng = await resIng.json();
+                  if (!resIng.ok) { setError(dataIng?.detail || 'Ingest failed'); setLoading(false); return; }
+                  setIngested(true);
+                  const secs = ((Date.now() - t0) / 1000).toFixed(1);
+                  setUrlMsg(`Ingested ${dataIng.chunks_indexed ?? 'unknown'} chunk(s) in ${secs}s.`);
+                }
+                // Run ask with timer
+                const started = Date.now();
+                if (timerRef.current) clearInterval(timerRef.current);
+                setElapsedSec(0);
+                timerRef.current = setInterval(() => setElapsedSec(((Date.now() - started) / 1000)), 100);
+                const resAsk = await fetch('/api/v1/rag/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ corpus_id: corpusId, question }) });
+                const dataAsk = await resAsk.json();
+                if (!resAsk.ok) { setError(dataAsk?.detail || 'Ask failed'); setAnswer(''); setInsights([]); setRisks([]); setNextSteps([]); setSources([]); setTimings({}); setGraph(null); return; }
+                setAnswer(dataAsk.answer || '');
+                setInsights(dataAsk.insights || []);
+                setRisks(dataAsk.risks || []);
+                setNextSteps(dataAsk.next_steps || []);
+                setSources(dataAsk.sources || []);
+                setTimings(dataAsk.timings || {});
+                setGraph(dataAsk.graph || null);
+                setTimeout(() => renderGraph(dataAsk.graph, dataAsk.timings || {}), 0);
+              } catch (e) { setError(String(e)); }
+              finally { setLoading(false); if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } }
+            } }, loading ? `Running... ${elapsedSec.toFixed(1)}s / ~25s` : 'Run (~25s)')
+        ]),
+        e('div', { className: 'small text-muted mb-2', key: 'eta-note' }, 'Expected wait: ~25s (first call may be longer due to warm-up).'),
+        e('div', { className: 'row', key: 'row2' }, [
+          e('div', { className: 'col-md-8', key: 'left' }, [
+            e('div', { className: 'mb-3', key: 'answer' }, [
+              e('h6', { key: 'h' }, 'Answer'),
+              e('div', { key: 'ans', className: 'p-3 border rounded', style: { minHeight: '120px', whiteSpace: 'pre-wrap' } }, answer || '—')
+            ]),
+            e('div', { className: 'row', key: 'triples' }, [
+              e('div', { className: 'col-md-4', key: 'ins-col' }, [ e('h6', { key: 'ins-h' }, 'Insights'), e('ul', { key: 'ins-ul' }, (insights || []).map((t, i) => e('li', { key: `ins-${i}` }, t))) ]),
+              e('div', { className: 'col-md-4', key: 'risks-col' }, [ e('h6', { key: 'risks-h' }, 'Risks'), e('ul', { key: 'risks-ul' }, (risks || []).map((t, i) => e('li', { key: `risk-${i}` }, t))) ]),
+              e('div', { className: 'col-md-4', key: 'next-col' }, [ e('h6', { key: 'next-h' }, 'Next Steps'), e('ul', { key: 'next-ul' }, (nextSteps || []).map((t, i) => e('li', { key: `next-${i}` }, t))) ])
+            ])
+          ]),
+          e('div', { className: 'col-md-4', key: 'right' }, [
+            e('h6', { key: 'src-h' }, 'Sources'),
+            e('div', { className: 'text-muted small mb-1', key: 'src-help' }, `Top retrieved snippets used to ground the answer (k = ${(sources || []).length}).`),
+            e('ul', { className: 'small', key: 'src-ul' }, (sources || []).map((s, i) => e('li', { key: `${s.title || 'src'}-${i}` }, `${s.title || 'Document'} (score: ${typeof s.score === 'number' ? s.score.toFixed(3) : s.score})`))),
+            e('h6', { className: 'mt-3', key: 'tm-h' }, 'Timings'),
+            e('ul', { className: 'small', key: 'tm-ul' }, Object.keys(timings || {}).map(k => e('li', { key: `tm-${k}` }, `${k}: ${timings[k]}s`)))
+          ])
+        ])
+        ,
+        // Pipeline moved below answer as full width
+        e('div', { className: 'mt-3', key: 'pipe-section' }, [
+          e('h6', { key: 'pipe-h2' }, 'Pipeline'),
+          loading ? e('div', { className: 'text-muted small mb-1' }, `Running… ${elapsedSec.toFixed(1)}s (est. 25s)`) : e('div', { className: 'text-muted small mb-1' }, 'Estimated total time: ~25s'),
+          e('div', { id: 'rag-graph', className: 'mb-3 border rounded', style: { width: '100%', height: '360px' }, key: 'graph-below' }),
+          e('div', { className: 'small text-muted mb-2' }, 'RAG retrieves the top matching snippets and augments the LLM prompt. Better retrieval → better answers.')
+        ])
+      ])
+    );
+  }
+
+  function mountRAGBI() {
+    const rootEl = document.getElementById('rag-bi-root');
+    if (!rootEl) return;
+    if (!rootEl._mounted) {
+      ReactDOM.createRoot(rootEl).render(e(RAGBI));
+      rootEl._mounted = true;
+    }
+  }
+
+  // Mount on tab show and also try once on DOM ready
+  document.addEventListener('DOMContentLoaded', function() {
+    const tab = document.getElementById('rag-bi-tab');
+    if (tab) tab.addEventListener('shown.bs.tab', mountRAGBI);
+    mountRAGBI();
+  });
+})();

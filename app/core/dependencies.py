@@ -79,3 +79,16 @@ async def get_ai_service(
     """Dependency for AI service"""
     from ..services.ai_service import AsyncAIService
     return AsyncAIService(http_client, cache_service, stock_service) 
+
+# RAG service singleton dependency
+_rag_service_singleton = None
+
+async def get_rag_service(
+    ai_service = Depends(get_ai_service)
+):
+    """Provide a singleton AsyncRAGService so ingested corpora persist across requests."""
+    global _rag_service_singleton
+    if _rag_service_singleton is None:
+        from ..services.rag_service import AsyncRAGService
+        _rag_service_singleton = AsyncRAGService(ai_service)
+    return _rag_service_singleton
