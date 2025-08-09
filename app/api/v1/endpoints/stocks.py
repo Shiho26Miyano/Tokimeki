@@ -145,6 +145,114 @@ async def get_available_tickers(
         logger.error(f"Error getting tickers: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/volatility_event_correlation")
+async def get_volatility_event_correlation(
+    symbol: str,
+    start_date: str = None,
+    end_date: str = None,
+    window: int = 30,
+    years: int = 2,
+    stock_service: AsyncStockService = Depends(get_stock_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get volatility event correlation data"""
+    start_time = time.time()
+    
+    try:
+        # Get volatility correlation data
+        result = await stock_service.get_volatility_event_correlation(
+            symbol=symbol.upper(),
+            start_date=start_date,
+            end_date=end_date,
+            window=window,
+            years=years
+        )
+        
+        # Track usage
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="volatility_event_correlation",
+            response_time=response_time,
+            success=True
+        )
+        
+        return result
+        
+    except Exception as e:
+        # Track failed request
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="volatility_event_correlation",
+            response_time=response_time,
+            success=False,
+            error=str(e)
+        )
+        
+        logger.error(f"Volatility event correlation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/volatility_regime/analyze")
+async def analyze_volatility_regime(
+    request: Request,
+    stock_service: AsyncStockService = Depends(get_stock_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Analyze volatility regime"""
+    start_time = time.time()
+    
+    try:
+        # Check content type
+        content_type = request.headers.get("content-type", "")
+        
+        if "application/json" in content_type:
+            # Handle JSON request
+            body = await request.json()
+            symbol = body.get("symbol", "").upper()
+            start_date = body.get("start_date")
+            end_date = body.get("end_date")
+            window = body.get("window", 30)
+        else:
+            # Handle form data
+            form_data = await request.form()
+            symbol = form_data.get("symbol", "").upper()
+            start_date = form_data.get("start_date")
+            end_date = form_data.get("end_date")
+            window = int(form_data.get("window", 30))
+        
+        if not symbol:
+            raise HTTPException(status_code=400, detail="Symbol is required")
+        
+        # Get volatility regime analysis
+        result = await stock_service.analyze_volatility_regime(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=end_date,
+            window=window
+        )
+        
+        # Track usage
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="volatility_regime_analyze",
+            response_time=response_time,
+            success=True
+        )
+        
+        return result
+        
+    except Exception as e:
+        # Track failed request
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="volatility_regime_analyze",
+            response_time=response_time,
+            success=False,
+            error=str(e)
+        )
+        
+        logger.error(f"Volatility regime analysis error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/health")
 async def health_check():
     """Health check for stock service"""

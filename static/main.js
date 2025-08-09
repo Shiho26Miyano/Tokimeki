@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Populate Stock Stability Explorer select ---
-    fetch('/available_tickers')
+            fetch('/api/v1/stocks/available_tickers')
         .then(res => res.json())
         .then(tickers => {
             const select = document.getElementById('explore-stock');
@@ -155,7 +155,7 @@ window.fetchStockTrends = function() {
         return;
     }
     document.getElementById('stock-trends-result').innerText = 'Loading...';
-    let url = `/stocks/history?symbols=${symbols.join(',')}&days=${range}`;
+            let url = `/api/v1/stocks/history?symbols=${symbols.join(',')}&days=${range}`;
     fetch(url)
         .then(res => res.json())
         .then(data => {
@@ -479,7 +479,7 @@ function fetchAndRenderVolatilityCorrelation() {
     chartDiv.innerHTML = 'Loading volatility data...';
     
     // Fetch volatility data
-    fetch(`/volatility_event_correlation?symbol=${symbol}&start_date=${start_date}&end_date=${end_date}&window=${windowSize}`)
+            fetch(`/api/v1/stocks/volatility_event_correlation?symbol=${symbol}&start_date=${start_date}&end_date=${end_date}&window=${windowSize}`)
         .then(res => {
             if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`);
@@ -517,7 +517,7 @@ function fetchAndRenderVolatilityCorrelation() {
             }
             
             // Now fetch regime analysis
-            return fetch('/volatility_regime/analyze', {
+            return fetch('/api/v1/stocks/volatility_regime/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -553,16 +553,39 @@ function fetchAndRenderVolatilityCorrelation() {
                     return;
                 }
                 
-                // Ensure all required fields exist - map backend structure to frontend expectations
+                // Ensure all required fields exist - normalize backend structure to frontend expectations
+                const volSeriesRaw = Array.isArray(regimeData.volatility_data)
+                    ? regimeData.volatility_data
+                    : (Array.isArray(regimeData.rolling_volatility) ? regimeData.rolling_volatility : []);
+                const volSeries = volSeriesRaw.filter(v => v !== null && v !== undefined && !isNaN(parseFloat(v))).map(v => typeof v === 'string' ? parseFloat(v) : v);
+                const currentVol = volSeries.length > 0 ? volSeries[volSeries.length - 1] : (regimeData.current_volatility || 0);
+                const avgVol = (regimeData.avg_volatility !== undefined ? regimeData.avg_volatility : regimeData.average_volatility) || 0;
+                const counts = regimeData.regime_counts || regimeData.regime_distribution || {};
+                const safeCounts = {
+                    high_volatility_periods: counts.high !== undefined ? counts.high : (counts.high_volatility_periods || 0),
+                    normal_volatility_periods: counts.normal !== undefined ? counts.normal : (counts.normal_volatility_periods || 0),
+                    low_volatility_periods: counts.low !== undefined ? counts.low : (counts.low_volatility_periods || 0)
+                };
+                let trendLabel = 'Unknown';
+                if (volSeries.length >= 5) {
+                    const last = volSeries[volSeries.length - 1];
+                    const prev = volSeries[volSeries.length - 5];
+                    const diff = last - prev;
+                    if (diff > 0.3) trendLabel = 'Increasing';
+                    else if (diff < -0.3) trendLabel = 'Decreasing';
+                    else trendLabel = 'Stable';
+                }
+                const regimeLabel = (regimeData.current_regime || regimeData.regime || 'Unknown');
+
                 const safeRegimeData = {
                     symbol: regimeData.symbol || 'Unknown',
-                    regime: regimeData.regime || 'Unknown', // Backend returns regime
-                    current_volatility: regimeData.current_volatility || 0,
-                    average_volatility: regimeData.average_volatility || 0,
-                    volatility_trend: regimeData.volatility_trend || 'Unknown',
-                    regime_distribution: regimeData.regime_distribution || {}, // Backend returns regime_distribution
-                    rolling_volatility: regimeData.rolling_volatility || [], // Backend returns rolling_volatility
-                    rolling_window: regimeData.rolling_window || 'Unknown',
+                    regime: regimeLabel,
+                    current_volatility: currentVol || 0,
+                    average_volatility: avgVol || 0,
+                    volatility_trend: trendLabel,
+                    regime_distribution: safeCounts,
+                    rolling_volatility: volSeries,
+                    rolling_window: regimeData.rolling_window || regimeData.window || 'Unknown',
                     analysis_period: regimeData.analysis_period || 'Unknown'
                 };
                 
@@ -727,11 +750,13 @@ function renderVolatilityCorrelationChart(data) {
     for (let i = 0; i < visibleDates.length; i++) {
         const date = visibleDates[i];
         const volValue = visibleVol[i];
+        // Coerce volatility to a number
+        const volValueNum = typeof volValue === 'string' ? parseFloat(volValue) : volValue;
         
-        if (isValidDate(date) && isValidNumber(volValue)) {
-            validData.push({ date, vol: volValue });
+        if (isValidDate(date) && isValidNumber(volValueNum)) {
+            validData.push({ date, vol: volValueNum });
             validDates.push(date);
-            validVol.push(volValue);
+            validVol.push(volValueNum);
         }
     }
     
@@ -881,15 +906,15 @@ function renderVolatilityCorrelationChart(data) {
         .call(d3.axisBottom(x).tickSizeOuter(0));
     
     g.append('g')
-        .call(d3.axisLeft(yLeft).ticks(6))
-        .append('text')
-        .attr('fill', '#183153')
-        .attr('x', -40)
-        .attr('y', -10)
-        .attr('text-anchor', 'start')
-        .attr('font-size', '1rem')
-        .attr('font-weight', 600)
-        .text('Volatility');
+        .call(d3.axisLeft(yLeft).ticks(6).tickFormat(d3.format('.3f')))
+         .append('text')
+         .attr('fill', '#183153')
+         .attr('x', -40)
+         .attr('y', -10)
+         .attr('text-anchor', 'start')
+         .attr('font-size', '1rem')
+         .attr('font-weight', 600)
+         .text('Volatility');
     
     // Tooltip logic
     const tooltip = d3.select('#volatility-correlation-chart')
@@ -1074,14 +1099,18 @@ function displayRegimeAnalysis(regimeData) {
     // Display additional metrics if available
     try {
         if (regimeData.rolling_volatility && Array.isArray(regimeData.rolling_volatility) && regimeData.rolling_volatility.length > 0) {
+            const safeRolling = regimeData.rolling_volatility.map(v => {
+                const n = typeof v === 'string' ? parseFloat(v) : v;
+                return isValidNumber(n) ? n : null;
+            }).filter(v => v !== null);
             periodsDiv.innerHTML = `
-                <h6 class="mb-3">Recent Volatility Trend (Last ${regimeData.rolling_volatility.length} periods)</h6>
+                <h6 class="mb-3">Recent Volatility Trend (Last ${safeRolling.length} periods)</h6>
                 <div class="alert alert-secondary">
                     <strong>Latest Volatility Values:</strong><br>
-                    ${regimeData.rolling_volatility.slice(-10).map(v => v.toFixed(2)).join('%, ')}%
+                    ${safeRolling.slice(-10).map(v => v.toFixed(2)).join('%, ')}%
                 </div>
                 <div class="mt-2">
-                    <small class="text-muted">Total periods analyzed: ${regimeData.rolling_volatility.length}</small>
+                    <small class="text-muted">Total periods analyzed: ${safeRolling.length}</small>
                 </div>
             `;
         } else {
@@ -1142,7 +1171,7 @@ window.fetchTweetVolatilityAnalysis = function() {
         if (usedPlaceholder) {
           toAnalyze = placeholderText;
         }
-        const resp = await fetch("/analyze_tweet", {
+        const resp = await fetch("/api/v1/sentiment/analyze_tweet", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: toAnalyze })
@@ -1255,7 +1284,7 @@ window.fetchTweetVolatilityAnalysis = function() {
 
     // Fetch companies and run initial analysis
     React.useEffect(() => {
-      fetch('/available_companies')
+              fetch('/api/v1/stocks/available_companies')
         .then(res => {
           if (!res.ok) {
             throw new Error(`Server responded with ${res.status}`);
@@ -1302,7 +1331,7 @@ window.fetchTweetVolatilityAnalysis = function() {
       setResult(null);
 
       try {
-        const resp = await fetch('/analyze', {
+        const resp = await fetch('/api/v1/stocks/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(params)
@@ -1491,7 +1520,7 @@ window.fetchTweetVolatilityAnalysis = function() {
 
     // Check API status and show demo on component mount
     React.useEffect(() => {
-      fetch('/health')
+              fetch('/api/v1/monitoring/health')
         .then(res => res.json())
         .then(data => {
           setApiStatus(data.api_configured);
@@ -1602,7 +1631,7 @@ window.fetchTweetVolatilityAnalysis = function() {
           }
         }, 1000);
 
-        const response = await fetch('/chat', {
+        const response = await fetch('/api/v1/chat/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1685,7 +1714,7 @@ window.fetchTweetVolatilityAnalysis = function() {
             }
         }, 1000);
         
-        const response = await fetch('/compare_models', {
+        const response = await fetch('/api/v1/chat/compare_models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
