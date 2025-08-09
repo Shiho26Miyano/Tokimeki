@@ -23,77 +23,110 @@ class AsyncStockService:
     ) -> Dict[str, Any]:
         """Analyze stock using trading strategies"""
         
-        # Convert period to days
-        period_days = {
-            "3mo": 90,
-            "6mo": 180,
-            "1y": 365,
-            "2y": 730,
-            "5y": 1825
-        }.get(period, 365)
-        
-        # Get stock data
-        data = await self.get_stock_data(symbol, period_days)
-        if not data:
-            raise Exception(f"No data available for {symbol}")
-        
-        # Calculate metrics based on strategy
-        prices = [day['Close'] for day in data['data']]
-        returns = []
-        for i in range(1, len(prices)):
-            returns.append((prices[i] - prices[i-1]) / prices[i-1])
-        
-        # Calculate basic metrics
-        total_return = ((prices[-1] / prices[0]) - 1) * 100
-        volatility = np.std(returns) * np.sqrt(252) * 100  # Annualized
-        sharpe_ratio = (np.mean(returns) * 252) / (np.std(returns) * np.sqrt(252)) if np.std(returns) > 0 else 0
-        
-        # Calculate max drawdown
-        peak = prices[0]
-        max_drawdown = 0
-        for price in prices:
-            if price > peak:
-                peak = price
-            drawdown = (peak - price) / peak
-            if drawdown > max_drawdown:
-                max_drawdown = drawdown
-        
-        # Calculate VaR (95%)
-        var_95 = np.percentile(returns, 5) * 100
-        
-        # Generate trading signals based on strategy
-        latest_signal = self._generate_signal(prices, strategy)
-        
-        # Handle date formatting safely
-        last_data_point = data['data'][-1]
-        
-        # Try different ways to get the date
-        last_date = None
-        if 'Date' in last_data_point:
-            last_date = last_data_point['Date']
-        elif 'date' in last_data_point:
-            last_date = last_data_point['date']
-        else:
-            last_date = datetime.now()
-        
-        if hasattr(last_date, 'strftime'):
-            date_str = last_date.strftime('%Y-%m-%d')
-        else:
-            date_str = str(last_date)
-        
-        return {
-            "latest_signals": {
-                "signal": latest_signal,
-                "price": prices[-1],
-                "date": date_str
-            },
-            "metrics": {
-                "total_return": round(total_return, 2),
-                "sharpe_ratio": round(sharpe_ratio, 2),
-                "max_drawdown": round(max_drawdown * 100, 2),
-                "var_95": round(var_95, 2)
+        try:
+            logger.info(f"Starting stock analysis for {symbol} with strategy {strategy} and period {period}")
+            
+            # Convert period to days
+            period_days = {
+                "3mo": 90,
+                "6mo": 180,
+                "1y": 365,
+                "2y": 730,
+                "5y": 1825
+            }.get(period, 365)
+            
+            logger.info(f"Fetching {period_days} days of data for {symbol}")
+            
+            # Get stock data
+            data = await self.get_stock_data(symbol, period_days)
+            if not data:
+                logger.error(f"No data returned from get_stock_data for {symbol}")
+                raise Exception(f"No data available for {symbol}")
+            
+            if not data.get('data') or len(data['data']) == 0:
+                logger.error(f"Empty data array for {symbol}")
+                raise Exception(f"No data available for {symbol}")
+            
+            logger.info(f"Retrieved {len(data['data'])} data points for {symbol}")
+            
+            # Calculate metrics based on strategy
+            prices = [day['Close'] for day in data['data']]
+            if len(prices) < 2:
+                logger.error(f"Not enough price data for {symbol}: {len(prices)} points")
+                raise Exception(f"Not enough price data for {symbol}")
+            
+            returns = []
+            for i in range(1, len(prices)):
+                if prices[i-1] > 0:  # Avoid division by zero
+                    returns.append((prices[i] - prices[i-1]) / prices[i-1])
+                else:
+                    returns.append(0)
+            
+            if len(returns) == 0:
+                logger.error(f"No valid returns calculated for {symbol}")
+                raise Exception(f"Unable to calculate returns for {symbol}")
+            
+            # Calculate basic metrics
+            total_return = ((prices[-1] / prices[0]) - 1) * 100 if prices[0] > 0 else 0
+            volatility = np.std(returns) * np.sqrt(252) * 100  # Annualized
+            sharpe_ratio = (np.mean(returns) * np.sqrt(252)) / (np.std(returns) * np.sqrt(252)) if np.std(returns) > 0 else 0
+            
+            # Calculate max drawdown
+            peak = prices[0]
+            max_drawdown = 0
+            for price in prices:
+                if price > peak:
+                    peak = price
+                if peak > 0:
+                    drawdown = (peak - price) / peak
+                    if drawdown > max_drawdown:
+                        max_drawdown = drawdown
+            
+            # Calculate VaR (95%)
+            var_95 = np.percentile(returns, 5) * 100 if len(returns) > 0 else 0
+            
+            # Generate trading signals based on strategy
+            latest_signal = self._generate_signal(prices, strategy)
+            
+            # Handle date formatting safely
+            last_data_point = data['data'][-1]
+            
+            # Try different ways to get the date
+            last_date = None
+            if 'Date' in last_data_point:
+                last_date = last_data_point['Date']
+            elif 'date' in last_data_point:
+                last_date = last_data_point['date']
+            else:
+                last_date = datetime.now()
+            
+            if hasattr(last_date, 'strftime'):
+                date_str = last_date.strftime('%Y-%m-%d')
+            else:
+                date_str = str(last_date)
+            
+            result = {
+                "latest_signals": {
+                    "signal": latest_signal,
+                    "price": prices[-1],
+                    "date": date_str
+                },
+                "metrics": {
+                    "total_return": round(total_return, 2),
+                    "volatility": round(volatility, 2),
+                    "sharpe_ratio": round(sharpe_ratio, 2),
+                    "max_drawdown": round(max_drawdown * 100, 2),
+                    "var_95": round(var_95, 2)
+                }
             }
-        }
+            
+            logger.info(f"Stock analysis completed successfully for {symbol}: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in analyze_stock for {symbol}: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            raise e
     
     def _generate_signal(self, prices: List[float], strategy: str) -> int:
         """Generate trading signal based on strategy"""
@@ -220,16 +253,20 @@ class AsyncStockService:
     ) -> Optional[Dict[str, Any]]:
         """Get stock data asynchronously using ThreadPoolExecutor"""
         
-        # Generate cache key
-        cache_key = f"stock_data:{symbol}:{days}"
-        
-        # Check cache first
-        cached_data = await self.cache_service.get(cache_key)
-        if cached_data:
-            logger.info(f"Cache hit for stock data: {symbol}")
-            return cached_data
-        
         try:
+            logger.info(f"Fetching stock data for {symbol} for {days} days")
+            
+            # Generate cache key
+            cache_key = f"stock_data:{symbol}:{days}"
+            
+            # Check cache first
+            cached_data = await self.cache_service.get(cache_key)
+            if cached_data:
+                logger.info(f"Cache hit for stock data: {symbol}")
+                return cached_data
+            
+            logger.info(f"Cache miss for {symbol}, fetching from yfinance")
+            
             # Run yfinance in thread pool (since it's not async)
             loop = asyncio.get_event_loop()
             ticker = await loop.run_in_executor(
@@ -241,54 +278,78 @@ class AsyncStockService:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
             
+            logger.info(f"Fetching historical data for {symbol} from {start_date} to {end_date}")
+            
             hist = await loop.run_in_executor(
                 self.executor,
                 lambda: ticker.history(start=start_date, end=end_date)
             )
             
             if hist.empty:
-                logger.warning(f"No data available for {symbol}")
+                logger.warning(f"No data available for {symbol} - empty DataFrame returned")
                 return None
+            
+            logger.info(f"Retrieved {len(hist)} rows from yfinance for {symbol}")
             
             # Process data - yfinance returns DataFrame with datetime index
             records = []
             for date, row in hist.iterrows():
-                record = {
-                    'Date': date,
-                    'Open': float(row['Open']),
-                    'High': float(row['High']),
-                    'Low': float(row['Low']),
-                    'Close': float(row['Close']),
-                    'Volume': int(row['Volume']),
-                    'Dividends': float(row['Dividends']),
-                    'Stock Splits': float(row['Stock Splits'])
-                }
-                records.append(record)
+                try:
+                    record = {
+                        'Date': date,
+                        'Open': float(row['Open']) if pd.notna(row['Open']) else 0.0,
+                        'High': float(row['High']) if pd.notna(row['High']) else 0.0,
+                        'Low': float(row['Low']) if pd.notna(row['Low']) else 0.0,
+                        'Close': float(row['Close']) if pd.notna(row['Close']) else 0.0,
+                        'Volume': int(row['Volume']) if pd.notna(row['Volume']) else 0,
+                        'Dividends': float(row['Dividends']) if pd.notna(row['Dividends']) else 0.0,
+                        'Stock Splits': float(row['Stock Splits']) if pd.notna(row['Stock Splits']) else 0.0
+                    }
+                    records.append(record)
+                except Exception as row_error:
+                    logger.error(f"Error processing row for {symbol} at {date}: {row_error}")
+                    continue
+            
+            if len(records) == 0:
+                logger.error(f"No valid records processed for {symbol}")
+                return None
+            
+            # Calculate summary statistics
+            close_prices = [r['Close'] for r in records if r['Close'] > 0]
+            if len(close_prices) == 0:
+                logger.error(f"No valid close prices for {symbol}")
+                return None
             
             data = {
                 "symbol": symbol,
                 "period": f"{days} days",
                 "data": records,
                 "summary": {
-                    "start_price": float(hist['Close'].iloc[0]),
-                    "end_price": float(hist['Close'].iloc[-1]),
-                    "min_price": float(hist['Close'].min()),
-                    "max_price": float(hist['Close'].max()),
-                    "avg_price": float(hist['Close'].mean()),
-                    "volume": int(hist['Volume'].sum()),
-                    "price_change": float(hist['Close'].iloc[-1] - hist['Close'].iloc[0]),
-                    "percent_change": float(((hist['Close'].iloc[-1] / hist['Close'].iloc[0]) - 1) * 100)
+                    "start_price": float(close_prices[0]),
+                    "end_price": float(close_prices[-1]),
+                    "min_price": float(min(close_prices)),
+                    "max_price": float(max(close_prices)),
+                    "avg_price": float(sum(close_prices) / len(close_prices)),
+                    "volume": int(sum(r['Volume'] for r in records)),
+                    "price_change": float(close_prices[-1] - close_prices[0]),
+                    "percent_change": float(((close_prices[-1] / close_prices[0]) - 1) * 100) if close_prices[0] > 0 else 0
                 }
             }
             
             # Cache the result
-            await self.cache_service.set(cache_key, data, ttl=300)  # 5 minutes
+            try:
+                await self.cache_service.set(cache_key, data, ttl=300)  # 5 minutes
+                logger.info(f"Cached stock data for {symbol}")
+            except Exception as cache_error:
+                logger.warning(f"Failed to cache data for {symbol}: {cache_error}")
             
             logger.info(f"Successfully fetched data for {symbol}: {len(records)} records")
             return data
             
         except Exception as e:
             logger.error(f"Error fetching stock data for {symbol}: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error details: {str(e)}")
             return None
     
     async def get_multiple_stocks(

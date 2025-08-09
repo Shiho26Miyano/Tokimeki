@@ -376,49 +376,7 @@ async def get_stock_symbols_endpoint():
         "symbols": common_stocks
     }
 
-@app.get("/api/model-comparison")
-async def get_model_comparison():
-    """Get model comparison data"""
-    models = [
-        {
-            "name": "Mistral Small",
-            "provider": "Mistral AI",
-            "context_window": "32K",
-            "performance": "High",
-            "model_size": "7B",
-            "best_for": ["General purpose"],
-            "strengths": ["Fast", "efficient", "good reasoning"],
-            "note": "Excellent balance of speed and capability",
-            "notes": "Excellent balance of speed and capability"
-        },
-        {
-            "name": "DeepSeek Chat",
-            "provider": "DeepSeek",
-            "context_window": "128K",
-            "performance": "Very High",
-            "model_size": "67B",
-            "best_for": ["Complex reasoning"],
-            "strengths": ["Strong reasoning", "long context"],
-            "note": "Best for complex tasks",
-            "notes": "Best for complex tasks"
-        },
-        {
-            "name": "Qwen 3 8B",
-            "provider": "Alibaba",
-            "context_window": "32K",
-            "performance": "High",
-            "model_size": "8B",
-            "best_for": ["Code and reasoning"],
-            "strengths": ["Good coding", "efficient"],
-            "note": "Strong for technical tasks",
-            "notes": "Strong for technical tasks"
-        }
-    ]
-    
-    return {
-        "success": True,
-        "models": models
-    }
+
 
 
 
@@ -427,6 +385,76 @@ async def get_model_comparison():
 @app.get("/")
 async def root():
     return FileResponse("static/index.html")
+
+# Add missing root-level endpoints for backward compatibility
+@app.post("/analyze")
+async def root_analyze_endpoint(request: Request):
+    """Root-level analyze endpoint for backward compatibility"""
+    # Redirect to the proper API endpoint
+    from .api.v1.endpoints.stocks import analyze_stock
+    from .core.dependencies import get_stock_service, get_usage_service
+    
+    try:
+        data = await request.json()
+        stock_service = await get_stock_service()
+        usage_service = await get_usage_service()
+        
+        # Create a mock request object
+        from .api.v1.endpoints.stocks import StockAnalysisRequest
+        stock_request = StockAnalysisRequest(**data)
+        
+        # Call the actual endpoint
+        return await analyze_stock(stock_request, stock_service, usage_service)
+    except Exception as e:
+        logger.error(f"Root analyze endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/chat")
+async def root_chat_endpoint(request: Request):
+    """Root-level chat endpoint for backward compatibility"""
+    # Redirect to the proper API endpoint
+    from .api.v1.endpoints.chat import chat_with_ai
+    from .core.dependencies import get_ai_service, get_usage_service
+    
+    try:
+        data = await request.json()
+        ai_service = await get_ai_service()
+        usage_service = await get_usage_service()
+        
+        # Create a mock request object
+        from .api.v1.endpoints.chat import ChatRequest
+        chat_request = ChatRequest(**data)
+        
+        # Call the actual endpoint
+        return await chat_with_ai(chat_request, ai_service, usage_service)
+    except Exception as e:
+        logger.error(f"Root chat endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/volatility_event_correlation")
+async def root_volatility_endpoint(
+    symbol: str,
+    start_date: str = None,
+    end_date: str = None,
+    window: int = 30,
+    years: int = 2
+):
+    """Root-level volatility endpoint for backward compatibility"""
+    # Redirect to the proper API endpoint
+    from .api.v1.endpoints.stocks import get_volatility_event_correlation
+    from .core.dependencies import get_stock_service, get_usage_service
+    
+    try:
+        stock_service = await get_stock_service()
+        usage_service = await get_usage_service()
+        
+        # Call the actual endpoint
+        return await get_volatility_event_correlation(
+            symbol, start_date, end_date, window, years, stock_service, usage_service
+        )
+    except Exception as e:
+        logger.error(f"Root volatility endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Health check moved to /api/v1/monitoring/health
 
