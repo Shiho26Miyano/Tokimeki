@@ -249,7 +249,10 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="deepseek-chatbot-tab" data-bs-toggle="pill" data-bs-target="#deepseek-chatbot-content" role="tab" aria-controls="deepseek-chatbot-content" aria-selected="true">🤖 Chatbot</a>
+                        <a class="nav-link active" id="rag-bi-tab" data-bs-toggle="pill" data-bs-target="#rag-bi-content" role="tab" aria-controls="rag-bi-content" aria-selected="true">📚 RAG Business Intelligence</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="deepseek-chatbot-tab" data-bs-toggle="pill" data-bs-target="#deepseek-chatbot-content" role="tab" aria-controls="deepseek-chatbot-content" aria-selected="false">🤖 Chatbot</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="ai-platform-comparables-tab" data-bs-toggle="pill" data-bs-target="#ai-platform-comparables-content" role="tab" aria-controls="ai-platform-comparables-content" aria-selected="false">🤖 AI Platform Comparables</a>
@@ -272,8 +275,8 @@
 
             <div class="col-md-10 py-4">
                 <div class="tab-content" id="main-tab-content">
-                    <div class="tab-pane fade show active" id="deepseek-chatbot-content" role="tabpanel" aria-labelledby="deepseek-chatbot-tab">
-                        <div id="react-deepseek-chatbot"></div>
+                    <div class="tab-pane fade show active" id="rag-bi-content" role="tabpanel" aria-labelledby="rag-bi-tab">
+                        <div id="rag-bi-root"></div>
                     </div>
                     <div class="tab-pane fade" id="ai-platform-comparables-content" role="tabpanel" aria-labelledby="ai-platform-comparables-tab">
                         <div class="card shadow-sm flex-fill d-flex flex-column" style="max-width: 1100px; margin: 0 auto; border-radius: 16px;">
@@ -685,6 +688,9 @@
                         </div>
                     </div>
 
+                    <div class="tab-pane fade" id="deepseek-chatbot-content" role="tabpanel" aria-labelledby="deepseek-chatbot-tab">
+                        <div id="react-deepseek-chatbot"></div>
+                    </div>
 
                 </div>
             </div>
@@ -806,7 +812,7 @@
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-    <script src="static/main.js?v=20241203"></script>
+    <script src="static/main.js?v=20250809"></script>
     
     <script>
         // Handle hover-triggered modals for "How it works" buttons

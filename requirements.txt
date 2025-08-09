@@ -1,3 +1,6 @@
+# PyTorch CPU wheels index (needed for sentence-transformers on servers without GPU)
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # FastAPI Migration Dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
@@ -26,3 +29,12 @@ requests==2.31.0
 # Development dependencies
 pytest==7.4.3
 pytest-asyncio==0.21.1 
+
+# RAG / LangChain
+langchain==0.2.11
+langchain-community==0.2.10
+faiss-cpu==1.8.0.post1
+sentence-transformers==2.7.0
+langchain-text-splitters==0.2.2
+torch==2.3.1
+pdfminer.six==20231228
