@@ -14,7 +14,7 @@ import time
 from .core.config import settings
 from .core.middleware import setup_middleware
 from .core.dependencies import get_cache_service, get_usage_service, get_ai_service, get_stock_service
-# from .api.v1.api import api_router  # Commented out to avoid conflicts
+from .api.v1.api import api_router
 from .services.ai_service import AsyncAIService
 from .services.stock_service import AsyncStockService
 from .services.usage_service import AsyncUsageService
@@ -77,155 +77,14 @@ async def not_found_handler(request: Request, exc: Exception):
         content={"error": "Resource not found"}
     )
 
-# Include API router - commented out to avoid conflicts
-# app.include_router(api_router, prefix="/api/v1")
+# Include API router
+app.include_router(api_router, prefix="/api/v1")
 
-# Direct endpoints to match original Flask app
-@app.get("/available_tickers")
-async def get_available_tickers():
-    """Get list of available tickers"""
-    tickers = [
-        "AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "META", "NVDA", "NFLX", "AMD", "INTC",
-        "BRK-B", "JNJ", "V", "JPM", "WMT", "PG", "KO", "XOM", "SPY", "QQQ", "VOO",
-        "ARKK", "EEM", "XLF", "ES=F", "NQ=F", "YM=F", "RTY=F", "MES=F", "MNQ=F",
-        "MYM=F", "M2K=F", "GC=F", "SI=F", "CL=F", "BZ=F", "NG=F", "HG=F", "ZC=F",
-        "ZS=F", "ZW=F", "VX=F", "BTC=F", "ETH=F"
-    ]
-    
-    return {
-        "success": True,
-        "tickers": tickers
-    }
+# Core app endpoints (not part of API v1)
 
-@app.get("/available_companies")
-async def get_available_companies():
-    """Get list of available companies"""
-    companies = [
-        {"symbol": "AAPL", "name": "Apple Inc."},
-        {"symbol": "GOOGL", "name": "Alphabet Inc."},
-        {"symbol": "MSFT", "name": "Microsoft Corporation"},
-        {"symbol": "AMZN", "name": "Amazon.com Inc."},
-        {"symbol": "TSLA", "name": "Tesla Inc."},
-        {"symbol": "META", "name": "Meta Platforms Inc."},
-        {"symbol": "NVDA", "name": "NVIDIA Corporation"},
-        {"symbol": "NFLX", "name": "Netflix Inc."},
-        {"symbol": "AMD", "name": "Advanced Micro Devices Inc."},
-        {"symbol": "INTC", "name": "Intel Corporation"}
-    ]
-    
-    return companies
+# Stock endpoints moved to /api/v1/stocks/
 
-@app.get("/stocks/history")
-async def get_stock_history(
-    symbols: str,
-    days: int = 7,
-    stock_service: AsyncStockService = Depends(get_stock_service),
-    usage_service: AsyncUsageService = Depends(get_usage_service)
-):
-    """Get historical stock data"""
-    start_time = time.time()
-    
-    try:
-        # Parse symbols
-        symbol_list = [s.strip().upper() for s in symbols.split(",")]
-        
-        # Get historical data using the correct method
-        result = await stock_service.get_stock_history(
-            symbols=symbol_list,
-            days=days
-        )
-        
-        # Track usage
-        response_time = time.time() - start_time
-        await usage_service.track_request(
-            endpoint="stock_history",
-            response_time=response_time,
-            success=True
-        )
-        
-        return result
-        
-    except Exception as e:
-        # Track failed request
-        response_time = time.time() - start_time
-        await usage_service.track_request(
-            endpoint="stock_history",
-            response_time=response_time,
-            success=False,
-            error=str(e)
-        )
-        
-        logger.error(f"Stock history error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/analyze")
-async def analyze_stock_endpoint(
-    request: Request,
-    stock_service: AsyncStockService = Depends(get_stock_service),
-    usage_service: AsyncUsageService = Depends(get_usage_service)
-):
-    """Analyze stock using trading strategies"""
-    start_time = time.time()
-    
-    try:
-        # Check content type
-        content_type = request.headers.get("content-type", "")
-        
-        if "application/json" in content_type:
-            # Handle JSON request
-            body = await request.json()
-            symbol = body.get("symbol", "").upper()
-            strategy = body.get("strategy", "trend")
-            period = body.get("period", "1y")
-        else:
-            # Handle form data
-            form_data = await request.form()
-            symbol = form_data.get("symbol", "").upper()
-            strategy = form_data.get("strategy", "trend")
-            period = form_data.get("period", "1y")
-        
-        if not symbol:
-            raise HTTPException(status_code=400, detail="Symbol is required")
-        
-        # Get stock data and perform analysis
-        result = await stock_service.analyze_stock(
-            symbol=symbol,
-            strategy=strategy,
-            period=period
-        )
-        
-        # Track usage
-        response_time = time.time() - start_time
-        await usage_service.track_request(
-            endpoint="analyze",
-            response_time=response_time,
-            success=True
-        )
-        
-        return {
-            "success": True,
-            "symbol": symbol,
-            "strategy": strategy,
-            "period": period,
-            "latest_signals": result.get("latest_signals", {}),
-            "metrics": result.get("metrics", {}),
-            "response_time": response_time
-        }
-        
-    except Exception as e:
-        # Track failed request
-        response_time = time.time() - start_time
-        await usage_service.track_request(
-            endpoint="analyze",
-            response_time=response_time,
-            success=False,
-            error=str(e)
-        )
-        
-        logger.error(f"Stock analysis error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/volatility_event_correlation")
+# @app.get("/volatility_event_correlation")  # Moved to /api/v1/stocks/
 async def get_volatility_event_correlation(
     symbol: str,
     start_date: str = None,
@@ -325,7 +184,7 @@ async def get_volatility_event_correlation(
         )
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/volatility_regime/analyze")
+# @app.post("/volatility_regime/analyze")  # Moved to /api/v1/stocks/
 async def analyze_volatility_regime(
     request: Request,
     stock_service: AsyncStockService = Depends(get_stock_service),
@@ -418,240 +277,11 @@ async def analyze_volatility_regime(
         )
         raise HTTPException(status_code=500, detail=str(e))
 
-# Chat endpoints to match original Flask app
-@app.post("/chat")
-async def chat_endpoint(
-    request: Request,
-    ai_service: AsyncAIService = Depends(get_ai_service),
-    usage_service: AsyncUsageService = Depends(get_usage_service)
-):
-    """Main chat endpoint - handles both JSON and form data"""
-    start_time = time.time()
-    
-    # Debug: Check API key status
-    logger.info(f"Chat endpoint - API key configured: {bool(ai_service.api_key)}")
-    logger.info(f"Chat endpoint - API key length: {len(ai_service.api_key) if ai_service.api_key else 0}")
-    
-    try:
-        # Check content type
-        content_type = request.headers.get("content-type", "")
-        
-        if "application/json" in content_type:
-            # Handle JSON request
-            body = await request.json()
-            message = body.get("message", "")
-            model = body.get("model", "mistral-small")
-            temperature = float(body.get("temperature", 0.7))
-            max_tokens = int(body.get("max_tokens", 1000))
-        else:
-            # Handle form data (like original Flask app)
-            form_data = await request.form()
-            message = form_data.get("message", "")
-            model = form_data.get("model", "mistral-small")
-            temperature = float(form_data.get("temperature", 0.7))
-            max_tokens = int(form_data.get("max_tokens", 1000))
-        
-        if not message:
-            raise HTTPException(status_code=400, detail="Message is required")
-        
-        # Make async API call with enhanced stock analysis
-        result = await ai_service.chat_with_stock_analysis(
-            message=message,
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
-        
-        # Track usage
-        response_time = time.time() - start_time
-        await usage_service.track_request(
-            endpoint="chat",
-            model=model,
-            response_time=response_time,
-            success=True
-        )
-        
-        response_data = {
-            "success": True,
-            "response": result["response"],
-            "model": result["model"],
-            "usage": result["usage"],
-            "response_time": response_time
-        }
-        
-        # Add stock analysis data if available
-        if "stock_analysis" in result:
-            response_data["stock_analysis"] = result["stock_analysis"]
-            response_data["symbol_analyzed"] = result.get("symbol_analyzed")
-        
-        return response_data
-        
-    except Exception as e:
-        # Track failed request
-        response_time = time.time() - start_time
-        try:
-            await usage_service.track_request(
-                endpoint="chat",
-                response_time=response_time,
-                success=False,
-                error=str(e)
-            )
-        except Exception as track_error:
-            logger.error(f"Failed to track usage: {track_error}")
-        
-        logger.error(f"Chat error: {e}")
-        
-        # Provide more helpful error messages
-        if "OpenRouter API key not configured" in str(e):
-            error_detail = "OpenRouter API key is not configured. Please set the OPENROUTER_API_KEY environment variable."
-        elif "API call failed" in str(e):
-            error_detail = f"AI service error: {str(e)}"
-        else:
-            error_detail = str(e)
-        
-        raise HTTPException(status_code=500, detail=error_detail)
+# Chat endpoints moved to /api/v1/chat/
 
-@app.post("/compare_models")
-async def compare_models_endpoint(
-    request: Request,
-    ai_service: AsyncAIService = Depends(get_ai_service),
-    usage_service: AsyncUsageService = Depends(get_usage_service)
-):
-    """Compare multiple AI models"""
-    start_time = time.time()
-    
-    try:
-        # Check content type
-        content_type = request.headers.get("content-type", "")
-        
-        if "application/json" in content_type:
-            # Handle JSON request
-            body = await request.json()
-            prompt = body.get("prompt", "")
-            models = body.get("models", []) if body.get("models") else None
-            temperature = float(body.get("temperature", 0.7))
-            max_tokens = int(body.get("max_tokens", 800))  # Increased from 500
-        else:
-            # Handle form data
-            form_data = await request.form()
-            prompt = form_data.get("prompt", "")
-            models = form_data.get("models", "").split(",") if form_data.get("models") else None
-            temperature = float(form_data.get("temperature", 0.7))
-            max_tokens = int(form_data.get("max_tokens", 800))  # Increased from 500
-        
-        if not prompt:
-            raise HTTPException(status_code=400, detail="Prompt is required")
-        
-        # Compare models concurrently
-        comparison_start_time = time.time()
-        results = await ai_service.compare_models(
-            prompt=prompt,
-            models=models,
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
-        
-        # Calculate actual response times for each model
-        total_comparison_time = time.time() - comparison_start_time
-        avg_model_time = total_comparison_time / len(results) if results else 0
-        
-        # Update results with response times
-        for i, result in enumerate(results):
-            if result.get("success", False):
-                # Approximate individual model time (since they run concurrently)
-                result["response_time"] = avg_model_time
-                
-                # Calculate word count and average word length
-                response_text = result.get("response", "")
-                words = response_text.split()
-                result["word_count"] = len(words)
-                result["avg_word_length"] = sum(len(word) for word in words) / len(words) if words else 0
-                result["token_count"] = result.get("usage", {}).get("total_tokens", 0)
-            else:
-                result["response_time"] = 0
-                result["word_count"] = 0
-                result["avg_word_length"] = 0
-                result["token_count"] = 0
-        
-        # Calculate summary statistics
-        successful_models = len([r for r in results if r.get("success", False)])
-        total_models = len(results)
-        
-        # Calculate average response time and token usage
-        response_times = []
-        token_counts = []
-        successful_results = [r for r in results if r.get("success", False)]
-        
-        for result in successful_results:
-            if "response_time" in result:
-                response_times.append(result["response_time"])
-            if "usage" in result and "total_tokens" in result["usage"]:
-                token_counts.append(result["usage"]["total_tokens"])
-        
-        avg_response_time = sum(response_times) / len(response_times) if response_times else 0
-        avg_token_count = sum(token_counts) / len(token_counts) if token_counts else 0
-        
-        # Find fastest model
-        fastest_model = None
-        if response_times:
-            fastest_index = response_times.index(min(response_times))
-            fastest_model = successful_results[fastest_index]["model"] if fastest_index < len(successful_results) else None
-        
-        # Create summary
-        summary = {
-            "successful_models": successful_models,
-            "total_models": total_models,
-            "avg_response_time": avg_response_time,
-            "avg_token_count": avg_token_count,
-            "fastest_model": fastest_model or (successful_results[0]["model"] if successful_results else None)
-        }
-        
-        # Track usage
-        response_time = time.time() - start_time
-        await usage_service.track_request(
-            endpoint="compare_models",
-            response_time=response_time,
-            success=True
-        )
-        
-        return {
-            "success": True,
-            "results": results,
-            "summary": summary,
-            "response_time": response_time
-        }
-        
-    except Exception as e:
-        # Track failed request
-        response_time = time.time() - start_time
-        await usage_service.track_request(
-            endpoint="compare_models",
-            response_time=response_time,
-            success=False,
-            error=str(e)
-        )
-        
-        logger.error(f"Model comparison error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+# Compare models endpoint moved to /api/v1/chat/compare_models
 
-@app.get("/models")
-async def get_models_endpoint(
-    ai_service: AsyncAIService = Depends(get_ai_service)
-):
-    """Get available AI models"""
-    try:
-        models = await ai_service.get_available_models()
-        return {
-            "success": True,
-            "models": models
-        }
-    except Exception as e:
-        logger.error(f"Error getting models: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "api_key_configured": bool(settings.openrouter_api_key)
-        }
+# Models endpoint moved to /api/v1/chat/models
 
 @app.post("/analyze_tweet")
 async def analyze_tweet_endpoint(
@@ -795,76 +425,13 @@ async def get_model_comparison():
 async def root():
     return FileResponse("static/index.html")
 
-# Health check
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "timestamp": time.time(),
-        "app_name": settings.app_name,
-        "debug": settings.debug,
-        "api_key_configured": bool(settings.openrouter_api_key)
-    }
+# Health check moved to /api/v1/monitoring/health
 
-# Test endpoint
-@app.get("/test")
-async def test():
-    return {
-        "message": "Hello, FastAPI world!",
-        "api_key_configured": bool(settings.openrouter_api_key),
-        "api_key_length": len(settings.openrouter_api_key) if settings.openrouter_api_key else 0,
-        "debug_mode": settings.debug,
-        "app_name": settings.app_name
-    }
+# Test endpoint moved to /api/v1/monitoring/test
 
-@app.get("/test-api")
-async def test_api(
-    ai_service: AsyncAIService = Depends(get_ai_service)
-):
-    """Test API call directly"""
-    try:
-        # Test a simple API call
-        result = await ai_service.call_api(
-            messages=[{"role": "user", "content": "Hello"}],
-            model="mistral-small",
-            temperature=0.7,
-            max_tokens=50
-        )
-        return {
-            "success": True,
-            "result": result
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "api_key_configured": bool(ai_service.api_key),
-            "api_key_length": len(ai_service.api_key) if ai_service.api_key else 0
-        }
+# Test API endpoint moved to /api/v1/monitoring/test-api
 
-@app.get("/test-comparison")
-async def test_comparison(
-    ai_service: AsyncAIService = Depends(get_ai_service)
-):
-    """Test model comparison with a simple prompt"""
-    try:
-        result = await ai_service.compare_models(
-            prompt="What is 2+2?",
-            models=["mistral-small"],
-            temperature=0.7,
-            max_tokens=50
-        )
-        return {
-            "success": True,
-            "message": "Model comparison test successful",
-            "results": result
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "api_key_configured": bool(ai_service.api_key)
-        }
+# Test comparison endpoint moved to /api/v1/monitoring/test-comparison
 
 
 

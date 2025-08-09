@@ -503,4 +503,171 @@ class AsyncStockService:
                 query_lower in stock["name"].lower()):
                 results.append(stock)
         
-        return results[:10]  # Limit to 10 results 
+        return results[:10]  # Limit to 10 results
+
+    async def get_volatility_event_correlation(
+        self,
+        symbol: str,
+        start_date: str = None,
+        end_date: str = None,
+        window: int = 30,
+        years: int = 2
+    ) -> Dict[str, Any]:
+        """Get volatility event correlation data"""
+        try:
+            # Set default dates if not provided
+            if not start_date or not end_date:
+                from datetime import datetime, timedelta
+                end = datetime.now()
+                start = end - timedelta(days=years*365)
+                start_date = start.strftime('%Y-%m-%d')
+                end_date = end.strftime('%Y-%m-%d')
+            
+            # Get stock data
+            stock_data = await self.get_stock_data(symbol, 365)
+            
+            if not stock_data or not stock_data.get('data'):
+                raise Exception(f"No data available for {symbol}")
+            
+            # Extract dates and prices
+            dates = []
+            for day in stock_data['data']:
+                if hasattr(day['Date'], 'strftime'):
+                    dates.append(day['Date'].strftime('%Y-%m-%d'))
+                else:
+                    # Handle ISO format dates
+                    date_str = str(day['Date'])
+                    if 'T' in date_str:
+                        dates.append(date_str.split('T')[0])
+                    else:
+                        dates.append(date_str)
+            prices = [day['Close'] for day in stock_data['data']]
+            
+            if len(prices) < window:
+                raise Exception(f"Not enough data for rolling volatility (need at least {window} days)")
+            
+            # Calculate returns
+            returns = []
+            for i in range(1, len(prices)):
+                returns.append((prices[i] - prices[i-1]) / prices[i-1])
+            
+            # Calculate rolling volatility
+            rolling_vol = []
+            for i in range(window-1, len(returns)):
+                window_returns = returns[i-window+1:i+1]
+                vol = np.std(window_returns) * np.sqrt(252) * 100
+                rolling_vol.append(vol)
+            
+            # Pad with None values for the first window-1 days
+            volatility = [None] * (window-1) + rolling_vol
+            
+            # Find minimum volatility period
+            valid_start = int(len(volatility) * 0.1)
+            valid_vols = [v for v in volatility[valid_start:] if v is not None]
+            valid_dates = dates[valid_start:]
+            
+            min_vol = None
+            min_vol_date = None
+            if valid_vols:
+                min_vol = min(valid_vols)
+                min_idx = volatility[valid_start:].index(min_vol) + valid_start
+                min_vol_date = dates[min_idx]
+            
+            # Create event titles (empty for now)
+            event_titles = [[] for _ in dates]
+            
+            return {
+                "dates": dates,
+                "volatility": volatility,
+                "event_titles": event_titles,
+                "min_vol": min_vol,
+                "min_vol_date": min_vol_date
+            }
+            
+        except Exception as e:
+            logger.error(f"Volatility event correlation error: {e}")
+            raise e
+
+    async def analyze_volatility_regime(
+        self,
+        symbol: str,
+        start_date: str = None,
+        end_date: str = None,
+        window: int = 30
+    ) -> Dict[str, Any]:
+        """Analyze volatility regime"""
+        try:
+            # Set default dates if not provided
+            if not start_date or not end_date:
+                from datetime import datetime, timedelta
+                end = datetime.now()
+                start = end - timedelta(days=365)
+                start_date = start.strftime('%Y-%m-%d')
+                end_date = end.strftime('%Y-%m-%d')
+            
+            # Get stock data
+            stock_data = await self.get_stock_data(symbol, 365)
+            
+            if not stock_data or not stock_data.get('data'):
+                raise Exception(f"No data available for {symbol}")
+            
+            # Extract prices
+            prices = [day['Close'] for day in stock_data['data']]
+            
+            if len(prices) < window:
+                raise Exception(f"Not enough data for volatility analysis (need at least {window} days)")
+            
+            # Calculate returns
+            returns = []
+            for i in range(1, len(prices)):
+                returns.append((prices[i] - prices[i-1]) / prices[i-1])
+            
+            # Calculate rolling volatility
+            rolling_vol = []
+            for i in range(window-1, len(returns)):
+                window_returns = returns[i-window+1:i+1]
+                vol = np.std(window_returns) * np.sqrt(252) * 100
+                rolling_vol.append(vol)
+            
+            # Pad with None values for the first window-1 days
+            volatility = [None] * (window-1) + rolling_vol
+            
+            # Calculate regime statistics
+            valid_vols = [v for v in volatility if v is not None]
+            if valid_vols:
+                avg_vol = np.mean(valid_vols)
+                vol_std = np.std(valid_vols)
+                high_vol_threshold = avg_vol + vol_std
+                low_vol_threshold = avg_vol - vol_std
+                
+                # Classify regimes
+                high_vol_count = sum(1 for v in valid_vols if v > high_vol_threshold)
+                low_vol_count = sum(1 for v in valid_vols if v < low_vol_threshold)
+                normal_vol_count = len(valid_vols) - high_vol_count - low_vol_count
+                
+                current_regime = "normal"
+                if volatility[-1] and volatility[-1] > high_vol_threshold:
+                    current_regime = "high"
+                elif volatility[-1] and volatility[-1] < low_vol_threshold:
+                    current_regime = "low"
+                
+                return {
+                    "symbol": symbol,
+                    "current_regime": current_regime,
+                    "avg_volatility": round(avg_vol, 2),
+                    "volatility_std": round(vol_std, 2),
+                    "high_vol_threshold": round(high_vol_threshold, 2),
+                    "low_vol_threshold": round(low_vol_threshold, 2),
+                    "regime_counts": {
+                        "high": high_vol_count,
+                        "normal": normal_vol_count,
+                        "low": low_vol_count
+                    },
+                    "volatility_data": volatility
+                }
+            else:
+                raise Exception("No valid volatility data available")
+                
+        except Exception as e:
+            logger.error(f"Volatility regime analysis error: {e}")
+            raise e 
