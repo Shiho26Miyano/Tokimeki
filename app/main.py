@@ -386,8 +386,9 @@ async def get_model_comparison():
             "context_window": "32K",
             "performance": "High",
             "model_size": "7B",
-            "best_for": "General purpose",
-            "strengths": "Fast, efficient, good reasoning",
+            "best_for": ["General purpose"],
+            "strengths": ["Fast", "efficient", "good reasoning"],
+            "note": "Excellent balance of speed and capability",
             "notes": "Excellent balance of speed and capability"
         },
         {
@@ -396,8 +397,9 @@ async def get_model_comparison():
             "context_window": "128K",
             "performance": "Very High",
             "model_size": "67B",
-            "best_for": "Complex reasoning",
-            "strengths": "Strong reasoning, long context",
+            "best_for": ["Complex reasoning"],
+            "strengths": ["Strong reasoning", "long context"],
+            "note": "Best for complex tasks",
             "notes": "Best for complex tasks"
         },
         {
@@ -406,8 +408,9 @@ async def get_model_comparison():
             "context_window": "32K",
             "performance": "High",
             "model_size": "8B",
-            "best_for": "Code and reasoning",
-            "strengths": "Good coding, efficient",
+            "best_for": ["Code and reasoning"],
+            "strengths": ["Good coding", "efficient"],
+            "note": "Strong for technical tasks",
             "notes": "Strong for technical tasks"
         }
     ]
@@ -434,6 +437,56 @@ async def root():
 # Test comparison endpoint moved to /api/v1/monitoring/test-comparison
 
 
+
+@app.get("/health")
+async def legacy_root_health():
+    """Backward-compatible root health endpoint"""
+    return {"status": "healthy", "service": "app", "timestamp": time.time()}
+
+@app.get("/available_tickers")
+async def legacy_available_tickers(
+    stock_service: AsyncStockService = Depends(get_stock_service)
+):
+    """Backward-compatible endpoint for available tickers"""
+    tickers = await stock_service.get_available_tickers()
+    return tickers
+
+@app.get("/available_companies")
+async def legacy_available_companies(
+    stock_service: AsyncStockService = Depends(get_stock_service)
+):
+    """Backward-compatible endpoint for available companies"""
+    companies = await stock_service.get_available_companies()
+    return companies
+
+@app.get("/stocks/history")
+async def legacy_stock_history(
+    symbols: str,
+    days: int = 1095,
+    stock_service: AsyncStockService = Depends(get_stock_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Backward-compatible endpoint mapping to /api/v1/stocks/history"""
+    start_time = time.time()
+    try:
+        symbol_list = [s.strip().upper() for s in symbols.split(",")]
+        result = await stock_service.get_stock_history(symbols=symbol_list, days=days)
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="stock_history_legacy",
+            response_time=response_time,
+            success=True
+        )
+        return result
+    except Exception as exc:
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="stock_history_legacy",
+            response_time=response_time,
+            success=False,
+            error=str(exc)
+        )
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @app.get("/ai-platform-comparison")
 async def get_ai_platform_comparison():

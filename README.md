@@ -166,19 +166,76 @@ uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
 ```
 Tokimeki/
-├── app/                    # FastAPI application
-│   ├── core/              # Configuration and dependencies
-│   ├── services/          # Business logic services
-│   └── api/               # API endpoints
-├── static/                # Frontend assets
-├── templates/             # HTML templates
-├── tests/                 # Test suite
-├── utils/                 # Utility functions
-├── logs/                  # Application logs
-├── .env                   # Environment variables (not in git)
-├── requirements.txt       # Python dependencies
-├── Procfile              # Railway deployment config
-└── README.md             # This file
+├── app/                         # FastAPI application package
+│   ├── __init__.py
+│   ├── main.py                  # App entrypoint (FastAPI)
+│   ├── core/                    # Config, middleware, DI
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── dependencies.py
+│   │   └── middleware.py
+│   ├── services/                # Async services (business logic)
+│   │   ├── __init__.py
+│   │   ├── ai_service.py
+│   │   ├── cache_service.py
+│   │   ├── stock_service.py
+│   │   └── usage_service.py
+│   ├── api/                     # API routers (v1)
+│   │   ├── __init__.py
+│   │   └── v1/
+│   │       ├── __init__.py
+│   │       ├── api.py           # Root v1 router
+│   │       └── endpoints/
+│   │           ├── __init__.py
+│   │           ├── chat.py
+│   │           ├── monitoring.py
+│   │           ├── sentiment.py
+│   │           ├── speech.py
+│   │           └── stocks.py
+│   └── utils/                   # Internal async helpers
+│       ├── async_cache.py
+│       └── async_usage_tracker.py
+├── static/                      # Frontend assets (SPA)
+│   ├── index.html
+│   ├── main.js
+│   ├── style.css
+│   └── img/
+├── templates/                   # Server-rendered HTML
+│   ├── index.html
+│   ├── ai_platform_comparison.html
+│   └── monitoring.html
+├── routes/                      # Legacy Flask-style routes (kept for reference)
+│   ├── ai_platform_comparison.py
+│   ├── deepseek_chatbot.py
+│   ├── investment_playbooks.py
+│   ├── speech_analysis.py
+│   ├── stock_data_provider.py
+│   ├── trading_strategy_analyzer.py
+│   ├── tweet_sentiment_analyzer.py
+│   └── volatility_regime_strategy.py
+├── utils/                       # Legacy utilities (non-app package)
+│   ├── __init__.py
+│   ├── cache_manager.py
+│   └── usage_tracker.py
+├── cache/                       # (optional) cache directory
+├── project_tracker/
+│   └── 001_fastapi_migration_plan_20250803.txt
+├── static/img/                  # Images used in README / UI
+├── run_fastapi.py               # Launcher script
+├── run_local.sh
+├── requirements.txt
+├── requirements_fastapi.txt
+├── README.md
+├── README_fastapi.md
+├── railway-setup.md
+├── cost-optimization.md
+├── verify_deployment.py
+├── server.log
+└── tests & artifacts           # Test files stored at repo root
+    ├── test_stock_ai.py
+    ├── test_enhanced_stock_ai.py
+    ├── test_results_summary.md
+    └── test_volatility_fixes.html
 ```
 
 ## 📊 API Endpoints
