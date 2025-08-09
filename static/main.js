@@ -1,5 +1,5 @@
-console.log('main.js loaded');
-// main.js - Clean, robust version for three features only
+console.log('main.js loaded - Updated 2025-01-01');
+// main.js - Clean, robust version for three features only - CACHE BUSTED
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded, initializing components...');
