@@ -80,6 +80,12 @@ async def get_ai_service(
     from ..services.ai_service import AsyncAIService
     return AsyncAIService(http_client, cache_service, stock_service) 
 
+# Portfolio service dependency
+async def get_portfolio_service():
+    """Dependency for portfolio service"""
+    from ..services.portfolio_service import PortfolioService
+    return PortfolioService()
+
 # RAG service singleton dependency
 _rag_service_singleton = None
 

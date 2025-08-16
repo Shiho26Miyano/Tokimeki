@@ -2,7 +2,7 @@
 API v1 router configuration
 """
 from fastapi import APIRouter
-from .endpoints import chat, stocks, sentiment, speech, monitoring, rag
+from .endpoints import chat, stocks, sentiment, speech, monitoring, rag, portfolio
 
 # Create main API router
 api_router = APIRouter()
@@ -14,6 +14,7 @@ api_router.include_router(sentiment.router, prefix="/sentiment", tags=["sentimen
 api_router.include_router(speech.router, prefix="/speech", tags=["speech"])
 api_router.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
 api_router.include_router(rag.router, prefix="/rag", tags=["rag"])
+api_router.include_router(portfolio.router, prefix="/portfolio", tags=["portfolio"])
 
 # Add API version info
 @api_router.get("/")
@@ -89,6 +90,7 @@ async def test_api():
             "stocks": "/api/v1/stocks",
             "chat": "/api/v1/chat",
             "rag": "/api/v1/rag",
-            "monitoring": "/api/v1/monitoring"
+            "monitoring": "/api/v1/monitoring",
+            "portfolio": "/api/v1/portfolio"
         }
     } 

@@ -38,3 +38,7 @@ sentence-transformers==2.7.0
 langchain-text-splitters==0.2.2
 torch==2.3.1
 pdfminer.six==20231228
+
+# Portfolio Dashboard Dependencies
+streamlit==1.48.1
+plotly==6.3.0
