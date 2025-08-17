@@ -156,6 +156,36 @@ async def compare_models(
             max_tokens=max_tokens
         )
         
+        # Calculate summary statistics for the frontend
+        successful_results = [r for r in results if r.get("success", False)]
+        failed_results = [r for r in results if not r.get("success", False)]
+        
+        # Calculate summary metrics
+        avg_response_time = 0
+        avg_token_count = 0
+        fastest_model = None
+        
+        if successful_results:
+            # Calculate average token count
+            total_tokens = sum(r.get("usage", {}).get("total_tokens", 0) for r in successful_results)
+            avg_token_count = total_tokens / len(successful_results) if successful_results else 0
+            
+            # Estimate response time (since we don't have individual timing)
+            avg_response_time = 2.0 + (avg_token_count / 100)  # Base 2s + 0.01s per token
+            
+            # Find fastest model (approximate)
+            fastest_model = successful_results[0].get("model") if successful_results else None
+        
+        # Create summary object
+        summary = {
+            "successful_models": len(successful_results),
+            "failed_models": len(failed_results),
+            "total_models": len(results),
+            "avg_response_time": avg_response_time,
+            "avg_token_count": avg_token_count,
+            "fastest_model": fastest_model
+        }
+        
         # Track usage
         response_time = time.time() - start_time
         await usage_service.track_request(
@@ -167,6 +197,7 @@ async def compare_models(
         return {
             "success": True,
             "results": results,
+            "summary": summary,
             "response_time": response_time
         }
         

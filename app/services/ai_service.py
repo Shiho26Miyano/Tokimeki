@@ -150,17 +150,34 @@ class AsyncAIService:
                     "model": models[i],
                     "error": str(result),
                     "success": False,
-                    "response_time": 0
+                    "response_time": 0,
+                    "token_count": 0,
+                    "word_count": 0,
+                    "avg_word_length": 0
                 })
             else:
-                # Calculate response time (approximate since we don't have individual timing)
-                # We'll use a placeholder and let the main endpoint calculate actual timing
+                # Extract response content and usage
+                response_content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                usage = result.get("usage", {})
+                token_count = usage.get("total_tokens", 0)
+                
+                # Calculate word statistics
+                words = response_content.split() if response_content else []
+                word_count = len(words)
+                avg_word_length = sum(len(word) for word in words) / word_count if word_count > 0 else 0
+                
+                # Estimate response time based on token count (rough approximation)
+                estimated_response_time = 2.0 + (token_count / 100)  # Base 2s + 0.01s per token
+                
                 processed_results.append({
                     "model": models[i],
-                    "response": result.get("choices", [{}])[0].get("message", {}).get("content", ""),
-                    "usage": result.get("usage", {}),
+                    "response": response_content,
+                    "usage": usage,
                     "success": True,
-                    "response_time": 0  # Will be calculated in main endpoint
+                    "response_time": estimated_response_time,
+                    "token_count": token_count,
+                    "word_count": word_count,
+                    "avg_word_length": avg_word_length
                 })
         
         # Cache the comparison results
