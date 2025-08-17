@@ -504,4 +504,189 @@ class AsyncMNQInvestmentService:
             logger.error(f"Error finding optimal investment amounts: {e}")
             raise
 
+    async def generate_diagnostic_event_analysis(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Generate diagnostic event analysis identifying worst week and factor impacts"""
+        try:
+            logger.info("Starting diagnostic event analysis")
+
+            # Set default dates if not provided
+            if not end_date:
+                end_date = datetime.now().strftime('%Y-%m-%d')
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+
+            # Get MNQ futures data
+            data = await self.get_mnq_futures_data(start_date, end_date)
+            if not data or not data.get('data'):
+                raise Exception("No MNQ futures data available")
+
+            # Calculate DCA performance to get weekly breakdown
+            weekly_amount = 1000.0  # Default amount for analysis
+            dca_results = await self._calculate_dca_performance(data, weekly_amount, start_date, end_date)
+            
+            if not dca_results or 'weekly_breakdown' not in dca_results:
+                raise Exception("No weekly breakdown data available")
+
+            # Find the worst week by time-weighted return
+            weekly_breakdown = dca_results['weekly_breakdown']
+            worst_week = None
+            worst_return = float('inf')
+            
+            for week_data in weekly_breakdown:
+                if week_data.get('time_weighted_return') is not None:
+                    twr = week_data['time_weighted_return']
+                    if twr < worst_return:
+                        worst_return = twr
+                        worst_week = week_data
+
+            if not worst_week:
+                raise Exception("Could not identify worst week")
+
+            # Create factor impact analysis
+            factor_analysis = await self._create_factor_impact_table(worst_week, data)
+
+            logger.info("Diagnostic event analysis completed successfully")
+            return {
+                'worst_week': worst_week,
+                'factor_analysis': factor_analysis
+            }
+
+        except Exception as e:
+            logger.error(f"Diagnostic event analysis error: {e}")
+            raise
+
+    async def _create_factor_impact_table(self, worst_week: Dict[str, Any], market_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create factor impact table using AI analysis"""
+        
+        # Extract worst week details
+        worst_date = worst_week.get('date', 'Unknown Date')
+        worst_return = worst_week.get('time_weighted_return', 0.0)
+        worst_return_pct = worst_return * 100
+        
+        # Get market context data
+        price_change = worst_week.get('price', 0)
+        volume_change = worst_week.get('contracts_bought', 0)
+        
+        # Create AI prompt for factor analysis
+        ai_prompt = f"""You are a financial market analyst. Analyze the worst week in MNQ futures trading and identify the key factors that caused the {worst_return_pct:.2f}% loss on {worst_date}.
+
+Context:
+- Date: {worst_date}
+- Weekly return: {worst_return_pct:.2f}%
+- Price change: ${price_change:.2f}
+- Volume change: {volume_change} contracts
+
+Generate exactly 5 specific market factors that likely contributed to this loss. For each factor:
+1. Provide a specific, realistic factor name (e.g., "Fed Rate Decision", "Earnings Miss", "Geopolitical Tension")
+2. Describe the concrete impact on the market
+3. Categorize the factor type (Policy, Market Index, Futures Market, Global Market, Volatility, Trade Relations, or Market Event)
+
+IMPORTANT: You must respond with ONLY valid JSON in this exact format:
+{{
+    "factor_table": [
+        {{"factor": "Factor Name", "impact": "Specific impact description", "factor_type": "Factor Type"}},
+        {{"factor": "Factor Name", "impact": "Specific impact description", "factor_type": "Factor Type"}},
+        {{"factor": "Factor Name", "impact": "Specific impact description", "factor_type": "Factor Type"}},
+        {{"factor": "Factor Name", "impact": "Specific impact description", "factor_type": "Factor Type"}},
+        {{"factor": "Factor Name", "impact": "Specific impact description", "factor_type": "Factor Type"}}
+    ]
+}}
+
+Focus on realistic market events that could cause such losses. Be specific and avoid generic statements. Do not include any text before or after the JSON."""
+        
+        try:
+            # Import AI service here to avoid circular imports
+            from app.services.ai_service import AsyncAIService
+            import httpx
+            
+            # Create HTTP client for AI service
+            async with httpx.AsyncClient() as http_client:
+                ai_service = AsyncAIService(http_client, self.cache_service)
+                
+                # Get AI analysis
+                ai_result = await ai_service.chat(
+                    message=ai_prompt,
+                    model="mistral-small",
+                    temperature=0.3,
+                    max_tokens=800
+                )
+            
+            # Parse AI response
+            response_text = ai_result.get("response", "")
+            
+            # Try to extract JSON from response
+            import json
+            import re
+            
+            # Clean the response text - remove any markdown formatting
+            cleaned_text = response_text.strip()
+            if cleaned_text.startswith('```json'):
+                cleaned_text = cleaned_text[7:]
+            if cleaned_text.endswith('```'):
+                cleaned_text = cleaned_text[:-3]
+            cleaned_text = cleaned_text.strip()
+            
+            # Try to parse the cleaned text directly first
+            try:
+                parsed_data = json.loads(cleaned_text)
+                if 'factor_table' in parsed_data:
+                    factor_table = parsed_data['factor_table']
+                    # Validate that we have exactly 5 factors
+                    if len(factor_table) != 5:
+                        raise ValueError(f"Expected 5 factors, got {len(factor_table)}")
+                else:
+                    raise ValueError("No factor_table in AI response")
+            except json.JSONDecodeError:
+                # Fallback: try to extract JSON using regex
+                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                if json_match:
+                    try:
+                        parsed_data = json.loads(json_match.group())
+                        if 'factor_table' in parsed_data:
+                            factor_table = parsed_data['factor_table']
+                            if len(factor_table) != 5:
+                                raise ValueError(f"Expected 5 factors, got {len(factor_table)}")
+                        else:
+                            raise ValueError("No factor_table in AI response")
+                    except json.JSONDecodeError:
+                        raise ValueError("Invalid JSON in AI response")
+                else:
+                    raise ValueError("No JSON found in AI response")
+            
+        except Exception as e:
+            logger.error(f"AI factor analysis failed: {e}")
+            raise
+
+        return {
+            'worst_date': worst_date,
+            'worst_return_pct': worst_return_pct,
+            'factor_table': factor_table
+        }
+
+    def _get_factor_type(self, factor_name: str) -> str:
+        """
+        Helper to categorize factors into broad categories.
+        This is a placeholder and can be expanded based on more specific rules.
+        """
+        if "Fed Rate Decision" in factor_name:
+            return "Macro Economic"
+        elif "Earnings Miss" in factor_name:
+            return "Earnings"
+        elif "Geopolitical Tension" in factor_name:
+            return "Geopolitical"
+        elif "Earnings" in factor_name:
+            return "Earnings"
+        elif "Technical Breakdown" in factor_name:
+            return "Technical"
+        elif "Sector Rotation" in factor_name:
+            return "Sector"
+        elif "Risk Aversion" in factor_name:
+            return "Risk"
+        else:
+            return "Other"
+
 

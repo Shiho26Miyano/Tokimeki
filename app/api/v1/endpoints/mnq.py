@@ -629,3 +629,107 @@ IMPORTANT: Use ONLY the actual calculated data provided above in the "Top 5 Reco
             "model_used": "fallback",
             "response_time": response_time
         }
+
+@router.post("/generate-diagnostic-analysis", response_model=MNQAnalysisResponse)
+async def generate_mnq_diagnostic_analysis(
+    request: MNQAnalysisRequest,
+    cache_service = Depends(get_cache_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Generate diagnostic event analysis identifying worst week and factor impacts"""
+    
+    start_time = time.time()
+    
+    try:
+        logger.info(f"Generating diagnostic analysis for MNQ strategy: ${request.weekly_amount}/week")
+        
+        from app.services.mnq_investment_service import AsyncMNQInvestmentService
+        
+        mnq_service = AsyncMNQInvestmentService(cache_service)
+        
+        # Generate diagnostic event analysis
+        diagnostic_result = await mnq_service.generate_diagnostic_event_analysis(
+            start_date=request.start_date,
+            end_date=request.end_date
+        )
+        
+        if not diagnostic_result:
+            raise Exception("Failed to generate diagnostic analysis")
+        
+        worst_week = diagnostic_result['worst_week']
+        factor_analysis = diagnostic_result['factor_analysis']
+        
+        # Create diagnostic analysis report
+        worst_date = factor_analysis['worst_date']
+        worst_return_pct = factor_analysis['worst_return_pct']
+        
+        # Create the diagnostic report in HTML format - concentrated and focused
+        diagnostic_report = f"""<div class="diagnostic-analysis">
+            <div class="diagnostic-header text-center mb-3">
+                <h4 class="text-primary mb-2">🔍 Diagnostic Event Analysis</h4>
+                <div class="alert alert-danger py-2">
+                    <strong>Worst Week: {worst_date} ({worst_return_pct:.2f}% loss)</strong>
+                </div>
+            </div>
+            
+            <div class="factor-impact-section mb-3">
+                <h5 class="text-dark mb-2">Factor Impact Table</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Factor</th>
+                                <th>Type</th>
+                                <th>Impact on {worst_date}</th>
+                            </tr>
+                        </thead>
+                        <tbody>"""
+        
+        # Add table rows - only the most important factors with type categorization
+        important_factors = factor_analysis['factor_table'][:5]  # Limit to top 5
+        for factor in important_factors:
+            factor_type = factor.get('factor_type', 'Market Event')  # Get factor type from AI response
+            diagnostic_report += f"""
+                            <tr>
+                                <td><strong>{factor['factor']}</strong></td>
+                                <td><span class="badge bg-secondary">{factor_type}</span></td>
+                                <td>{factor['impact']}</td>
+                            </tr>"""
+        
+        diagnostic_report += f"""
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>"""
+
+        # Track usage
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="mnq_diagnostic_analysis",
+            model="diagnostic_analysis",
+            response_time=response_time,
+            success=True
+        )
+        
+        logger.info(f"Diagnostic analysis generated successfully in {response_time:.2f}s")
+        
+        return {
+            "success": True,
+            "analysis": diagnostic_report,
+            "model_used": "diagnostic_analysis",
+            "response_time": response_time
+        }
+        
+    except Exception as e:
+        # Track failed request
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="mnq_diagnostic_analysis",
+            response_time=response_time,
+            success=False,
+            error=str(e)
+        )
+        
+        logger.error(f"Diagnostic analysis generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Diagnostic analysis failed: {str(e)}")

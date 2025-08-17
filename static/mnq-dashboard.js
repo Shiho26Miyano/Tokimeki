@@ -137,8 +137,8 @@ async function calculateMNQInvestment() {
             })
         });
 
-        // Start AI analysis preparation in parallel (using estimated data)
-        const aiPromise = prepareAIAnalysis(weeklyAmount, startDate, endDate);
+        // Start diagnostic analysis preparation in parallel (using estimated data)
+        const aiPromise = prepareDiagnosticAnalysis(weeklyAmount, startDate, endDate);
 
         // Wait for MNQ results first (display immediately)
         console.log('Waiting for MNQ calculation results...');
@@ -190,17 +190,17 @@ async function calculateMNQInvestment() {
             console.warn('Error fetching optimal amounts:', optimalError);
         }
         
-        // Now generate AI analysis with real data (non-blocking)
-        console.log('Starting AI analysis with real data...');
-        generateAIStrategyAnalysis(data);
+        // Now generate diagnostic analysis with real data (non-blocking)
+        console.log('Starting diagnostic analysis with real data...');
+        generateDiagnosticEventAnalysis(data);
         
-        // Wait for AI analysis to complete in background (non-blocking)
+        // Wait for diagnostic analysis to complete in background (non-blocking)
         aiPromise.then(aiResult => {
             if (aiResult) {
-                console.log('Background AI analysis completed');
+                console.log('Background diagnostic analysis completed');
             }
         }).catch(aiError => {
-            console.log('Background AI analysis completed separately');
+            console.log('Background diagnostic analysis completed separately');
         });
         
         console.log('MNQ calculation completed successfully');
@@ -437,10 +437,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 console.log('MNQ Dashboard JavaScript setup complete');
 
-// AI Strategy Analysis Functions
-async function generateAIStrategyAnalysis(data) {
+// Diagnostic Event Analysis Functions
+async function generateDiagnosticEventAnalysis(data) {
     try {
-        console.log('Generating AI strategy analysis with data:', data);
+        console.log('Generating diagnostic event analysis with data:', data);
         
         // Only proceed if we have complete data
         if (!data || !data.total_invested || !data.performance_metrics) {
@@ -474,7 +474,7 @@ async function generateAIStrategyAnalysis(data) {
         // Show loading state
         const combinedAnalysis = document.getElementById('ai-combined-analysis');
         if (combinedAnalysis) {
-            combinedAnalysis.innerHTML = '<div class="d-flex align-items-center gap-2"><div class="spinner-border spinner-border-sm text-primary"></div> AI analyzing your strategy and performance...</div>';
+            combinedAnalysis.innerHTML = '<div class="d-flex align-items-center gap-2"><div class="spinner-border spinner-border-sm text-primary"></div> Analyzing market events and identifying worst week...</div>';
         }
         
         // Prepare data for AI analysis using actual calculation results
@@ -498,20 +498,13 @@ async function generateAIStrategyAnalysis(data) {
         
         console.log('AI Analysis Data:', analysisData);
         
-        // Generate AI analysis using Python backend
+        // Generate diagnostic analysis using Python backend
         const analysisResult = await callPythonBackendAnalysis(analysisData);
         
-        // Update UI with AI analysis (render markdown)
+        // Update UI with diagnostic analysis (display HTML directly)
         if (combinedAnalysis && analysisResult) {
-            // Convert markdown to HTML if showdown is available
-            if (typeof showdown !== 'undefined') {
-                const converter = new showdown.Converter();
-                const html = converter.makeHtml(analysisResult);
-                combinedAnalysis.innerHTML = html;
-            } else {
-                // Fallback to plain text if showdown not available
-                combinedAnalysis.innerHTML = analysisResult.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            }
+            // Display HTML content directly since we're now returning HTML
+            combinedAnalysis.innerHTML = analysisResult;
         }
         
         // Stop timer and hide loading state
@@ -548,10 +541,10 @@ async function generateAIStrategyAnalysis(data) {
 
 async function callPythonBackendAnalysis(analysisData) {
     try {
-        console.log('Calling Python backend for AI analysis...');
+        console.log('Calling Python backend for diagnostic analysis...');
         
-        // Call Python backend analysis endpoint
-        const response = await fetch('/api/v1/mnq/generate-analysis', {
+        // Call Python backend diagnostic analysis endpoint
+        const response = await fetch('/api/v1/mnq/generate-diagnostic-analysis', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -669,18 +662,18 @@ function generateStructuredAnalysis(data) {
     }
 }
 
-// Prepare AI analysis in parallel with MNQ calculation
-async function prepareAIAnalysis(weeklyAmount, startDate, endDate) {
+// Prepare diagnostic analysis in parallel with MNQ calculation
+async function prepareDiagnosticAnalysis(weeklyAmount, startDate, endDate) {
     try {
-        console.log('Preparing AI analysis in parallel...');
+        console.log('Preparing diagnostic analysis in parallel...');
         
-        // Estimate some data for early AI preparation
+        // Estimate some data for early diagnostic preparation
         const estimatedData = {
             weekly_amount: weeklyAmount,
             start_date: startDate,
             end_date: endDate,
             total_weeks: Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24 * 7)),
-            // Use conservative estimates for AI preparation
+            // Use conservative estimates for diagnostic preparation
             estimated_total_invested: weeklyAmount * 52, // Assume 52 weeks
             estimated_current_value: weeklyAmount * 52 * 0.95, // Assume slight loss
             estimated_return: -5.0, // Conservative estimate
@@ -692,22 +685,22 @@ async function prepareAIAnalysis(weeklyAmount, startDate, endDate) {
         const preliminaryAnalysis = generateStructuredAnalysis(estimatedData);
         
         if (preliminaryAnalysis) {
-            console.log('Preliminary analysis prepared');
+            console.log('Preliminary diagnostic analysis prepared');
             return preliminaryAnalysis;
         }
         
         return null;
     } catch (error) {
-        console.log('Preliminary AI preparation failed (non-critical):', error);
+        console.log('Preliminary diagnostic preparation failed (non-critical):', error);
         return null;
     }
 }
 
-// Manual refresh function for strategy analysis
-function refreshAIAnalysis() {
+// Manual refresh function for diagnostic analysis
+function refreshDiagnosticAnalysis() {
     const calculateBtn = document.getElementById('mnq-calculate-btn');
     if (calculateBtn && !calculateBtn.disabled) {
-        calculateBtn.click(); // This will trigger a new calculation and AI analysis
+        calculateBtn.click(); // This will trigger a new calculation and diagnostic analysis
     }
 }
 
