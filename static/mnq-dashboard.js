@@ -161,6 +161,18 @@ async function calculateMNQInvestment() {
         
         // Fetch and display optimal amounts
         console.log('Fetching optimal amounts...');
+        
+        // Show progress indicator for optimal amounts
+        const topByPercentage = document.getElementById('top-by-percentage');
+        const topByAmount = document.getElementById('top-by-amount');
+        
+        if (topByPercentage) {
+            topByPercentage.innerHTML = '<div class="list-group-item text-center text-info py-3">🔄 Calculating optimal amounts with $10 step size...</div>';
+        }
+        if (topByAmount) {
+            topByAmount.innerHTML = '<div class="list-group-item text-center text-info py-3">🔄 Calculating optimal amounts with $10 step size...</div>';
+        }
+        
         try {
             const optimalResponse = await fetch('/api/v1/mnq/optimal-amounts', {
                 method: 'POST',
@@ -172,22 +184,88 @@ async function calculateMNQInvestment() {
                     end_date: endDate,
                     min_amount: 100,
                     max_amount: 10000,
-                    step_size: 100,
+                    step_size: 10,
                     top_n: 5,
                     sort_key: "total_return",
                     descending: true
-                })
+                }),
+                signal: AbortSignal.timeout(300000) // 5 minute timeout
             });
+            
+            console.log('Optimal response status:', optimalResponse.status);
+            console.log('Optimal response headers:', optimalResponse.headers);
             
             if (optimalResponse.ok) {
                 const optimalData = await optimalResponse.json();
                 console.log('Optimal amounts received:', optimalData);
-                updateOptimalAmounts(optimalData);
+                console.log('Data type:', typeof optimalData);
+                console.log('Data keys:', Object.keys(optimalData));
+                console.log('Success flag:', optimalData.success);
+                console.log('Top by percentage:', optimalData.top_by_percentage);
+                console.log('Top by profit:', optimalData.top_by_profit);
+                
+                if (optimalData.success && (optimalData.top_by_percentage || optimalData.top_by_profit)) {
+                    updateOptimalAmounts(optimalData);
+                } else {
+                    console.error('Optimal data missing required fields:', optimalData);
+                    // Show error in UI
+                    const topByPercentage = document.getElementById('top-by-percentage');
+                    const topByAmount = document.getElementById('top-by-amount');
+                    
+                    if (topByPercentage) {
+                        topByPercentage.innerHTML = '<div class="list-group-item text-center text-danger py-3">Error: No optimal data received</div>';
+                    }
+                    if (topByAmount) {
+                        topByAmount.innerHTML = '<div class="list-group-item text-center text-danger py-3">Error: No optimal data received</div>';
+                    }
+                }
             } else {
-                console.warn('Failed to fetch optimal amounts');
+                const errorText = await optimalResponse.text();
+                console.error('Failed to fetch optimal amounts. Status:', optimalResponse.status, 'Response:', errorText);
+                
+                // Show error in UI with details
+                const topByPercentage = document.getElementById('top-by-percentage');
+                const topByAmount = document.getElementById('top-by-amount');
+                
+                let errorDisplay = `API Error: ${optimalResponse.status}`;
+                try {
+                    const errorData = JSON.parse(errorText);
+                    if (errorData.detail) {
+                        errorDisplay += ` - ${errorData.detail}`;
+                    }
+                } catch (e) {
+                    if (errorText) {
+                        errorDisplay += ` - ${errorText}`;
+                    }
+                }
+                
+                if (topByPercentage) {
+                    topByPercentage.innerHTML = `<div class="list-group-item text-center text-danger py-3">${errorDisplay}</div>`;
+                }
+                if (topByAmount) {
+                    topByAmount.innerHTML = `<div class="list-group-item text-center text-danger py-3">${errorDisplay}</div>`;
+                }
             }
         } catch (optimalError) {
-            console.warn('Error fetching optimal amounts:', optimalError);
+            console.error('Error fetching optimal amounts:', optimalError);
+            
+            // Show error in UI
+            const topByPercentage = document.getElementById('top-by-percentage');
+            const topByAmount = document.getElementById('top-by-amount');
+            
+            let errorMessage = 'Network Error: Failed to fetch';
+            if (optimalError.name === 'TimeoutError') {
+                errorMessage = 'Calculation Timeout: Please try with a larger step size';
+            } else if (optimalError.name === 'AbortError') {
+                errorMessage = 'Request Aborted: Please try again';
+            }
+            
+            if (topByPercentage) {
+                topByPercentage.innerHTML = `<div class="list-group-item text-center text-danger py-3">${errorMessage}</div>`;
+            }
+            if (topByAmount) {
+                topByAmount.innerHTML = `<div class="list-group-item text-center text-danger py-3">${errorMessage}</div>`;
+            }
         }
         
         // Now generate diagnostic analysis with real data (non-blocking)
@@ -725,18 +803,18 @@ function updateOptimalAmounts(data) {
         });
     }
     
-    // Update right column: By Sharpe Ratio (best risk-adjusted returns)
+    // Update right column: By Dollar Profit (best absolute returns)
     const topByAmount = document.getElementById('top-by-amount');
-    if (topByAmount && data.top_by_sharpe) {
+    if (topByAmount && data.top_by_profit) {
         topByAmount.innerHTML = '';
-        data.top_by_sharpe.forEach((item, index) => {
+        data.top_by_profit.forEach((item, index) => {
             const listItem = document.createElement('div');
             listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
             listItem.innerHTML = `
                 <div>
                     <strong>${index + 1}.</strong> $${item.weekly_amount.toLocaleString()}
                 </div>
-                <span class="badge bg-success rounded-pill">${item.sharpe_ratio.toFixed(2)}</span>
+                <span class="badge bg-success rounded-pill">$${item.dollar_profit.toFixed(2)}</span>
             `;
             topByAmount.appendChild(listItem);
         });
