@@ -506,12 +506,13 @@ class AsyncMNQInvestmentService:
 
     async def generate_diagnostic_event_analysis(
         self,
+        weekly_amount: float = 1000.0,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate diagnostic event analysis identifying worst week and factor impacts"""
         try:
-            logger.info("Starting diagnostic event analysis")
+            logger.info(f"Starting diagnostic event analysis with weekly_amount: ${weekly_amount}")
 
             # Set default dates if not provided
             if not end_date:
@@ -525,20 +526,22 @@ class AsyncMNQInvestmentService:
                 raise Exception("No MNQ futures data available")
 
             # Calculate DCA performance to get weekly breakdown
-            weekly_amount = 1000.0  # Default amount for analysis
+            logger.info(f"Calculating DCA performance with weekly_amount: ${weekly_amount}")
             dca_results = await self._calculate_dca_performance(data, weekly_amount, start_date, end_date)
             
             if not dca_results or 'weekly_breakdown' not in dca_results:
                 raise Exception("No weekly breakdown data available")
 
-            # Find the worst week by time-weighted return
+            # Find the worst week by return percentage
             weekly_breakdown = dca_results['weekly_breakdown']
+            logger.info(f"Analyzing {len(weekly_breakdown)} weeks for worst performance")
+            
             worst_week = None
             worst_return = float('inf')
             
             for week_data in weekly_breakdown:
-                if week_data.get('time_weighted_return') is not None:
-                    twr = week_data['time_weighted_return']
+                if week_data.get('return_pct') is not None:
+                    twr = week_data['return_pct']
                     if twr < worst_return:
                         worst_return = twr
                         worst_week = week_data
@@ -546,13 +549,109 @@ class AsyncMNQInvestmentService:
             if not worst_week:
                 raise Exception("Could not identify worst week")
 
+            # Log the worst week details for debugging
+            logger.info(f"Worst week identified: {worst_week.get('date')} with return_pct: {worst_week.get('return_pct'):.2f}%")
+
             # Create factor impact analysis
             factor_analysis = await self._create_factor_impact_table(worst_week, data)
+
+            # Create the diagnostic report in HTML format - concentrated and focused
+            diagnostic_report = f"""<div class="diagnostic-analysis">
+                <div class="diagnostic-header text-center mb-3">
+                    <h4 class="text-primary mb-2">🔍 Diagnostic Event Analysis</h4>
+                    <div class="alert alert-danger py-2">
+                        <strong>Worst Week: {worst_week.get('date', 'Unknown Date')} ({worst_week.get('return_pct', 0.0):.2f}% loss)</strong>
+                    </div>
+                </div>
+                
+                <div class="factor-impact-section mb-3">
+                    <h5 class="text-dark mb-2">Factor Impact Table</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Factor</th>
+                                    <th>Type</th>
+                                    <th>Impact on {worst_week.get('date', 'Unknown Date')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>"""
+
+            for factor in factor_analysis['factor_table']:
+                factor_type = self._get_factor_type(factor['factor'])
+                diagnostic_report += f"""
+                                <tr>
+                                    <td>{factor['factor']}</td>
+                                    <td>{factor_type}</td>
+                                    <td>{factor['impact']}</td>
+                                </tr>"""
+            diagnostic_report += """
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="equity-curve-section mb-3">
+                    <h5 class="text-dark mb-2">Equity Curve</h5>
+                    <div class="chart-container">
+                        <canvas id="equityCurveChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="weekly-breakdown-section mb-3">
+                    <h5 class="text-dark mb-2">Weekly Breakdown</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Week</th>
+                                    <th>Date</th>
+                                    <th>Price</th>
+                                    <th>Investment</th>
+                                    <th>Contracts Bought</th>
+                                    <th>Total Contracts</th>
+                                    <th>Total Invested</th>
+                                    <th>Current Value</th>
+                                    <th>Position Value</th>
+                                    <th>Cash Balance</th>
+                                    <th>Required Margin</th>
+                                    <th>PnL</th>
+                                    <th>Return %</th>
+                                    <th>Time-Weighted Return</th>
+                                </tr>
+                            </thead>
+                            <tbody>"""
+
+            for week_data in dca_results['weekly_breakdown']:
+                diagnostic_report += f"""
+                                <tr>
+                                    <td>{week_data['week']}</td>
+                                    <td>{week_data['date']}</td>
+                                    <td>${week_data['price']:.2f}</td>
+                                    <td>${week_data['investment']:.2f}</td>
+                                    <td>{week_data['contracts_bought']}</td>
+                                    <td>{week_data['total_contracts']}</td>
+                                    <td>${week_data['total_invested']:.2f}</td>
+                                    <td>${week_data['current_value']:.2f}</td>
+                                    <td>${week_data['position_value']:.2f}</td>
+                                    <td>${week_data['cash_balance']:.2f}</td>
+                                    <td>${week_data['required_margin']:.2f}</td>
+                                    <td>${week_data['pnl']:.2f}</td>
+                                    <td>{week_data['return_pct']:.2f}%</td>
+                                    <td>{week_data['time_weighted_return']:.4f}</td>
+                                </tr>"""
+            diagnostic_report += """
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>"""
 
             logger.info("Diagnostic event analysis completed successfully")
             return {
                 'worst_week': worst_week,
-                'factor_analysis': factor_analysis
+                'factor_analysis': factor_analysis,
+                'diagnostic_report': diagnostic_report
             }
 
         except Exception as e:
@@ -564,8 +663,8 @@ class AsyncMNQInvestmentService:
         
         # Extract worst week details
         worst_date = worst_week.get('date', 'Unknown Date')
-        worst_return = worst_week.get('time_weighted_return', 0.0)
-        worst_return_pct = worst_return * 100
+        worst_return = worst_week.get('return_pct', 0.0)
+        worst_return_pct = worst_return  # return_pct is already a percentage
         
         # Get market context data
         price_change = worst_week.get('price', 0)

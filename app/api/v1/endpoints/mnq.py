@@ -649,6 +649,7 @@ async def generate_mnq_diagnostic_analysis(
         
         # Generate diagnostic event analysis
         diagnostic_result = await mnq_service.generate_diagnostic_event_analysis(
+            weekly_amount=request.weekly_amount,
             start_date=request.start_date,
             end_date=request.end_date
         )
