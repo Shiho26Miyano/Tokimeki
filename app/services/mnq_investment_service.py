@@ -23,6 +23,9 @@ class AsyncMNQInvestmentService:
         self.commission_per_contract = 2.50  # $2.50 commission per contract
         self.slippage_per_contract = 1.00  # $1.00 estimated slippage per contract
         self.max_contracts = 100  # Maximum contracts to prevent runaway leverage
+        # Position sizing controls
+        self.min_equity_to_notional = 0.10   # require ≥10% equity vs notional before adding
+        self.max_add_per_week = 1            # cap new contracts per week
 
     async def calculate_weekly_dca_performance(
         self,
@@ -170,122 +173,109 @@ class AsyncMNQInvestmentService:
         weekly_data: List[Dict[str, Any]],
         weekly_amount: float,
     ) -> Dict[str, Any]:
-        """Simulate weekly DCA investment with futures-style margin logic.
-
-        NOTE: This simplified model values equity as cash + position_value.
-        That implicitly treats contract notional as an asset; opening trades
-        do not debit notional, only fees. Liquidations transfer notional to cash,
-        keeping equity nearly unchanged net of fees. This is internally consistent
-        but not a full variation-margin model.
-        """
-        cash_balance = 0.0  # Track unspent cash
-        total_contracts = 0  # Integer contracts only
+        cash_balance = 0.0
+        equity = 0.0
+        total_contracts = 0
         total_invested = 0.0
         weekly_breakdown: List[Dict[str, Any]] = []
         equity_curve: List[Dict[str, Any]] = []
-        prev_equity = 0.0
+        prev_price: Optional[float] = None
 
         for i, week_data in enumerate(weekly_data):
             price = float(week_data['Close'])
             date = week_data['Date']
 
-            # Add weekly contribution
+            # 1) Mark-to-market on existing position
+            if prev_price is not None and total_contracts != 0:
+                dPnL = (price - prev_price) * self.contract_multiplier * total_contracts
+                cash_balance += dPnL
+                equity += dPnL
+
+            equity_before_contrib = equity
+
+            # 2) Weekly contribution
             cash_balance += weekly_amount
             total_invested += weekly_amount
+            equity += weekly_amount
 
-            # Pre-trade equity
-            position_value = total_contracts * price * self.contract_multiplier
-            current_equity = cash_balance + position_value
-
-            # --- Margin-based buying logic (initial margin to open) ---
-            def can_hold(k: int) -> bool:
-                if k <= 0:
-                    return True
-                if total_contracts + k > self.max_contracts:
+            # 3) Controlled position adds
+            def can_add_one(curr_contracts: int, eq: float) -> bool:
+                next_contracts = curr_contracts + 1
+                fees = (self.commission_per_contract + self.slippage_per_contract)
+                eq_after_fees = eq - fees
+                # initial margin check
+                if eq_after_fees < next_contracts * self.margin_per_contract:
                     return False
-                fees = k * (self.commission_per_contract + self.slippage_per_contract)
-                eq_after = current_equity - fees
-                req_initial_after = (total_contracts + k) * self.margin_per_contract
-                return eq_after >= req_initial_after
+                # equity/notional buffer
+                notional_after = next_contracts * price * self.contract_multiplier
+                return eq_after_fees >= notional_after * self.min_equity_to_notional
 
-            contracts_to_buy = 0
-            # Safety guard in pathological cases
-            while can_hold(contracts_to_buy + 1) and contracts_to_buy < 10_000:
-                contracts_to_buy += 1
+            adds = 0
+            while (
+                adds < self.max_add_per_week and
+                total_contracts < self.max_contracts and
+                can_add_one(total_contracts, equity)
+            ):
+                fees = (self.commission_per_contract + self.slippage_per_contract)
+                cash_balance -= fees
+                equity -= fees
+                total_contracts += 1
+                adds += 1
 
-            if contracts_to_buy > 0:
-                total_fees = contracts_to_buy * (self.commission_per_contract + self.slippage_per_contract)
-                cash_balance -= total_fees  # pay fees only
-                total_contracts += contracts_to_buy
-                # Recompute equity after trade
-                position_value = total_contracts * price * self.contract_multiplier
-                current_equity = cash_balance + position_value
+            # 4) Maintenance margin & forced liquidation
+            required_maint = total_contracts * self.maintenance_margin_per_contract
+            if total_contracts > 0 and equity < required_maint:
+                close_fee = (self.commission_per_contract + self.slippage_per_contract)
+                while total_contracts > 0 and equity < (total_contracts * self.maintenance_margin_per_contract):
+                    cash_balance -= close_fee
+                    equity -= close_fee
+                    total_contracts -= 1
+                required_maint = total_contracts * self.maintenance_margin_per_contract
 
-            # --- Maintenance margin & forced liquidation ---
-            required_margin = total_contracts * self.maintenance_margin_per_contract
-            if current_equity < required_margin and total_contracts > 0:
-                deficit = required_margin - current_equity
-                contracts_to_liquidate = math.ceil(deficit / self.maintenance_margin_per_contract)
-                contracts_to_liquidate = min(contracts_to_liquidate, total_contracts)
+            # 5) If fully flat and fees made equity negative, wipe to zero
+            if total_contracts == 0 and equity < 0:
+                equity = 0.0
+                cash_balance = 0.0
+                equity_before_contrib = 0.0
 
-                if contracts_to_liquidate > 0:
-                    liquidation_proceeds = contracts_to_liquidate * price * self.contract_multiplier
-                    liquidation_commissions = contracts_to_liquidate * self.commission_per_contract
-                    liquidation_slippage = contracts_to_liquidate * self.slippage_per_contract
-                    net_proceeds = liquidation_proceeds - liquidation_commissions - liquidation_slippage
-
-                    total_contracts -= contracts_to_liquidate
-                    cash_balance += net_proceeds
-
-                    # Recalculate after liquidation
-                    position_value = total_contracts * price * self.contract_multiplier
-                    current_equity = cash_balance + position_value
-
-            # Time-weighted return (exclude external cash flow this week)
-            if prev_equity > 0:
-                time_weighted_return = (current_equity - prev_equity - weekly_amount) / prev_equity
-            else:
-                time_weighted_return = 0.0
-
+            current_equity = equity
             pnl = current_equity - total_invested
+            exposure_notional = total_contracts * price * self.contract_multiplier
 
-            weekly_breakdown.append(
-                {
-                    'week': i + 1,
-                    'date': date,
-                    'price': price,
-                    'investment': weekly_amount,
-                    'contracts_bought': contracts_to_buy,
-                    'total_contracts': total_contracts,
-                    'total_invested': total_invested,
-                    'current_value': current_equity,
-                    'position_value': position_value,
-                    'cash_balance': cash_balance,
-                    'required_margin': required_margin,
-                    'pnl': pnl,
-                    'return_pct': (pnl / total_invested * 100) if total_invested > 0 else 0.0,
-                    'time_weighted_return': time_weighted_return,
-                }
-            )
+            # time-weighted return (exclude this week's contribution)
+            twr = ((current_equity - equity_before_contrib - weekly_amount) / equity_before_contrib) if equity_before_contrib > 0 else 0.0
 
-            equity_curve.append(
-                {
-                    'date': date,
-                    'equity': current_equity,
-                    'position_value': position_value,
-                    'cash_balance': cash_balance,
-                    'invested': total_invested,
-                    'pnl': pnl,
-                    'time_weighted_return': time_weighted_return,
-                    'prev_equity': prev_equity,
-                }
-            )
+            weekly_breakdown.append({
+                'week': i + 1,
+                'date': date,
+                'price': price,
+                'investment': weekly_amount,
+                'contracts_bought': adds,
+                'total_contracts': total_contracts,
+                'total_invested': total_invested,
+                'current_value': current_equity,            # <-- equity
+                'position_value': exposure_notional,        # <-- DISPLAY ONLY
+                'cash_balance': cash_balance,
+                'required_margin': required_maint,
+                'pnl': pnl,
+                'return_pct': (pnl / total_invested * 100) if total_invested > 0 else 0.0,
+                'time_weighted_return': twr,
+            })
 
-            prev_equity = current_equity
+            equity_curve.append({
+                'date': date,
+                'equity': current_equity,
+                'cash_balance': cash_balance,
+                'invested': total_invested,
+                'pnl': pnl,
+                'time_weighted_return': twr,
+            })
+
+            prev_price = price
 
         return {
             'total_invested': total_invested,
-            'current_value': current_equity,
+            'current_value': equity,       # equity, not notional
             'total_contracts': total_contracts,
             'cash_balance': cash_balance,
             'weekly_breakdown': weekly_breakdown,

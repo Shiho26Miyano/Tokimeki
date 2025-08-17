@@ -121,8 +121,11 @@ async function calculateMNQInvestment() {
             throw new Error('Start date must be before end date');
         }
         
-        // Make API call
-        const response = await fetch('/api/v1/mnq/calculate', {
+        // Start MNQ calculation and AI preparation in parallel
+        console.log('Starting parallel processing: MNQ calculation + AI preparation');
+        
+        // Start MNQ calculation
+        const mnqPromise = fetch('/api/v1/mnq/calculate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -133,6 +136,13 @@ async function calculateMNQInvestment() {
                 end_date: endDate
             })
         });
+
+        // Start AI analysis preparation in parallel (using estimated data)
+        const aiPromise = prepareAIAnalysis(weeklyAmount, startDate, endDate);
+
+        // Wait for MNQ results first (display immediately)
+        console.log('Waiting for MNQ calculation results...');
+        const response = await mnqPromise;
         
         if (!response.ok) {
             const errorData = await response.json();
@@ -142,13 +152,25 @@ async function calculateMNQInvestment() {
         const data = await response.json();
         mnqData = data;
         
-        // Update UI
+        // Display MNQ results immediately
+        console.log('MNQ results received, updating UI immediately');
         updateMNQPerformanceCards(data);
         updateMNQMetrics(data);
         updateMNQWeeklyTable(data);
-        
-        // Show results
         showMNQResults(true);
+        
+        // Now generate AI analysis with real data (non-blocking)
+        console.log('Starting AI analysis with real data...');
+        generateAIStrategyAnalysis(data);
+        
+        // Wait for AI analysis to complete in background (non-blocking)
+        aiPromise.then(aiResult => {
+            if (aiResult) {
+                console.log('Background AI analysis completed');
+            }
+        }).catch(aiError => {
+            console.log('Background AI analysis completed separately');
+        });
         
         console.log('MNQ calculation completed successfully');
         
@@ -383,3 +405,186 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('MNQ Dashboard JavaScript setup complete');
+
+// AI Strategy Analysis Functions
+async function generateAIStrategyAnalysis(data) {
+    try {
+        console.log('Generating AI strategy analysis with data:', data);
+        
+        // Only proceed if we have complete data
+        if (!data || !data.total_invested || !data.performance_metrics) {
+            console.log('Incomplete data, skipping AI analysis');
+            const combinedAnalysis = document.getElementById('ai-combined-analysis');
+            if (combinedAnalysis) {
+                combinedAnalysis.innerHTML = 'Waiting for complete calculation results...';
+            }
+            return;
+        }
+        
+        // Start timer and show loading state
+        const startTime = Date.now();
+        const timerElement = document.getElementById('ai-analysis-timer');
+        const spinnerElement = document.getElementById('ai-analysis-spinner');
+        const refreshBtn = document.getElementById('ai-refresh-btn');
+        
+        // Show spinner and disable refresh button
+        if (spinnerElement) spinnerElement.style.display = 'inline-block';
+        if (refreshBtn) refreshBtn.disabled = true;
+        
+        const timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            if (timerElement) {
+                timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }, 1000);
+        
+        // Show loading state
+        const combinedAnalysis = document.getElementById('ai-combined-analysis');
+        if (combinedAnalysis) {
+            combinedAnalysis.innerHTML = '<div class="d-flex align-items-center gap-2"><div class="spinner-border spinner-border-sm text-primary"></div> AI analyzing your strategy and performance...</div>';
+        }
+        
+        // Prepare data for AI analysis using actual calculation results
+        const analysisData = {
+            weekly_amount: parseFloat(document.getElementById('mnq-weekly-amount').value) || 1000,
+            start_date: document.getElementById('mnq-start-date').value,
+            end_date: document.getElementById('mnq-end-date').value,
+            total_invested: data.total_invested || 0,
+            current_value: data.current_value || 0,
+            total_return: data.total_return || 0,
+            cagr: data.performance_metrics?.cagr || 0,
+            volatility: data.performance_metrics?.volatility || 0,
+            sharpe_ratio: data.performance_metrics?.sharpe_ratio || 0,
+            max_drawdown: data.performance_metrics?.max_drawdown || 0,
+            total_contracts: data.total_contracts || 0,
+            total_weeks: data.total_weeks || 0,
+            weekly_breakdown: data.weekly_breakdown || []
+        };
+        
+        console.log('AI Analysis Data:', analysisData);
+        
+        // Generate combined analysis prompt
+        const combinedPrompt = `Analyze this MNQ futures DCA strategy performance in 3-4 sentences. Provide insights on:
+
+1. Strategy Effectiveness: How well the DCA approach worked (timing, risk management, contract accumulation)
+2. Performance Drivers: What caused the returns to be positive/negative (market conditions, margin usage, costs)
+3. Risk Assessment: Impact of volatility, drawdowns, and liquidation events
+4. Key Insights: What the weekly breakdown reveals about the investment journey
+
+Data: Weekly $${analysisData.weekly_amount} investment over ${analysisData.total_weeks} weeks. Total invested: $${analysisData.total_invested.toLocaleString()}, Current value: $${analysisData.current_value.toLocaleString()}, Return: ${analysisData.total_return.toFixed(2)}%, CAGR ${analysisData.cagr.toFixed(2)}%, Volatility ${analysisData.volatility.toFixed(2)}%, Max drawdown ${analysisData.max_drawdown.toFixed(2)}%, Total contracts: ${analysisData.total_contracts.toFixed(4)}.`;
+
+        // Call AI service for combined analysis
+        const analysisResult = await callAIService(combinedPrompt);
+        
+        // Update UI with AI analysis
+        if (combinedAnalysis && analysisResult) {
+            combinedAnalysis.innerHTML = analysisResult;
+        }
+        
+        // Stop timer and hide loading state
+        clearInterval(timerInterval);
+        const totalTime = Math.floor((Date.now() - startTime) / 1000);
+        const finalMinutes = Math.floor(totalTime / 60);
+        const finalSeconds = totalTime % 60;
+        if (timerElement) {
+            timerElement.textContent = `${finalMinutes.toString().padStart(2, '0')}:${finalSeconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Hide spinner and enable refresh button
+        if (spinnerElement) spinnerElement.style.display = 'none';
+        if (refreshBtn) refreshBtn.disabled = false;
+        
+        console.log('AI analysis completed');
+        
+    } catch (error) {
+        console.error('Error generating AI analysis:', error);
+        
+        // Fallback to static analysis if AI fails
+        const combinedAnalysis = document.getElementById('ai-combined-analysis');
+        if (combinedAnalysis) {
+            combinedAnalysis.innerHTML = 'AI analysis unavailable. Your DCA strategy shows typical futures trading patterns with margin management and risk controls. Review the performance metrics above for insights.';
+        }
+        
+        // Reset timer on error
+        const timerElement = document.getElementById('ai-analysis-timer');
+        if (timerElement) {
+            timerElement.textContent = '00:00';
+        }
+    }
+}
+
+async function callAIService(prompt) {
+    try {
+        const response = await fetch('/api/v1/chat/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: prompt,
+                model: 'mistral-small',
+                temperature: 0.3
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`AI service error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.response || data.message || 'Analysis generated successfully.';
+        
+    } catch (error) {
+        console.error('AI service call failed:', error);
+        return null;
+    }
+}
+
+// Prepare AI analysis in parallel with MNQ calculation
+async function prepareAIAnalysis(weeklyAmount, startDate, endDate) {
+    try {
+        console.log('Preparing AI analysis in parallel...');
+        
+        // Estimate some data for early AI preparation
+        const estimatedData = {
+            weekly_amount: weeklyAmount,
+            start_date: startDate,
+            end_date: endDate,
+            total_weeks: Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24 * 7)),
+            // Use conservative estimates for AI preparation
+            estimated_total_invested: weeklyAmount * 52, // Assume 52 weeks
+            estimated_current_value: weeklyAmount * 52 * 0.95, // Assume slight loss
+            estimated_return: -5.0, // Conservative estimate
+            estimated_volatility: 15.0, // Typical market volatility
+            estimated_max_drawdown: 20.0 // Conservative drawdown estimate
+        };
+        
+        // Generate a preliminary AI analysis prompt
+        const preliminaryPrompt = `Prepare analysis for MNQ DCA strategy with estimated data:
+Weekly $${weeklyAmount} investment over approximately ${estimatedData.total_weeks} weeks.
+Estimated performance: Conservative estimates for planning purposes.`;
+        
+        // Start AI service call (non-blocking)
+        const aiResponse = await callAIService(preliminaryPrompt);
+        
+        if (aiResponse) {
+            console.log('Preliminary AI analysis prepared');
+            return aiResponse;
+        }
+        
+        return null;
+    } catch (error) {
+        console.log('Preliminary AI preparation failed (non-critical):', error);
+        return null;
+    }
+}
+
+// Manual refresh function for strategy analysis
+function refreshAIAnalysis() {
+    const calculateBtn = document.getElementById('mnq-calculate-btn');
+    if (calculateBtn && !calculateBtn.disabled) {
+        calculateBtn.click(); // This will trigger a new calculation and AI analysis
+    }
+}

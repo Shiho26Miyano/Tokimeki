@@ -826,6 +826,29 @@
 
 
 
+                                <!-- AI Analysis Section -->
+                                <div class="card mb-4" style="border-radius: 12px;">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 class="card-title mb-0">🤖 AI Strategy Analysis</h5>
+                                            <div class="d-flex align-items-center gap-3">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="spinner-border spinner-border-sm text-primary" id="ai-analysis-spinner" style="display: none;" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                    <div class="text-muted small" id="ai-analysis-timer">00:00</div>
+                                                </div>
+                                                <button class="btn btn-primary btn-sm" onclick="refreshAIAnalysis()" title="Refresh AI Analysis" id="ai-refresh-btn">
+                                                    Refresh
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="ai-combined-analysis" class="text-muted">
+                                            Click "Calculate Performance" to generate AI-powered analysis of your MNQ DCA strategy.
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Weekly Breakdown Table -->
                                 <div class="card mb-4" style="border-radius: 12px;">
                                     <div class="card-body">
