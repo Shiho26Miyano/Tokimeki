@@ -49,7 +49,8 @@ class MNQOptimalAmountsResponse(BaseModel):
     start_date: str
     end_date: str
     summary: dict
-    top_results: List[dict]
+    top_by_percentage: List[dict]  # Left side: sorted by percentage/return
+    top_by_profit: List[dict]      # Right side: top 5 by dollar profit
     all_results: List[dict]
 
 class MNQAnalysisRequest(BaseModel):
@@ -490,13 +491,28 @@ async def generate_mnq_analysis(
             descending=True
         )
 
-        top = optimal.get("top_results", [])[:5]
+        # Get top results by percentage (existing behavior)
+        top_by_percentage = optimal.get("top_by_percentage", [])[:5]
         top_5_amounts = []
-        for i, t in enumerate(top):
+        for i, t in enumerate(top_by_percentage):
             top_5_amounts.append(f"{i+1}. ${t['weekly_amount']:,.0f} - {t['total_return']:.2f}% return")
         
-        top_5_text = "\n".join(top_5_amounts)
-        logger.info(f"Service returned top amounts: {top_5_text}")
+        # Also get top results by Sharpe ratio for comparison
+        top_by_sharpe = optimal.get("top_by_sharpe", [])[:5]
+        top_5_by_sharpe = []
+        for i, t in enumerate(top_by_sharpe):
+            top_5_by_sharpe.append(f"{i+1}. ${t['weekly_amount']:,.0f} - {t['sharpe_ratio']:.2f} Sharpe")
+        
+        # Create simple table format
+        table_rows = []
+        for i in range(5):
+            left_item = top_5_amounts[i] if i < len(top_5_amounts) else ""
+            right_item = top_5_by_sharpe[i] if i < len(top_5_by_sharpe) else ""
+            table_rows.append(f"| {left_item} | {right_item} |")
+        
+        table_content = "\n".join(table_rows)
+        logger.info(f"Service returned top amounts by percentage: {top_5_amounts}")
+        logger.info(f"Service returned top amounts by Sharpe ratio: {top_5_by_sharpe}")
         
         # Create structured prompt for AI service
         structured_prompt = f"""You are a quantitative product manager and research writer.
@@ -511,8 +527,11 @@ FOLLOW THIS EXACT FORMAT (no deviations):
 • Results: {request.total_return:.2f}% return, {request.cagr:.2f}% CAGR
 • Key insight: One-sentence summary of performance
 
-**Top 5 Recommended Weekly Amounts** (Based on Actual Calculations)
-{top_5_text}
+**Top 5 Weekly Amounts by Performance** (Based on Actual Calculations)
+
+| Left: By Return % | Right: By Sharpe Ratio |
+|-------------------|------------------------|
+| {table_content} |
 
 **Key Performance Metrics**
 | Metric | Value |
@@ -529,7 +548,7 @@ FOLLOW THIS EXACT FORMAT (no deviations):
 
 Data: Weekly ${request.weekly_amount:,.0f} investment over {request.total_weeks} weeks. Total invested: ${request.total_invested:,.0f}, Current value: ${request.current_value:,.0f}, Return: {request.total_return:.2f}%, CAGR {request.cagr:.2f}%, Volatility {request.volatility:.2f}%, Max drawdown {request.max_drawdown:.2f}%, Total contracts: {request.total_contracts:.4f}.
 
-IMPORTANT: Use ONLY the actual calculated data provided above in the "Top 5 Recommended Weekly Amounts" section. Do NOT generate new recommendations. The {top_5_text} contains the real performance data that should be displayed exactly as shown."""
+IMPORTANT: Use ONLY the actual calculated data provided above in the "Top 5 Weekly Amounts by Performance" section. Do NOT generate new recommendations. The {table_content} contains the real performance data that should be displayed exactly as shown."""
 
         # Call AI service
         logger.info("Calling AI service with structured prompt...")
@@ -586,8 +605,11 @@ IMPORTANT: Use ONLY the actual calculated data provided above in the "Top 5 Reco
 • Results: {request.total_return:.2f}% return, {request.cagr:.2f}% CAGR
 • Key insight: {'Positive' if request.total_return > 0 else 'Negative'} returns over {request.total_weeks} weeks with {request.max_drawdown:.2f}% max drawdown
 
-**Top 5 Recommended Weekly Amounts** (Based on Actual Calculations)
-{top_5_text}
+**Top 5 Weekly Amounts by Performance** (Based on Actual Calculations)
+
+| Left: By Return % | Right: By Sharpe Ratio |
+|-------------------|------------------------|
+| {table_content} |
 
 **Key Performance Metrics**
 | Metric | Value |
@@ -607,3 +629,108 @@ IMPORTANT: Use ONLY the actual calculated data provided above in the "Top 5 Reco
             "model_used": "fallback",
             "response_time": response_time
         }
+
+@router.post("/generate-diagnostic-analysis", response_model=MNQAnalysisResponse)
+async def generate_mnq_diagnostic_analysis(
+    request: MNQAnalysisRequest,
+    cache_service = Depends(get_cache_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Generate diagnostic event analysis identifying worst week and factor impacts"""
+    
+    start_time = time.time()
+    
+    try:
+        logger.info(f"Generating diagnostic analysis for MNQ strategy: ${request.weekly_amount}/week")
+        
+        from app.services.mnq_investment_service import AsyncMNQInvestmentService
+        
+        mnq_service = AsyncMNQInvestmentService(cache_service)
+        
+        # Generate diagnostic event analysis
+        diagnostic_result = await mnq_service.generate_diagnostic_event_analysis(
+            weekly_amount=request.weekly_amount,
+            start_date=request.start_date,
+            end_date=request.end_date
+        )
+        
+        if not diagnostic_result:
+            raise Exception("Failed to generate diagnostic analysis")
+        
+        worst_week = diagnostic_result['worst_week']
+        factor_analysis = diagnostic_result['factor_analysis']
+        
+        # Create diagnostic analysis report
+        worst_date = factor_analysis['worst_date']
+        worst_return_pct = factor_analysis['worst_return_pct']
+        
+        # Create the diagnostic report in HTML format - concentrated and focused
+        diagnostic_report = f"""<div class="diagnostic-analysis">
+            <div class="diagnostic-header text-center mb-3">
+                <h4 class="text-primary mb-2">🔍 Diagnostic Event Analysis</h4>
+                <div class="alert alert-danger py-2">
+                    <strong>Worst Week: {worst_date} ({worst_return_pct:.2f}% loss)</strong>
+                </div>
+            </div>
+            
+            <div class="factor-impact-section mb-3">
+                <h5 class="text-dark mb-2">Factor Impact Table</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Factor</th>
+                                <th>Type</th>
+                                <th>Impact on {worst_date}</th>
+                            </tr>
+                        </thead>
+                        <tbody>"""
+        
+        # Add table rows - only the most important factors with type categorization
+        important_factors = factor_analysis['factor_table'][:5]  # Limit to top 5
+        for factor in important_factors:
+            factor_type = factor.get('factor_type', 'Market Event')  # Get factor type from AI response
+            diagnostic_report += f"""
+                            <tr>
+                                <td><strong>{factor['factor']}</strong></td>
+                                <td><span class="badge bg-secondary">{factor_type}</span></td>
+                                <td>{factor['impact']}</td>
+                            </tr>"""
+        
+        diagnostic_report += f"""
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>"""
+
+        # Track usage
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="mnq_diagnostic_analysis",
+            model="diagnostic_analysis",
+            response_time=response_time,
+            success=True
+        )
+        
+        logger.info(f"Diagnostic analysis generated successfully in {response_time:.2f}s")
+        
+        return {
+            "success": True,
+            "analysis": diagnostic_report,
+            "model_used": "diagnostic_analysis",
+            "response_time": response_time
+        }
+        
+    except Exception as e:
+        # Track failed request
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="mnq_diagnostic_analysis",
+            response_time=response_time,
+            success=False,
+            error=str(e)
+        )
+        
+        logger.error(f"Diagnostic analysis generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Diagnostic analysis failed: {str(e)}")

@@ -830,7 +830,7 @@
                                 <div class="card mb-4" style="border-radius: 12px;">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <h5 class="card-title mb-0">🤖 AI Strategy Analysis</h5>
+                                            <h5 class="card-title mb-0">🔍 Diagnostic Event Analysis</h5>
                                             <div class="d-flex align-items-center gap-3">
                                                 <div class="d-flex align-items-center gap-2">
                                                     <div class="spinner-border spinner-border-sm text-primary" id="ai-analysis-spinner" style="display: none;" role="status">
@@ -838,13 +838,13 @@
                                                     </div>
                                                     <div class="text-muted small" id="ai-analysis-timer">00:00</div>
                                                 </div>
-                                                <button class="btn btn-primary btn-sm" onclick="refreshAIAnalysis()" title="Refresh AI Analysis" id="ai-refresh-btn">
+                                                <button class="btn btn-primary btn-sm" onclick="refreshDiagnosticAnalysis()" title="Refresh Diagnostic Analysis" id="ai-refresh-btn">
                                                     Refresh
                                                 </button>
                                             </div>
                                         </div>
                                         <div id="ai-combined-analysis" class="text-muted">
-                                            Click "Calculate Performance" to generate AI-powered analysis of your MNQ DCA strategy.
+                                            Click "Calculate Performance" to identify the worst week and analyze market factor impacts.
                                         </div>
                                         <style>
                                             #ai-combined-analysis h1, #ai-combined-analysis h2, #ai-combined-analysis h3 {
@@ -878,7 +878,108 @@
                                             #ai-combined-analysis li {
                                                 margin: 0.25rem 0;
                                             }
+                                            
+                                            /* Diagnostic Analysis Styles - Compact */
+                                            .diagnostic-analysis {
+                                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                                max-width: 800px;
+                                                margin: 0 auto;
+                                            }
+                                            
+                                            .diagnostic-header h4 {
+                                                color: #0d6efd;
+                                                font-weight: 700;
+                                                margin-bottom: 0.5rem;
+                                            }
+                                            
+                                            .factor-impact-section table {
+                                                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                                                border-radius: 6px;
+                                                overflow: hidden;
+                                                font-size: 0.9rem;
+                                            }
+                                            
+                                            .factor-impact-section th {
+                                                background: linear-gradient(135deg, #343a40, #495057) !important;
+                                                color: white;
+                                                font-weight: 600;
+                                                text-transform: uppercase;
+                                                letter-spacing: 0.3px;
+                                                padding: 8px 12px;
+                                            }
+                                            
+                                            .factor-impact-section td {
+                                                padding: 8px 12px;
+                                                vertical-align: middle;
+                                            }
+                                            
+                                            .factor-impact-section tr:hover {
+                                                background-color: #f8f9fa;
+                                            }
+                                            
+                                            .key-drivers .card {
+                                                border-radius: 6px;
+                                                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                                                transition: all 0.2s ease;
+                                                cursor: pointer;
+                                            }
+                                            
+                                            .key-drivers .card:hover {
+                                                transform: translateY(-1px);
+                                                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+                                            }
+                                            
+                                            .key-drivers .card-body {
+                                                padding: 6px 8px;
+                                                font-weight: 500;
+                                                font-size: 0.85rem;
+                                            }
+                                            
+                                            .alert {
+                                                margin-bottom: 1rem;
+                                                border-radius: 6px;
+                                            }
                                         </style>
+                                    </div>
+                                </div>
+
+
+                                <div class="card mb-4" style="border-radius: 12px;">
+                                    <div class="card-body">
+                                        <h5 class="card-title mb-3">📊 Top 5 Weekly Amounts by Performance</h5>
+                                        <div class="row">
+                                            <!-- Left Column: By Return % -->
+                                            <div class="col-md-6">
+                                                <div class="card" style="border: 1px solid #e9ecef; background: #f8f9fa;">
+                                                    <div class="card-header text-center" style="background: #e3f2fd; border-bottom: 1px solid #e9ecef;">
+                                                        <h6 class="mb-0" style="color: #1976d2; font-weight: 600;">🏆 By Return %</h6>
+                                                    </div>
+                                                    <div class="card-body p-0">
+                                                        <div id="top-by-percentage" class="list-group list-group-flush">
+                                                            <div class="list-group-item text-center text-muted py-3">
+                                                                Click "Calculate Performance" to see top amounts by return percentage
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Right Column: By Sharpe Ratio -->
+                                            <div class="col-md-6">
+                                                <div class="card" style="border: 1px solid #e9ecef; background: #f8f9fa;">
+                                                    <div class="card-header text-center" style="background: #e8f5e8; border-bottom: 1px solid #e9ecef;">
+                                                        <h6 class="mb-0" style="color: #2e7d32; font-weight: 600;">📈 By Sharpe Ratio</h6>
+                                                    </div>
+                                                    <div class="card-body p-0">
+                                                        <div id="top-by-amount" class="list-group list-group-flush">
+                                                            <div class="list-group-item text-center text-muted py-3">
+                                                                Click "Calculate Performance" to see top amounts by money invested
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 

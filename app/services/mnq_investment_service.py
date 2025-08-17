@@ -368,7 +368,7 @@ class AsyncMNQInvestmentService:
             "end_date": end_date
         }
 
-    async def find_optimal_investment_amounts(
+    async def find_optimal_percentage_amounts(
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
@@ -380,9 +380,10 @@ class AsyncMNQInvestmentService:
         descending: bool = True
     ) -> Dict[str, Any]:
         """
-        Grid-search weekly amounts and rank strictly by *calculated* performance.
-        Uses precomputed weekly data (1 fetch), respects position sizing rules,
-        and returns a clean top-N along with full results.
+        Find the top N weekly amounts that produce the best performance by percentage-based metrics.
+        
+        This function ranks amounts by percentage-based metrics (returns, Sharpe ratio, etc.)
+        and is designed for performance analysis and comparison.
         """
 
         try:
@@ -442,12 +443,14 @@ class AsyncMNQInvestmentService:
 
                     total_return_pct = ((current_value / total_invested) - 1.0) * 100.0 if total_invested > 0 else 0.0
                     ret_per_dollar = ((current_value - total_invested) / total_invested) if total_invested > 0 else 0.0
+                    dollar_profit = current_value - total_invested  # Calculate absolute dollar profit
 
                     results.append({
                         "weekly_amount": amt,
                         "total_invested": total_invested,
                         "current_value": current_value,
                         "total_return": round(total_return_pct, 2),
+                        "dollar_profit": round(dollar_profit, 2),  # Add dollar profit to results
                         "cagr": metrics.get("cagr", 0.0),
                         "volatility": metrics.get("volatility", 0.0),
                         "sharpe_ratio": metrics.get("sharpe_ratio", 0.0),
@@ -465,25 +468,29 @@ class AsyncMNQInvestmentService:
             if not results:
                 raise Exception("No valid results generated")
 
-            # ---- Sort & pick top-N ----
-            results.sort(key=lambda x: x.get(sort_key, 0.0), reverse=descending)
-            top_results = results[:max(1, min(top_n, len(results)))]
+            # ---- Sort by percentage/return (existing behavior) ----
+            results_by_percentage = sorted(results, key=lambda x: x.get(sort_key, 0.0), reverse=descending)
+            top_by_percentage = results_by_percentage[:max(1, min(top_n, len(results)))]
+
+            # ---- Sort by dollar profit (best absolute returns) ----
+            results_by_profit = sorted(results, key=lambda x: x.get("dollar_profit", -999999.0), reverse=True)
+            top_by_profit = results_by_profit[:5]  # Top 5 by dollar profit
 
             # ---- Summary ----
             summary = {
                 "total_tested": len(results),
                 "sort_key": sort_key,
                 "sort_direction": "descending" if descending else "ascending",
-                "best_return": top_results[0]["total_return"] if top_results else 0.0,
-                "worst_return": results[-1]["total_return"] if results else 0.0,
+                "best_return": top_by_percentage[0]["total_return"] if top_by_percentage else 0.0,
+                "worst_return": results_by_percentage[-1]["total_return"] if results_by_percentage else 0.0,
                 "avg_return": round(sum(r["total_return"] for r in results) / len(results), 3),
-                "recommendation": f"Top {len(top_results)} based strictly on '{sort_key}'.",
+                "recommendation": f"Top {len(top_by_percentage)} by {sort_key} and Top 5 by dollar profit.",
             }
 
             logger.info(
                 f"Optimal search complete: tested={len(results)} "
-                f"best=${top_results[0]['weekly_amount'] if top_results else 'N/A'} "
-                f"({top_results[0]['total_return']:.2f}% by {sort_key})"
+                f"best=${top_by_percentage[0]['weekly_amount'] if top_by_percentage else 'N/A'} "
+                f"({top_by_percentage[0]['total_return']:.2f}% by {sort_key})"
             )
 
             return {
@@ -491,12 +498,452 @@ class AsyncMNQInvestmentService:
                 "start_date": start_date,
                 "end_date": end_date,
                 "summary": summary,
-                "top_results": top_results,
+                "top_by_percentage": top_by_percentage,  # Left side: sorted by percentage/return
+                "top_by_profit": top_by_profit,          # Right side: top 5 by dollar profit
                 "all_results": results,
             }
 
         except Exception as e:
             logger.error(f"Error finding optimal investment amounts: {e}")
             raise
+
+    async def find_optimal_dollar_profit_amounts(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        min_amount: float = 100.0,
+        max_amount: float = 10000.0,
+        step: float = 100.0,
+        top_n: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Find the top N weekly amounts that produce the largest absolute dollars of profit.
+        
+        Ranking rule:
+        1. Primary: PROFIT(A) = EQ(A) - INV(A) descending (largest dollar profit first)
+        2. Tie-breaker 1: Sharpe ratio descending (better risk-adjusted among equal profits)
+        3. Tie-breaker 2: Lower volatility
+        4. Tie-breaker 3: Smaller weekly amount (prefer cheaper plan if tied)
+        
+        This function is designed for profit maximization, not performance analysis.
+        """
+        try:
+            logger.info(f"Finding optimal profit amounts: ${min_amount}-${max_amount}, step ${step}")
+            
+            # Set default dates if not provided
+            if not end_date:
+                end_date = datetime.now().strftime('%Y-%m-%d')
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+
+            # Get MNQ futures data
+            data = await self.get_mnq_futures_data(start_date, end_date)
+            if not data or not data.get('data'):
+                raise Exception("No MNQ futures data available")
+
+            # Generate grid of amounts to test
+            amounts = np.arange(min_amount, max_amount + step, step)
+            logger.info(f"Generated grid: min=${min_amount}, max=${max_amount}, step=${step}, points={len(amounts)}")
+
+            results = []
+            
+            # Test each amount
+            for amt in amounts:
+                try:
+                    logger.info(f"Testing amount: ${amt}")
+                    
+                    # Run DCA simulation for this amount
+                    dca_result = await self._calculate_dca_performance(data, amt, start_date, end_date)
+                    
+                    if not dca_result:
+                        continue
+                    
+                    # Calculate dollar profit: PROFIT(A) = EQ(A) - INV(A)
+                    total_invested = float(dca_result['total_invested'])
+                    current_value = float(dca_result['current_value'])
+                    dollar_profit = current_value - total_invested
+                    
+                    # Calculate Sharpe ratio from time-weighted returns
+                    equity_curve = dca_result['equity_curve']
+                    if len(equity_curve) < 2:
+                        continue
+                    
+                    # Get weekly time-weighted returns, skip week 1
+                    weekly_returns = [p.get('time_weighted_return', None) for p in equity_curve[1:]]
+                    weekly_returns = [x for x in weekly_returns if x is not None and not math.isnan(x)]
+                    
+                    if len(weekly_returns) < 2:
+                        continue
+                    
+                    # Calculate Sharpe ratio (annualized, rf=0)
+                    mean_return = np.mean(weekly_returns)
+                    std_return = np.std(weekly_returns)
+                    
+                    if std_return > 0:
+                        sharpe_ratio = (mean_return / std_return) * np.sqrt(52)
+                    else:
+                        sharpe_ratio = 0.0
+                    
+                    # Calculate volatility
+                    volatility = std_return * np.sqrt(52) * 100 if std_return > 0 else 0.0
+                    
+                    # Calculate max drawdown
+                    peak = equity_curve[0]['equity']
+                    max_drawdown = 0.0
+                    for point in equity_curve:
+                        eq = point['equity']
+                        if eq > peak:
+                            peak = eq
+                        if peak > 0:
+                            dd = (peak - eq) / peak
+                            if dd > max_drawdown:
+                                max_drawdown = dd
+                    
+                    result = {
+                        'weekly_amount': amt,
+                        'dollar_profit': dollar_profit,
+                        'total_invested': total_invested,
+                        'current_value': current_value,
+                        'sharpe_ratio': sharpe_ratio,
+                        'volatility': volatility,
+                        'max_drawdown': max_drawdown * 100,  # Convert to percentage
+                        'total_weeks': len(equity_curve)
+                    }
+                    
+                    results.append(result)
+                    logger.info(f"Amount ${amt}: profit=${dollar_profit:.2f}, Sharpe={sharpe_ratio:.2f}")
+                    
+                except Exception as e:
+                    logger.warning(f"Amount ${amt}: calculation failed ({e})")
+                    continue
+
+            if not results:
+                raise Exception("No valid results generated")
+
+            # Sort by dollar profit (descending), then by Sharpe ratio (descending), then by volatility (ascending), then by weekly amount (ascending)
+            results_sorted = sorted(
+                results, 
+                key=lambda x: (
+                    -x['dollar_profit'],      # Primary: dollar profit descending
+                    -x['sharpe_ratio'],       # Tie-breaker 1: Sharpe ratio descending
+                    x['volatility'],           # Tie-breaker 2: volatility ascending
+                    x['weekly_amount']         # Tie-breaker 3: weekly amount ascending
+                )
+            )
+            
+            top_by_profit = results_sorted[:top_n]
+
+            # Summary
+            summary = {
+                "total_tested": len(results),
+                "objective": "maximize_dollar_profit",
+                "best_profit": top_by_profit[0]['dollar_profit'] if top_by_profit else 0.0,
+                "worst_profit": results_sorted[-1]['dollar_profit'] if results_sorted else 0.0,
+                "avg_profit": round(sum(r['dollar_profit'] for r in results) / len(results), 2),
+                "recommendation": f"Top {len(top_by_profit)} by absolute dollar profit with Sharpe ratio tie-breakers.",
+            }
+
+            logger.info(
+                f"Optimal profit search complete: tested={len(results)} "
+                f"best=${top_by_profit[0]['weekly_amount'] if top_by_profit else 'N/A'} "
+                f"(profit=${top_by_profit[0]['dollar_profit']:.2f})"
+            )
+
+            return {
+                "success": True,
+                "start_date": start_date,
+                "end_date": end_date,
+                "summary": summary,
+                "top_by_profit": top_by_profit,  # Right side: sorted by dollar profit
+                "all_results": results,
+            }
+
+        except Exception as e:
+            logger.error(f"Error finding optimal profit amounts: {e}")
+            raise
+
+    async def generate_diagnostic_event_analysis(
+        self,
+        weekly_amount: float = 1000.0,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Generate diagnostic event analysis identifying worst week and factor impacts"""
+        try:
+            logger.info(f"Starting diagnostic event analysis with weekly_amount: ${weekly_amount}")
+
+            # Set default dates if not provided
+            if not end_date:
+                end_date = datetime.now().strftime('%Y-%m-%d')
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+
+            # Get MNQ futures data
+            data = await self.get_mnq_futures_data(start_date, end_date)
+            if not data or not data.get('data'):
+                raise Exception("No MNQ futures data available")
+
+            # Calculate DCA performance to get weekly breakdown
+            logger.info(f"Calculating DCA performance with weekly_amount: ${weekly_amount}")
+            dca_results = await self._calculate_dca_performance(data, weekly_amount, start_date, end_date)
+            
+            if not dca_results or 'weekly_breakdown' not in dca_results:
+                raise Exception("No weekly breakdown data available")
+
+            # Find the worst week by return percentage
+            weekly_breakdown = dca_results['weekly_breakdown']
+            logger.info(f"Analyzing {len(weekly_breakdown)} weeks for worst performance")
+            
+            worst_week = None
+            worst_return = float('inf')
+            
+            for week_data in weekly_breakdown:
+                if week_data.get('return_pct') is not None:
+                    twr = week_data['return_pct']
+                    if twr < worst_return:
+                        worst_return = twr
+                        worst_week = week_data
+
+            if not worst_week:
+                raise Exception("Could not identify worst week")
+
+            # Log the worst week details for debugging
+            logger.info(f"Worst week identified: {worst_week.get('date')} with return_pct: {worst_week.get('return_pct'):.2f}%")
+
+            # Create factor impact analysis
+            factor_analysis = await self._create_factor_impact_table(worst_week, data)
+
+            # Create the diagnostic report in HTML format - concentrated and focused
+            diagnostic_report = f"""<div class="diagnostic-analysis">
+                <div class="diagnostic-header text-center mb-3">
+                    <h4 class="text-primary mb-2">🔍 Diagnostic Event Analysis</h4>
+                    <div class="alert alert-danger py-2">
+                        <strong>Worst Week: {worst_week.get('date', 'Unknown Date')} ({worst_week.get('return_pct', 0.0):.2f}% loss)</strong>
+                    </div>
+                </div>
+                
+                <div class="factor-impact-section mb-3">
+                    <h5 class="text-dark mb-2">Factor Impact Table</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Factor</th>
+                                    <th>Type</th>
+                                    <th>Impact on {worst_week.get('date', 'Unknown Date')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>"""
+
+            for factor in factor_analysis['factor_table']:
+                factor_type = self._get_factor_type(factor['factor'])
+                diagnostic_report += f"""
+                                <tr>
+                                    <td>{factor['factor']}</td>
+                                    <td>{factor_type}</td>
+                                    <td>{factor['impact']}</td>
+                                </tr>"""
+            diagnostic_report += """
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="equity-curve-section mb-3">
+                    <h5 class="text-dark mb-2">Equity Curve</h5>
+                    <div class="chart-container">
+                        <canvas id="equityCurveChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="weekly-breakdown-section mb-3">
+                    <h5 class="text-dark mb-2">Weekly Breakdown</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Week</th>
+                                    <th>Date</th>
+                                    <th>Price</th>
+                                    <th>Investment</th>
+                                    <th>Contracts Bought</th>
+                                    <th>Total Contracts</th>
+                                    <th>Total Invested</th>
+                                    <th>Current Value</th>
+                                    <th>Position Value</th>
+                                    <th>Cash Balance</th>
+                                    <th>Required Margin</th>
+                                    <th>PnL</th>
+                                    <th>Return %</th>
+                                    <th>Time-Weighted Return</th>
+                                </tr>
+                            </thead>
+                            <tbody>"""
+
+            for week_data in dca_results['weekly_breakdown']:
+                diagnostic_report += f"""
+                                <tr>
+                                    <td>{week_data['week']}</td>
+                                    <td>{week_data['date']}</td>
+                                    <td>${week_data['price']:.2f}</td>
+                                    <td>${week_data['investment']:.2f}</td>
+                                    <td>{week_data['contracts_bought']}</td>
+                                    <td>{week_data['total_contracts']}</td>
+                                    <td>${week_data['total_invested']:.2f}</td>
+                                    <td>${week_data['current_value']:.2f}</td>
+                                    <td>${week_data['position_value']:.2f}</td>
+                                    <td>${week_data['cash_balance']:.2f}</td>
+                                    <td>${week_data['required_margin']:.2f}</td>
+                                    <td>${week_data['pnl']:.2f}</td>
+                                    <td>{week_data['return_pct']:.2f}%</td>
+                                    <td>{week_data['time_weighted_return']:.4f}</td>
+                                </tr>"""
+            diagnostic_report += """
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>"""
+
+            logger.info("Diagnostic event analysis completed successfully")
+            return {
+                'worst_week': worst_week,
+                'factor_analysis': factor_analysis,
+                'diagnostic_report': diagnostic_report
+            }
+
+        except Exception as e:
+            logger.error(f"Diagnostic event analysis error: {e}")
+            raise
+
+    async def _create_factor_impact_table(self, worst_week: Dict[str, Any], market_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create factor impact table using AI analysis"""
+        
+        # Extract worst week details
+        worst_date = worst_week.get('date', 'Unknown Date')
+        worst_return = worst_week.get('return_pct', 0.0)
+        worst_return_pct = worst_return  # return_pct is already a percentage
+        
+        # Get market context data
+        price_change = worst_week.get('price', 0)
+        volume_change = worst_week.get('contracts_bought', 0)
+        
+        # Create AI prompt for factor analysis
+        ai_prompt = f"""You are a financial market analyst. Analyze the worst week in MNQ futures trading and identify the key factors that caused the {worst_return_pct:.2f}% loss on {worst_date}.
+
+Context:
+- Date: {worst_date}
+- Weekly return: {worst_return_pct:.2f}%
+- Price change: ${price_change:.2f}
+- Volume change: {volume_change} contracts
+
+Generate exactly 5 specific market factors that likely contributed to this loss. For each factor:
+1. Provide a specific, realistic factor name (e.g., "Fed Rate Decision", "Earnings Miss", "Geopolitical Tension")
+2. Describe the concrete impact on the market
+3. Categorize the factor type (Policy, Market Index, Futures Market, Global Market, Volatility, Trade Relations, or Market Event)
+
+IMPORTANT: You must respond with ONLY valid JSON in this exact format:
+{{
+    "factor_table": [
+        {{"factor": "Factor Name", "impact": "Specific impact description", "factor_type": "Factor Type"}},
+        {{"factor": "Factor Name", "impact": "Specific impact description", "factor_type": "Factor Type"}},
+        {{"factor": "Factor Name", "impact": "Specific impact description", "factor_type": "Factor Type"}},
+        {{"factor": "Factor Name", "impact": "Specific impact description", "factor_type": "Factor Type"}},
+        {{"factor": "Factor Name", "impact": "Specific impact description", "factor_type": "Factor Type"}}
+    ]
+}}
+
+Focus on realistic market events that could cause such losses. Be specific and avoid generic statements. Do not include any text before or after the JSON."""
+        
+        try:
+            # Import AI service here to avoid circular imports
+            from app.services.ai_service import AsyncAIService
+            import httpx
+            
+            # Create HTTP client for AI service
+            async with httpx.AsyncClient() as http_client:
+                ai_service = AsyncAIService(http_client, self.cache_service)
+                
+                # Get AI analysis
+                ai_result = await ai_service.chat(
+                    message=ai_prompt,
+                    model="mistral-small",
+                    temperature=0.3,
+                    max_tokens=800
+                )
+            
+            # Parse AI response
+            response_text = ai_result.get("response", "")
+            
+            # Try to extract JSON from response
+            import json
+            import re
+            
+            # Clean the response text - remove any markdown formatting
+            cleaned_text = response_text.strip()
+            if cleaned_text.startswith('```json'):
+                cleaned_text = cleaned_text[7:]
+            if cleaned_text.endswith('```'):
+                cleaned_text = cleaned_text[:-3]
+            cleaned_text = cleaned_text.strip()
+            
+            # Try to parse the cleaned text directly first
+            try:
+                parsed_data = json.loads(cleaned_text)
+                if 'factor_table' in parsed_data:
+                    factor_table = parsed_data['factor_table']
+                    # Validate that we have exactly 5 factors
+                    if len(factor_table) != 5:
+                        raise ValueError(f"Expected 5 factors, got {len(factor_table)}")
+                else:
+                    raise ValueError("No factor_table in AI response")
+            except json.JSONDecodeError:
+                # Fallback: try to extract JSON using regex
+                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                if json_match:
+                    try:
+                        parsed_data = json.loads(json_match.group())
+                        if 'factor_table' in parsed_data:
+                            factor_table = parsed_data['factor_table']
+                            if len(factor_table) != 5:
+                                raise ValueError(f"Expected 5 factors, got {len(factor_table)}")
+                        else:
+                            raise ValueError("No factor_table in AI response")
+                    except json.JSONDecodeError:
+                        raise ValueError("Invalid JSON in AI response")
+                else:
+                    raise ValueError("No JSON found in AI response")
+            
+        except Exception as e:
+            logger.error(f"AI factor analysis failed: {e}")
+            raise
+
+        return {
+            'worst_date': worst_date,
+            'worst_return_pct': worst_return_pct,
+            'factor_table': factor_table
+        }
+
+    def _get_factor_type(self, factor_name: str) -> str:
+        """
+        Helper to categorize factors into broad categories.
+        This is a placeholder and can be expanded based on more specific rules.
+        """
+        if "Fed Rate Decision" in factor_name:
+            return "Macro Economic"
+        elif "Earnings Miss" in factor_name:
+            return "Earnings"
+        elif "Geopolitical Tension" in factor_name:
+            return "Geopolitical"
+        elif "Earnings" in factor_name:
+            return "Earnings"
+        elif "Technical Breakdown" in factor_name:
+            return "Technical"
+        elif "Sector Rotation" in factor_name:
+            return "Sector"
+        elif "Risk Aversion" in factor_name:
+            return "Risk"
+        else:
+            return "Other"
 
 
