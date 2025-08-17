@@ -368,7 +368,7 @@ class AsyncMNQInvestmentService:
             "end_date": end_date
         }
 
-    async def find_optimal_investment_amounts(
+    async def find_optimal_percentage_amounts(
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
@@ -380,9 +380,10 @@ class AsyncMNQInvestmentService:
         descending: bool = True
     ) -> Dict[str, Any]:
         """
-        Grid-search weekly amounts and rank strictly by *calculated* performance.
-        Uses precomputed weekly data (1 fetch), respects position sizing rules,
-        and returns a clean top-N along with full results.
+        Find the top N weekly amounts that produce the best performance by percentage-based metrics.
+        
+        This function ranks amounts by percentage-based metrics (returns, Sharpe ratio, etc.)
+        and is designed for performance analysis and comparison.
         """
 
         try:
@@ -442,12 +443,14 @@ class AsyncMNQInvestmentService:
 
                     total_return_pct = ((current_value / total_invested) - 1.0) * 100.0 if total_invested > 0 else 0.0
                     ret_per_dollar = ((current_value - total_invested) / total_invested) if total_invested > 0 else 0.0
+                    dollar_profit = current_value - total_invested  # Calculate absolute dollar profit
 
                     results.append({
                         "weekly_amount": amt,
                         "total_invested": total_invested,
                         "current_value": current_value,
                         "total_return": round(total_return_pct, 2),
+                        "dollar_profit": round(dollar_profit, 2),  # Add dollar profit to results
                         "cagr": metrics.get("cagr", 0.0),
                         "volatility": metrics.get("volatility", 0.0),
                         "sharpe_ratio": metrics.get("sharpe_ratio", 0.0),
@@ -469,9 +472,9 @@ class AsyncMNQInvestmentService:
             results_by_percentage = sorted(results, key=lambda x: x.get(sort_key, 0.0), reverse=descending)
             top_by_percentage = results_by_percentage[:max(1, min(top_n, len(results)))]
 
-            # ---- Sort by Sharpe ratio (best risk-adjusted returns) ----
-            results_by_sharpe = sorted(results, key=lambda x: x.get("sharpe_ratio", -999.0), reverse=True)
-            top_by_sharpe = results_by_sharpe[:5]  # Top 5 by Sharpe ratio
+            # ---- Sort by dollar profit (best absolute returns) ----
+            results_by_profit = sorted(results, key=lambda x: x.get("dollar_profit", -999999.0), reverse=True)
+            top_by_profit = results_by_profit[:5]  # Top 5 by dollar profit
 
             # ---- Summary ----
             summary = {
@@ -481,7 +484,7 @@ class AsyncMNQInvestmentService:
                 "best_return": top_by_percentage[0]["total_return"] if top_by_percentage else 0.0,
                 "worst_return": results_by_percentage[-1]["total_return"] if results_by_percentage else 0.0,
                 "avg_return": round(sum(r["total_return"] for r in results) / len(results), 3),
-                "recommendation": f"Top {len(top_by_percentage)} by {sort_key} and Top 5 by Sharpe ratio.",
+                "recommendation": f"Top {len(top_by_percentage)} by {sort_key} and Top 5 by dollar profit.",
             }
 
             logger.info(
@@ -496,12 +499,167 @@ class AsyncMNQInvestmentService:
                 "end_date": end_date,
                 "summary": summary,
                 "top_by_percentage": top_by_percentage,  # Left side: sorted by percentage/return
-                "top_by_sharpe": top_by_sharpe,         # Right side: top 5 by Sharpe ratio
+                "top_by_profit": top_by_profit,          # Right side: top 5 by dollar profit
                 "all_results": results,
             }
 
         except Exception as e:
             logger.error(f"Error finding optimal investment amounts: {e}")
+            raise
+
+    async def find_optimal_dollar_profit_amounts(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        min_amount: float = 100.0,
+        max_amount: float = 10000.0,
+        step: float = 100.0,
+        top_n: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Find the top N weekly amounts that produce the largest absolute dollars of profit.
+        
+        Ranking rule:
+        1. Primary: PROFIT(A) = EQ(A) - INV(A) descending (largest dollar profit first)
+        2. Tie-breaker 1: Sharpe ratio descending (better risk-adjusted among equal profits)
+        3. Tie-breaker 2: Lower volatility
+        4. Tie-breaker 3: Smaller weekly amount (prefer cheaper plan if tied)
+        
+        This function is designed for profit maximization, not performance analysis.
+        """
+        try:
+            logger.info(f"Finding optimal profit amounts: ${min_amount}-${max_amount}, step ${step}")
+            
+            # Set default dates if not provided
+            if not end_date:
+                end_date = datetime.now().strftime('%Y-%m-%d')
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+
+            # Get MNQ futures data
+            data = await self.get_mnq_futures_data(start_date, end_date)
+            if not data or not data.get('data'):
+                raise Exception("No MNQ futures data available")
+
+            # Generate grid of amounts to test
+            amounts = np.arange(min_amount, max_amount + step, step)
+            logger.info(f"Generated grid: min=${min_amount}, max=${max_amount}, step=${step}, points={len(amounts)}")
+
+            results = []
+            
+            # Test each amount
+            for amt in amounts:
+                try:
+                    logger.info(f"Testing amount: ${amt}")
+                    
+                    # Run DCA simulation for this amount
+                    dca_result = await self._calculate_dca_performance(data, amt, start_date, end_date)
+                    
+                    if not dca_result:
+                        continue
+                    
+                    # Calculate dollar profit: PROFIT(A) = EQ(A) - INV(A)
+                    total_invested = float(dca_result['total_invested'])
+                    current_value = float(dca_result['current_value'])
+                    dollar_profit = current_value - total_invested
+                    
+                    # Calculate Sharpe ratio from time-weighted returns
+                    equity_curve = dca_result['equity_curve']
+                    if len(equity_curve) < 2:
+                        continue
+                    
+                    # Get weekly time-weighted returns, skip week 1
+                    weekly_returns = [p.get('time_weighted_return', None) for p in equity_curve[1:]]
+                    weekly_returns = [x for x in weekly_returns if x is not None and not math.isnan(x)]
+                    
+                    if len(weekly_returns) < 2:
+                        continue
+                    
+                    # Calculate Sharpe ratio (annualized, rf=0)
+                    mean_return = np.mean(weekly_returns)
+                    std_return = np.std(weekly_returns)
+                    
+                    if std_return > 0:
+                        sharpe_ratio = (mean_return / std_return) * np.sqrt(52)
+                    else:
+                        sharpe_ratio = 0.0
+                    
+                    # Calculate volatility
+                    volatility = std_return * np.sqrt(52) * 100 if std_return > 0 else 0.0
+                    
+                    # Calculate max drawdown
+                    peak = equity_curve[0]['equity']
+                    max_drawdown = 0.0
+                    for point in equity_curve:
+                        eq = point['equity']
+                        if eq > peak:
+                            peak = eq
+                        if peak > 0:
+                            dd = (peak - eq) / peak
+                            if dd > max_drawdown:
+                                max_drawdown = dd
+                    
+                    result = {
+                        'weekly_amount': amt,
+                        'dollar_profit': dollar_profit,
+                        'total_invested': total_invested,
+                        'current_value': current_value,
+                        'sharpe_ratio': sharpe_ratio,
+                        'volatility': volatility,
+                        'max_drawdown': max_drawdown * 100,  # Convert to percentage
+                        'total_weeks': len(equity_curve)
+                    }
+                    
+                    results.append(result)
+                    logger.info(f"Amount ${amt}: profit=${dollar_profit:.2f}, Sharpe={sharpe_ratio:.2f}")
+                    
+                except Exception as e:
+                    logger.warning(f"Amount ${amt}: calculation failed ({e})")
+                    continue
+
+            if not results:
+                raise Exception("No valid results generated")
+
+            # Sort by dollar profit (descending), then by Sharpe ratio (descending), then by volatility (ascending), then by weekly amount (ascending)
+            results_sorted = sorted(
+                results, 
+                key=lambda x: (
+                    -x['dollar_profit'],      # Primary: dollar profit descending
+                    -x['sharpe_ratio'],       # Tie-breaker 1: Sharpe ratio descending
+                    x['volatility'],           # Tie-breaker 2: volatility ascending
+                    x['weekly_amount']         # Tie-breaker 3: weekly amount ascending
+                )
+            )
+            
+            top_by_profit = results_sorted[:top_n]
+
+            # Summary
+            summary = {
+                "total_tested": len(results),
+                "objective": "maximize_dollar_profit",
+                "best_profit": top_by_profit[0]['dollar_profit'] if top_by_profit else 0.0,
+                "worst_profit": results_sorted[-1]['dollar_profit'] if results_sorted else 0.0,
+                "avg_profit": round(sum(r['dollar_profit'] for r in results) / len(results), 2),
+                "recommendation": f"Top {len(top_by_profit)} by absolute dollar profit with Sharpe ratio tie-breakers.",
+            }
+
+            logger.info(
+                f"Optimal profit search complete: tested={len(results)} "
+                f"best=${top_by_profit[0]['weekly_amount'] if top_by_profit else 'N/A'} "
+                f"(profit=${top_by_profit[0]['dollar_profit']:.2f})"
+            )
+
+            return {
+                "success": True,
+                "start_date": start_date,
+                "end_date": end_date,
+                "summary": summary,
+                "top_by_profit": top_by_profit,  # Right side: sorted by dollar profit
+                "all_results": results,
+            }
+
+        except Exception as e:
+            logger.error(f"Error finding optimal profit amounts: {e}")
             raise
 
     async def generate_diagnostic_event_analysis(

@@ -50,7 +50,7 @@ class MNQOptimalAmountsResponse(BaseModel):
     end_date: str
     summary: dict
     top_by_percentage: List[dict]  # Left side: sorted by percentage/return
-    top_by_sharpe: List[dict]      # Right side: top 5 by Sharpe ratio
+    top_by_profit: List[dict]      # Right side: top 5 by dollar profit
     all_results: List[dict]
 
 class MNQAnalysisRequest(BaseModel):
