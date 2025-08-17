@@ -126,8 +126,11 @@ class AsyncMNQInvestmentService:
     ) -> Dict[str, Any]:
         """Calculate DCA performance metrics"""
         try:
-            # Group data by week (Friday close)
-            weekly_data = self._group_by_week(data['data'])
+            # Use precomputed weekly data if available, otherwise group by week
+            if 'weekly_data' in data:
+                weekly_data = data['weekly_data']
+            else:
+                weekly_data = self._group_by_week(data['data'])
 
             # Calculate DCA performance
             dca_results = self._simulate_dca_investment(weekly_data, weekly_amount)
@@ -349,5 +352,151 @@ class AsyncMNQInvestmentService:
             'sharpe_ratio': round(sharpe, 2),
             'max_drawdown': round(max_drawdown * 100, 2),
             'profit_factor': profit_factor,
-            'win_rate': win_rate,
+            'win_rate': round(win_rate, 2),
         }
+
+    async def _prepare_weekly_data(self, start_date: str, end_date: str) -> Dict[str, Any]:
+        """Precompute weekly data once for reuse across multiple calculations"""
+        data = await self.get_mnq_futures_data(start_date, end_date)
+        if not data or not data.get('data'):
+            raise Exception("No MNQ futures data available")
+        weekly_data = self._group_by_week(data['data'])
+        return {
+            "symbol": data["symbol"], 
+            "weekly_data": weekly_data,
+            "start_date": start_date, 
+            "end_date": end_date
+        }
+
+    async def find_optimal_investment_amounts(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        min_amount: float = 100.0,
+        max_amount: float = 10000.0,
+        step_size: float = 100.0,
+        top_n: int = 5,
+        sort_key: str = "total_return",
+        descending: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Grid-search weekly amounts and rank strictly by *calculated* performance.
+        Uses precomputed weekly data (1 fetch), respects position sizing rules,
+        and returns a clean top-N along with full results.
+        """
+
+        try:
+            # ---- Dates (defaults) ----
+            if not end_date:
+                end_date = datetime.now().strftime('%Y-%m-%d')
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+
+            # ---- Precompute once (weekly prices) ----
+            prepared = await self._prepare_weekly_data(start_date, end_date)  # {"weekly_data": ...}
+
+            # ---- Build amount grid (use step_size; guard count) ----
+            if step_size <= 0:
+                step_size = 1.0
+            if max_amount < min_amount:
+                min_amount, max_amount = max_amount, min_amount
+
+            # cap at ~500 evaluations to keep API snappy
+            est_points = int((max_amount - min_amount) // step_size) + 1
+            if est_points > 500:
+                # stretch step to keep ~<=500
+                step_size = max(step_size, (max_amount - min_amount) / 500.0)
+                est_points = int((max_amount - min_amount) // step_size) + 1
+
+            # numeric stability/rounding
+            grid = [round(min_amount + i * step_size, 2) for i in range(est_points)]
+            if grid[-1] < max_amount:
+                grid.append(round(max_amount, 2))
+            
+            # Debug logging to see what grid is generated
+            logger.info(f"Generated grid: min=${min_amount}, max=${max_amount}, step=${step_size}, points={est_points}")
+            logger.info(f"Grid includes $120: {'$120' in [f'${amt}' for amt in grid]}")
+            logger.info(f"First 10 grid values: {grid[:10]}")
+            logger.info(f"Grid around $120: {[amt for amt in grid if 115 <= amt <= 125]}")
+
+            valid_sort_keys = {"total_return", "sharpe_ratio", "profit_factor", "return_per_invested_dollar"}
+
+            if sort_key not in valid_sort_keys:
+                logger.warning(f"Invalid sort_key '{sort_key}', defaulting to 'total_return'")
+                sort_key = "total_return"
+
+            results: List[Dict[str, Any]] = []
+
+            # ---- Evaluate sequentially (fast enough; uses precomputed data) ----
+            for amt in grid:
+                try:
+                    perf = await self._calculate_dca_performance(
+                        data=prepared, weekly_amount=amt,
+                        start_date=start_date, end_date=end_date
+                    )
+                    metrics = perf["performance_metrics"]
+
+                    # NOTE: current_value is *equity* (cash + MTM). This already prices the open position.
+                    total_invested = float(perf["total_invested"])
+                    current_value  = float(perf["current_value"])
+
+                    total_return_pct = ((current_value / total_invested) - 1.0) * 100.0 if total_invested > 0 else 0.0
+                    ret_per_dollar = ((current_value - total_invested) / total_invested) if total_invested > 0 else 0.0
+
+                    results.append({
+                        "weekly_amount": amt,
+                        "total_invested": total_invested,
+                        "current_value": current_value,
+                        "total_return": round(total_return_pct, 2),
+                        "cagr": metrics.get("cagr", 0.0),
+                        "volatility": metrics.get("volatility", 0.0),
+                        "sharpe_ratio": metrics.get("sharpe_ratio", 0.0),
+                        "max_drawdown": metrics.get("max_drawdown", 0.0),
+                        "win_rate": metrics.get("win_rate", 0.0),
+                        "profit_factor": metrics.get("profit_factor", 0.0),
+                        "total_contracts": perf.get("total_contracts", 0.0),
+                        "return_per_invested_dollar": round(ret_per_dollar, 6),
+                    })
+
+                except Exception as e:
+                    logger.warning(f"Amount ${amt}: calculation failed ({e})")
+                    continue
+
+            if not results:
+                raise Exception("No valid results generated")
+
+            # ---- Sort & pick top-N ----
+            results.sort(key=lambda x: x.get(sort_key, 0.0), reverse=descending)
+            top_results = results[:max(1, min(top_n, len(results)))]
+
+            # ---- Summary ----
+            summary = {
+                "total_tested": len(results),
+                "sort_key": sort_key,
+                "sort_direction": "descending" if descending else "ascending",
+                "best_return": top_results[0]["total_return"] if top_results else 0.0,
+                "worst_return": results[-1]["total_return"] if results else 0.0,
+                "avg_return": round(sum(r["total_return"] for r in results) / len(results), 3),
+                "recommendation": f"Top {len(top_results)} based strictly on '{sort_key}'.",
+            }
+
+            logger.info(
+                f"Optimal search complete: tested={len(results)} "
+                f"best=${top_results[0]['weekly_amount'] if top_results else 'N/A'} "
+                f"({top_results[0]['total_return']:.2f}% by {sort_key})"
+            )
+
+            return {
+                "success": True,
+                "start_date": start_date,
+                "end_date": end_date,
+                "summary": summary,
+                "top_results": top_results,
+                "all_results": results,
+            }
+
+        except Exception as e:
+            logger.error(f"Error finding optimal investment amounts: {e}")
+            raise
+
+

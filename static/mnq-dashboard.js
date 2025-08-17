@@ -458,6 +458,8 @@ async function generateAIStrategyAnalysis(data) {
             volatility: data.performance_metrics?.volatility || 0,
             sharpe_ratio: data.performance_metrics?.sharpe_ratio || 0,
             max_drawdown: data.performance_metrics?.max_drawdown || 0,
+            win_rate: data.performance_metrics?.win_rate || 0,
+            profit_factor: data.performance_metrics?.profit_factor || 0,
             total_contracts: data.total_contracts || 0,
             total_weeks: data.total_weeks || 0,
             weekly_breakdown: data.weekly_breakdown || []
@@ -465,22 +467,20 @@ async function generateAIStrategyAnalysis(data) {
         
         console.log('AI Analysis Data:', analysisData);
         
-        // Generate combined analysis prompt
-        const combinedPrompt = `Analyze this MNQ futures DCA strategy performance in 3-4 sentences. Provide insights on:
-
-1. Strategy Effectiveness: How well the DCA approach worked (timing, risk management, contract accumulation)
-2. Performance Drivers: What caused the returns to be positive/negative (market conditions, margin usage, costs)
-3. Risk Assessment: Impact of volatility, drawdowns, and liquidation events
-4. Key Insights: What the weekly breakdown reveals about the investment journey
-
-Data: Weekly $${analysisData.weekly_amount} investment over ${analysisData.total_weeks} weeks. Total invested: $${analysisData.total_invested.toLocaleString()}, Current value: $${analysisData.current_value.toLocaleString()}, Return: ${analysisData.total_return.toFixed(2)}%, CAGR ${analysisData.cagr.toFixed(2)}%, Volatility ${analysisData.volatility.toFixed(2)}%, Max drawdown ${analysisData.max_drawdown.toFixed(2)}%, Total contracts: ${analysisData.total_contracts.toFixed(4)}.`;
-
-        // Call AI service for combined analysis
-        const analysisResult = await callAIService(combinedPrompt);
+        // Generate AI analysis using Python backend
+        const analysisResult = await callPythonBackendAnalysis(analysisData);
         
-        // Update UI with AI analysis
+        // Update UI with AI analysis (render markdown)
         if (combinedAnalysis && analysisResult) {
-            combinedAnalysis.innerHTML = analysisResult;
+            // Convert markdown to HTML if showdown is available
+            if (typeof showdown !== 'undefined') {
+                const converter = new showdown.Converter();
+                const html = converter.makeHtml(analysisResult);
+                combinedAnalysis.innerHTML = html;
+            } else {
+                // Fallback to plain text if showdown not available
+                combinedAnalysis.innerHTML = analysisResult.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            }
         }
         
         // Stop timer and hide loading state
@@ -515,30 +515,126 @@ Data: Weekly $${analysisData.weekly_amount} investment over ${analysisData.total
     }
 }
 
-async function callAIService(prompt) {
+async function callPythonBackendAnalysis(analysisData) {
     try {
-        const response = await fetch('/api/v1/chat/chat', {
+        console.log('Calling Python backend for AI analysis...');
+        
+        // Call Python backend analysis endpoint
+        const response = await fetch('/api/v1/mnq/generate-analysis', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                message: prompt,
-                model: 'mistral-small',
-                temperature: 0.3
+                weekly_amount: analysisData.weekly_amount,
+                start_date: analysisData.start_date,
+                end_date: analysisData.end_date,
+                total_weeks: analysisData.total_weeks,
+                total_invested: analysisData.total_invested,
+                current_value: analysisData.current_value,
+                total_return: analysisData.total_return,
+                cagr: analysisData.cagr,
+                volatility: analysisData.volatility,
+                sharpe_ratio: analysisData.sharpe_ratio,
+                max_drawdown: analysisData.max_drawdown,
+                win_rate: analysisData.win_rate,
+                profit_factor: analysisData.profit_factor,
+                total_contracts: analysisData.total_contracts
             })
         });
         
         if (!response.ok) {
-            throw new Error(`AI service error: ${response.status}`);
+            throw new Error(`Python backend error: ${response.status}`);
         }
         
         const data = await response.json();
-        return data.response || data.message || 'Analysis generated successfully.';
+        console.log('Python backend analysis response:', data);
+        
+        if (data.success) {
+            return data.analysis;
+        } else {
+            // Use fallback analysis if AI failed
+            return data.analysis || 'Analysis generation failed. Please review the performance metrics above for insights.';
+        }
         
     } catch (error) {
-        console.error('AI service call failed:', error);
-        return null;
+        console.error('Python backend analysis failed:', error);
+        // Fallback to local analysis if backend fails
+        return generateStructuredAnalysis(analysisData);
+    }
+}
+
+function generateStructuredAnalysis(data) {
+    try {
+        console.log('Generating analysis for data:', data);
+        
+        // Extract data with fallbacks
+        const weeklyAmount = data.weekly_amount || 1000;
+        const totalWeeks = data.total_weeks || 0;
+        const totalInvested = data.total_invested || 0;
+        const currentValue = data.current_value || 0;
+        const totalReturn = data.total_return || 0;
+        const cagr = data.cagr || 0;
+        const volatility = data.volatility || 0;
+        const sharpeRatio = data.sharpe_ratio || 0;
+        const maxDrawdown = data.max_drawdown || 0;
+        const winRate = data.win_rate || 0;
+        const profitFactor = data.profit_factor || 0;
+        const totalContracts = data.total_contracts || 0;
+        
+        // Calculate time period
+        const startDate = new Date(data.start_date || new Date().toISOString().split('T')[0]);
+        const endDate = new Date(data.end_date || new Date().toISOString().split('T')[0]);
+        const days = (endDate - startDate) / (1000 * 60 * 60 * 24);
+        const years = days / 365.25;
+        
+        // Executive Summary (≤120 words)
+        const summary = `**Executive Summary**\n` +
+            `Analysis of weekly $${weeklyAmount.toLocaleString()} investment over ${totalWeeks} weeks (${years.toFixed(1)} years). ` +
+            `Total invested: $${totalInvested.toLocaleString()}, Current value: $${currentValue.toLocaleString()}, ` +
+            `Return: ${totalReturn.toFixed(2)}%, CAGR: ${cagr.toFixed(2)}%. ` +
+            `Strategy uses Dollar-Cost Averaging (DCA) into MNQ futures with controlled position sizing and risk management.`;
+        
+        // Key Metrics Table
+        const metrics = `\n**Key Performance Metrics**\n` +
+            `| Metric | Value |\n` +
+            `|--------|-------|\n` +
+            `| Total Return | ${totalReturn.toFixed(2)}% |\n` +
+            `| CAGR | ${cagr.toFixed(2)}% |\n` +
+            `| Volatility | ${volatility.toFixed(2)}% |\n` +
+            `| Sharpe Ratio | ${sharpeRatio.toFixed(2)} |\n` +
+            `| Max Drawdown | ${maxDrawdown.toFixed(2)}% |\n` +
+            `| Win Rate | ${winRate.toFixed(2)}% |\n` +
+            `| Profit Factor | ${profitFactor.toFixed(2)} |\n` +
+            `| Total Contracts | ${totalContracts.toFixed(1)} |`;
+        
+        // Strategy Insights
+        const insights = `\n**Strategy Insights**\n` +
+            `• **DCA Effectiveness**: ${totalReturn > 0 ? 'Positive' : 'Negative'} returns over ${totalWeeks} weeks\n` +
+            `• **Risk Management**: ${maxDrawdown > 25 ? 'High' : maxDrawdown > 10 ? 'Moderate' : 'Low'} volatility with ${maxDrawdown.toFixed(2)}% max drawdown\n` +
+            `• **Contract Accumulation**: ${totalContracts.toFixed(1)} contracts accumulated through systematic weekly investments\n` +
+            `• **Performance Drivers**: ${totalReturn > 0 ? 'Market appreciation and timing' : 'Market decline and volatility'} impacted overall returns`;
+        
+        // Action Items
+        const action = `\n**Action**\n` +
+            `• **Test Different Amounts**: Use the "Find Optimal Amounts" feature to discover the best weekly investment amounts\n` +
+            `• **Compare Time Periods**: Analyze performance across different market cycles and volatility periods`;
+        
+        // Risk & Method
+        const risk = `\n**Risk & Method**\n` +
+            `• **Leverage Risk**: Futures trading involves significant leverage; max drawdowns can exceed 50%\n` +
+            `• **Backtest Assumptions**: Results based on historical data; past performance doesn't guarantee future results`;
+        
+        // Metrics Footnote
+        const footnote = `\n**Metrics Footnote**\n` +
+            `Sharpe ratio calculated from weekly time-weighted returns, annualized by √52. ` +
+            `Maximum drawdown measured on equity path. Returns calculated as percentage of total contributed capital.`;
+        
+        return summary + metrics + insights + action + risk + footnote;
+        
+    } catch (error) {
+        console.error('Error in generateStructuredAnalysis:', error);
+        return `**Analysis Generation Error**\nUnable to generate analysis due to: ${error.message}\n\nPlease review the performance metrics above for insights.`;
     }
 }
 
@@ -561,17 +657,12 @@ async function prepareAIAnalysis(weeklyAmount, startDate, endDate) {
             estimated_max_drawdown: 20.0 // Conservative drawdown estimate
         };
         
-        // Generate a preliminary AI analysis prompt
-        const preliminaryPrompt = `Prepare analysis for MNQ DCA strategy with estimated data:
-Weekly $${weeklyAmount} investment over approximately ${estimatedData.total_weeks} weeks.
-Estimated performance: Conservative estimates for planning purposes.`;
+        // Generate preliminary analysis
+        const preliminaryAnalysis = generateStructuredAnalysis(estimatedData);
         
-        // Start AI service call (non-blocking)
-        const aiResponse = await callAIService(preliminaryPrompt);
-        
-        if (aiResponse) {
-            console.log('Preliminary AI analysis prepared');
-            return aiResponse;
+        if (preliminaryAnalysis) {
+            console.log('Preliminary analysis prepared');
+            return preliminaryAnalysis;
         }
         
         return null;
