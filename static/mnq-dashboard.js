@@ -159,6 +159,37 @@ async function calculateMNQInvestment() {
         updateMNQWeeklyTable(data);
         showMNQResults(true);
         
+        // Fetch and display optimal amounts
+        console.log('Fetching optimal amounts...');
+        try {
+            const optimalResponse = await fetch('/api/v1/mnq/optimal-amounts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    start_date: startDate,
+                    end_date: endDate,
+                    min_amount: 100,
+                    max_amount: 10000,
+                    step_size: 100,
+                    top_n: 5,
+                    sort_key: "total_return",
+                    descending: true
+                })
+            });
+            
+            if (optimalResponse.ok) {
+                const optimalData = await optimalResponse.json();
+                console.log('Optimal amounts received:', optimalData);
+                updateOptimalAmounts(optimalData);
+            } else {
+                console.warn('Failed to fetch optimal amounts');
+            }
+        } catch (optimalError) {
+            console.warn('Error fetching optimal amounts:', optimalError);
+        }
+        
         // Now generate AI analysis with real data (non-blocking)
         console.log('Starting AI analysis with real data...');
         generateAIStrategyAnalysis(data);
@@ -678,4 +709,45 @@ function refreshAIAnalysis() {
     if (calculateBtn && !calculateBtn.disabled) {
         calculateBtn.click(); // This will trigger a new calculation and AI analysis
     }
+}
+
+// Update optimal amounts display
+function updateOptimalAmounts(data) {
+    console.log('Updating optimal amounts display with data:', data);
+    
+    // Update left column: By Return %
+    const topByPercentage = document.getElementById('top-by-percentage');
+    if (topByPercentage && data.top_by_percentage) {
+        topByPercentage.innerHTML = '';
+        data.top_by_percentage.forEach((item, index) => {
+            const listItem = document.createElement('div');
+            listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+            listItem.innerHTML = `
+                <div>
+                    <strong>${index + 1}.</strong> $${item.weekly_amount.toLocaleString()}
+                </div>
+                <span class="badge bg-primary rounded-pill">${item.total_return.toFixed(2)}%</span>
+            `;
+            topByPercentage.appendChild(listItem);
+        });
+    }
+    
+    // Update right column: By Money Invested
+    const topByAmount = document.getElementById('top-by-amount');
+    if (topByAmount && data.top_by_amount) {
+        topByAmount.innerHTML = '';
+        data.top_by_amount.forEach((item, index) => {
+            const listItem = document.createElement('div');
+            listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+            listItem.innerHTML = `
+                <div>
+                    <strong>${index + 1}.</strong> $${item.weekly_amount.toLocaleString()}
+                </div>
+                <span class="badge bg-success rounded-pill">$${item.total_invested.toLocaleString()}</span>
+            `;
+            topByAmount.appendChild(listItem);
+        });
+    }
+    
+    console.log('Optimal amounts display updated');
 }

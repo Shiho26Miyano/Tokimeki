@@ -465,25 +465,29 @@ class AsyncMNQInvestmentService:
             if not results:
                 raise Exception("No valid results generated")
 
-            # ---- Sort & pick top-N ----
-            results.sort(key=lambda x: x.get(sort_key, 0.0), reverse=descending)
-            top_results = results[:max(1, min(top_n, len(results)))]
+            # ---- Sort by percentage/return (existing behavior) ----
+            results_by_percentage = sorted(results, key=lambda x: x.get(sort_key, 0.0), reverse=descending)
+            top_by_percentage = results_by_percentage[:max(1, min(top_n, len(results)))]
+
+            # ---- Sort by largest amount of money invested ----
+            results_by_amount = sorted(results, key=lambda x: x.get("total_invested", 0.0), reverse=True)
+            top_by_amount = results_by_amount[:5]  # Top 5 by money invested
 
             # ---- Summary ----
             summary = {
                 "total_tested": len(results),
                 "sort_key": sort_key,
                 "sort_direction": "descending" if descending else "ascending",
-                "best_return": top_results[0]["total_return"] if top_results else 0.0,
-                "worst_return": results[-1]["total_return"] if results else 0.0,
+                "best_return": top_by_percentage[0]["total_return"] if top_by_percentage else 0.0,
+                "worst_return": results_by_percentage[-1]["total_return"] if results_by_percentage else 0.0,
                 "avg_return": round(sum(r["total_return"] for r in results) / len(results), 3),
-                "recommendation": f"Top {len(top_results)} based strictly on '{sort_key}'.",
+                "recommendation": f"Top {len(top_by_percentage)} by {sort_key} and Top 5 by amount invested.",
             }
 
             logger.info(
                 f"Optimal search complete: tested={len(results)} "
-                f"best=${top_results[0]['weekly_amount'] if top_results else 'N/A'} "
-                f"({top_results[0]['total_return']:.2f}% by {sort_key})"
+                f"best=${top_by_percentage[0]['weekly_amount'] if top_by_percentage else 'N/A'} "
+                f"({top_by_percentage[0]['total_return']:.2f}% by {sort_key})"
             )
 
             return {
@@ -491,7 +495,8 @@ class AsyncMNQInvestmentService:
                 "start_date": start_date,
                 "end_date": end_date,
                 "summary": summary,
-                "top_results": top_results,
+                "top_by_percentage": top_by_percentage,  # Left side: sorted by percentage/return
+                "top_by_amount": top_by_amount,          # Right side: top 5 by money invested
                 "all_results": results,
             }
 
