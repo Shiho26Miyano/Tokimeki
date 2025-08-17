@@ -50,7 +50,7 @@ class MNQOptimalAmountsResponse(BaseModel):
     end_date: str
     summary: dict
     top_by_percentage: List[dict]  # Left side: sorted by percentage/return
-    top_by_amount: List[dict]      # Right side: top 5 by money invested
+    top_by_sharpe: List[dict]      # Right side: top 5 by Sharpe ratio
     all_results: List[dict]
 
 class MNQAnalysisRequest(BaseModel):
@@ -497,22 +497,22 @@ async def generate_mnq_analysis(
         for i, t in enumerate(top_by_percentage):
             top_5_amounts.append(f"{i+1}. ${t['weekly_amount']:,.0f} - {t['total_return']:.2f}% return")
         
-        # Also get top results by amount invested for comparison
-        top_by_amount = optimal.get("top_by_amount", [])[:5]
-        top_5_by_amount = []
-        for i, t in enumerate(top_by_amount):
-            top_5_by_amount.append(f"{i+1}. ${t['weekly_amount']:,.0f} - ${t['total_invested']:,.0f} invested")
+        # Also get top results by Sharpe ratio for comparison
+        top_by_sharpe = optimal.get("top_by_sharpe", [])[:5]
+        top_5_by_sharpe = []
+        for i, t in enumerate(top_by_sharpe):
+            top_5_by_sharpe.append(f"{i+1}. ${t['weekly_amount']:,.0f} - {t['sharpe_ratio']:.2f} Sharpe")
         
         # Create simple table format
         table_rows = []
         for i in range(5):
             left_item = top_5_amounts[i] if i < len(top_5_amounts) else ""
-            right_item = top_5_by_amount[i] if i < len(top_5_by_amount) else ""
+            right_item = top_5_by_sharpe[i] if i < len(top_5_by_sharpe) else ""
             table_rows.append(f"| {left_item} | {right_item} |")
         
         table_content = "\n".join(table_rows)
         logger.info(f"Service returned top amounts by percentage: {top_5_amounts}")
-        logger.info(f"Service returned top amounts by money invested: {top_5_by_amount}")
+        logger.info(f"Service returned top amounts by Sharpe ratio: {top_5_by_sharpe}")
         
         # Create structured prompt for AI service
         structured_prompt = f"""You are a quantitative product manager and research writer.
@@ -527,10 +527,10 @@ FOLLOW THIS EXACT FORMAT (no deviations):
 • Results: {request.total_return:.2f}% return, {request.cagr:.2f}% CAGR
 • Key insight: One-sentence summary of performance
 
-**Top 5 Recommended Weekly Amounts** (Based on Actual Calculations)
+**Top 5 Weekly Amounts by Performance** (Based on Actual Calculations)
 
-| Left: By Return % | Right: By Money Invested |
-|-------------------|---------------------------|
+| Left: By Return % | Right: By Sharpe Ratio |
+|-------------------|------------------------|
 | {table_content} |
 
 **Key Performance Metrics**
@@ -548,7 +548,7 @@ FOLLOW THIS EXACT FORMAT (no deviations):
 
 Data: Weekly ${request.weekly_amount:,.0f} investment over {request.total_weeks} weeks. Total invested: ${request.total_invested:,.0f}, Current value: ${request.current_value:,.0f}, Return: {request.total_return:.2f}%, CAGR {request.cagr:.2f}%, Volatility {request.volatility:.2f}%, Max drawdown {request.max_drawdown:.2f}%, Total contracts: {request.total_contracts:.4f}.
 
-IMPORTANT: Use ONLY the actual calculated data provided above in the "Top 5 Recommended Weekly Amounts" section. Do NOT generate new recommendations. The {table_content} contains the real performance data that should be displayed exactly as shown."""
+IMPORTANT: Use ONLY the actual calculated data provided above in the "Top 5 Weekly Amounts by Performance" section. Do NOT generate new recommendations. The {table_content} contains the real performance data that should be displayed exactly as shown."""
 
         # Call AI service
         logger.info("Calling AI service with structured prompt...")
@@ -605,10 +605,10 @@ IMPORTANT: Use ONLY the actual calculated data provided above in the "Top 5 Reco
 • Results: {request.total_return:.2f}% return, {request.cagr:.2f}% CAGR
 • Key insight: {'Positive' if request.total_return > 0 else 'Negative'} returns over {request.total_weeks} weeks with {request.max_drawdown:.2f}% max drawdown
 
-**Top 5 Recommended Weekly Amounts** (Based on Actual Calculations)
+**Top 5 Weekly Amounts by Performance** (Based on Actual Calculations)
 
-| Left: By Return % | Right: By Money Invested |
-|-------------------|---------------------------|
+| Left: By Return % | Right: By Sharpe Ratio |
+|-------------------|------------------------|
 | {table_content} |
 
 **Key Performance Metrics**

@@ -725,18 +725,18 @@ function updateOptimalAmounts(data) {
         });
     }
     
-    // Update right column: By Money Invested
+    // Update right column: By Sharpe Ratio (best risk-adjusted returns)
     const topByAmount = document.getElementById('top-by-amount');
-    if (topByAmount && data.top_by_amount) {
+    if (topByAmount && data.top_by_sharpe) {
         topByAmount.innerHTML = '';
-        data.top_by_amount.forEach((item, index) => {
+        data.top_by_sharpe.forEach((item, index) => {
             const listItem = document.createElement('div');
             listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
             listItem.innerHTML = `
                 <div>
                     <strong>${index + 1}.</strong> $${item.weekly_amount.toLocaleString()}
                 </div>
-                <span class="badge bg-success rounded-pill">$${item.total_invested.toLocaleString()}</span>
+                <span class="badge bg-success rounded-pill">${item.sharpe_ratio.toFixed(2)}</span>
             `;
             topByAmount.appendChild(listItem);
         });

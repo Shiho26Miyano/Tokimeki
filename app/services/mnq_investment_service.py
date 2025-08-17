@@ -469,9 +469,9 @@ class AsyncMNQInvestmentService:
             results_by_percentage = sorted(results, key=lambda x: x.get(sort_key, 0.0), reverse=descending)
             top_by_percentage = results_by_percentage[:max(1, min(top_n, len(results)))]
 
-            # ---- Sort by largest amount of money invested ----
-            results_by_amount = sorted(results, key=lambda x: x.get("total_invested", 0.0), reverse=True)
-            top_by_amount = results_by_amount[:5]  # Top 5 by money invested
+            # ---- Sort by Sharpe ratio (best risk-adjusted returns) ----
+            results_by_sharpe = sorted(results, key=lambda x: x.get("sharpe_ratio", -999.0), reverse=True)
+            top_by_sharpe = results_by_sharpe[:5]  # Top 5 by Sharpe ratio
 
             # ---- Summary ----
             summary = {
@@ -481,7 +481,7 @@ class AsyncMNQInvestmentService:
                 "best_return": top_by_percentage[0]["total_return"] if top_by_percentage else 0.0,
                 "worst_return": results_by_percentage[-1]["total_return"] if results_by_percentage else 0.0,
                 "avg_return": round(sum(r["total_return"] for r in results) / len(results), 3),
-                "recommendation": f"Top {len(top_by_percentage)} by {sort_key} and Top 5 by amount invested.",
+                "recommendation": f"Top {len(top_by_percentage)} by {sort_key} and Top 5 by Sharpe ratio.",
             }
 
             logger.info(
@@ -496,7 +496,7 @@ class AsyncMNQInvestmentService:
                 "end_date": end_date,
                 "summary": summary,
                 "top_by_percentage": top_by_percentage,  # Left side: sorted by percentage/return
-                "top_by_amount": top_by_amount,          # Right side: top 5 by money invested
+                "top_by_sharpe": top_by_sharpe,         # Right side: top 5 by Sharpe ratio
                 "all_results": results,
             }
 
