@@ -395,6 +395,8 @@ class AsyncMNQInvestmentService:
 
             # ---- Precompute once (weekly prices) ----
             prepared = await self._prepare_weekly_data(start_date, end_date)  # {"weekly_data": ...}
+            if not prepared or 'weekly_data' not in prepared:
+                raise Exception("Failed to prepare weekly data")
 
             # ---- Build amount grid (use step_size; guard count) ----
             if step_size <= 0:
@@ -402,11 +404,11 @@ class AsyncMNQInvestmentService:
             if max_amount < min_amount:
                 min_amount, max_amount = max_amount, min_amount
 
-            # cap at ~500 evaluations to keep API snappy
+            # cap at ~1000 evaluations to keep API snappy but allow more granular testing
             est_points = int((max_amount - min_amount) // step_size) + 1
-            if est_points > 500:
-                # stretch step to keep ~<=500
-                step_size = max(step_size, (max_amount - min_amount) / 500.0)
+            if est_points > 1000:
+                # stretch step to keep ~<=1000
+                step_size = max(step_size, (max_amount - min_amount) / 1000.0)
                 est_points = int((max_amount - min_amount) // step_size) + 1
 
             # numeric stability/rounding
@@ -428,7 +430,9 @@ class AsyncMNQInvestmentService:
 
             results: List[Dict[str, Any]] = []
 
-            # ---- Evaluate sequentially (fast enough; uses precomputed data) ----
+            # ---- Evaluate sequentially for now (will optimize later) ----
+            logger.info(f"Starting sequential evaluation of {len(grid)} amounts...")
+            
             for amt in grid:
                 try:
                     perf = await self._calculate_dca_performance(
@@ -460,10 +464,14 @@ class AsyncMNQInvestmentService:
                         "total_contracts": perf.get("total_contracts", 0.0),
                         "return_per_invested_dollar": round(ret_per_dollar, 6),
                     })
+                    
+                    logger.info(f"Amount ${amt}: return={total_return_pct:.2f}%, profit=${dollar_profit:.2f}")
 
                 except Exception as e:
                     logger.warning(f"Amount ${amt}: calculation failed ({e})")
                     continue
+            
+            logger.info(f"Sequential evaluation completed. {len(results)} successful results out of {len(grid)} attempts.")
 
             if not results:
                 raise Exception("No valid results generated")

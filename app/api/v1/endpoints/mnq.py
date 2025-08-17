@@ -26,7 +26,7 @@ class MNQOptimalAmountsRequest(BaseModel):
     end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)")
     min_amount: float = Field(default=100.0, ge=50, le=5000, description="Minimum weekly investment amount to test")
     max_amount: float = Field(default=10000.0, ge=500, le=50000, description="Maximum weekly investment amount to test")
-    step_size: float = Field(default=100.0, ge=25, le=1000, description="Step size between test amounts")
+    step_size: float = Field(default=10.0, ge=10, le=1000, description="Step size between test amounts")
     top_n: int = Field(default=5, ge=1, le=20, description="Number of top results to return")
     sort_key: str = Field(default="total_return", description="Sort key: total_return, sharpe_ratio, profit_factor, or return_per_invested_dollar")
     descending: bool = Field(default=True, description="Sort in descending order (True) or ascending (False)")
@@ -413,7 +413,7 @@ async def find_optimal_mnq_amounts(
         mnq_service = AsyncMNQInvestmentService(cache_service)
         
         # Find optimal amounts
-        result = await mnq_service.find_optimal_investment_amounts(
+        result = await mnq_service.find_optimal_percentage_amounts(
             start_date=request.start_date,
             end_date=request.end_date,
             min_amount=request.min_amount,
@@ -480,7 +480,7 @@ async def generate_mnq_analysis(
         
         # Use the improved service to find optimal amounts (real calculations)
         logger.info("Finding optimal amounts via service (real calculations)...")
-        optimal = await mnq_service.find_optimal_investment_amounts(
+        optimal = await mnq_service.find_optimal_percentage_amounts(
             start_date=request.start_date,
             end_date=request.end_date,
             min_amount=max(50.0, request.weekly_amount * 0.1),  # sensible local neighborhood
