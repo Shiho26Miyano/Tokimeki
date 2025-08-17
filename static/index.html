@@ -271,6 +271,9 @@
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">⚡ Trading Strategy Analyzer</a>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="mnq-dashboard-tab" data-bs-toggle="pill" data-bs-target="#mnq-dashboard-content" role="tab" aria-controls="mnq-dashboard-content" aria-selected="false">🧪 Experimental Trading Hub</a>
+                    </li>
 
 
                 </ul>
@@ -695,6 +698,232 @@
                         <div id="react-deepseek-chatbot"></div>
                     </div>
 
+                    <div class="tab-pane fade" id="mnq-dashboard-content" role="tabpanel" aria-labelledby="mnq-dashboard-tab">
+                        <div class="card shadow-sm flex-fill d-flex flex-column" style="max-width: 1200px; margin: 0 auto; border-radius: 16px;">
+                            <div class="card-body d-flex flex-column" style="padding: 32px;">
+                                <div class="card-header-row mb-3">
+                                    <span class="card-title" style="font-size: 2rem; font-weight: 600; color: #183153;">🧪 Experimental Trading Hub</span>
+                                </div>
+                                <div class="alert alert-info mb-4" style="background: #f1f5fa; color: #27457c; border: none; border-radius: 10px;">
+                                    <strong>What is this?</strong> This experimental hub tests various investment strategies and amounts to discover optimal performance patterns. Currently analyzing MNQ (Micro E-mini NASDAQ-100) futures using Dollar-Cost Averaging (DCA) with dynamic position sizing.
+                                </div>
+                                
+                                <!-- Investment Parameters -->
+                                <div class="card mb-4" style="border-radius: 12px;">
+                                    <div class="card-body">
+                                        <h5 class="card-title mb-3">Investment Parameters</h5>
+                                        <div class="row g-3">
+                                            <div class="col-md-4">
+                                                <label for="mnq-weekly-amount" class="form-label">Weekly Investment Amount ($)</label>
+                                                <input type="number" class="form-control" id="mnq-weekly-amount" value="1000" min="100" max="10000" step="100">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label for="mnq-start-date" class="form-label">Start Date</label>
+                                                <input type="date" class="form-control" id="mnq-start-date">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label for="mnq-end-date" class="form-label">End Date</label>
+                                                <input type="date" class="form-control" id="mnq-end-date">
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <button class="btn btn-dark-bbg" id="mnq-calculate-btn">Calculate Performance</button>
+                                            <button class="btn btn-outline-secondary ms-2" id="mnq-reset-btn">Reset to Defaults</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Performance Summary Table -->
+                                <div class="card mb-4" style="border-radius: 12px;" id="mnq-performance-cards">
+                                    <div class="card-header" style="background: #f8f9fa; border-bottom: 1px solid #dee2e6; border-radius: 12px 12px 0 0;">
+                                        <h6 class="mb-0" style="color: #495057; font-weight: 600;">📊 Performance Summary</h6>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm mb-0" style="margin: 0;">
+                                                <tbody>
+                                                    <tr>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #e8f5e8, #d4edda); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Total Invested</div>
+                                                                <div class="h5 mb-0" id="mnq-total-invested" style="color: #28a745; font-weight: 700;">$0</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #e8f4fd, #d1ecf1); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Current Value</div>
+                                                                <div class="h5 mb-0" id="mnq-current-value" style="color: #17a2b8; font-weight: 700;">$0</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #fff3cd, #ffeaa7); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Total Return</div>
+                                                                <div class="h5 mb-0" id="mnq-total-return" style="color: #ffc107; font-weight: 700;">0.00%</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #f8d7da, #f5c6cb); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">CAGR</div>
+                                                                <div class="h5 mb-0" id="mnq-cagr" style="color: #dc3545; font-weight: 700;">0.00%</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #e2e3e5, #d6d8db); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Volatility</div>
+                                                                <div class="h5 mb-0" id="mnq-volatility" style="color: #6c757d; font-weight: 700;">0.00%</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #d1ecf1, #bee5eb); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Sharpe Ratio</div>
+                                                                <div class="h5 mb-0" id="mnq-sharpe" style="color: #0c5460; font-weight: 700;">0.00</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #fff3cd, #ffeaa7); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Max Drawdown</div>
+                                                                <div class="h5 mb-0" id="mnq-max-drawdown" style="color: #856404; font-weight: 700;">0.00%</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #d4edda, #c3e6cb); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Win Rate</div>
+                                                                <div class="h5 mb-0" id="mnq-win-rate" style="color: #155724; font-weight: 700;">0.00%</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #e8f4fd, #d1ecf1); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Profit Factor</div>
+                                                                <div class="h5 mb-0" id="mnq-profit-factor" style="color: #0c5460; font-weight: 700;">0.00</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #f8d7da, #f5c6cb); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Total Weeks</div>
+                                                                <div class="h5 mb-0" id="mnq-total-weeks" style="color: #721c24; font-weight: 700;">0</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #fff3cd, #ffeaa7); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Total Contracts</div>
+                                                                <div class="h5 mb-0" id="mnq-total-contracts" style="color: #856404; font-weight: 700;">0</div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-center" style="background: linear-gradient(135deg, #e8f5e8, #d4edda); border: none;">
+                                                            <div class="py-3">
+                                                                <div class="text-muted small">Avg Price</div>
+                                                                <div class="h5 mb-0" id="mnq-avg-price" style="color: #28a745; font-weight: 700;">$0</div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+
+
+
+                                <!-- AI Analysis Section -->
+                                <div class="card mb-4" style="border-radius: 12px;">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 class="card-title mb-0">🤖 AI Strategy Analysis</h5>
+                                            <div class="d-flex align-items-center gap-3">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="spinner-border spinner-border-sm text-primary" id="ai-analysis-spinner" style="display: none;" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                    <div class="text-muted small" id="ai-analysis-timer">00:00</div>
+                                                </div>
+                                                <button class="btn btn-primary btn-sm" onclick="refreshAIAnalysis()" title="Refresh AI Analysis" id="ai-refresh-btn">
+                                                    Refresh
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="ai-combined-analysis" class="text-muted">
+                                            Click "Calculate Performance" to generate AI-powered analysis of your MNQ DCA strategy.
+                                        </div>
+                                        <style>
+                                            #ai-combined-analysis h1, #ai-combined-analysis h2, #ai-combined-analysis h3 {
+                                                color: #183153;
+                                                margin-top: 1rem;
+                                                margin-bottom: 0.5rem;
+                                                font-weight: 600;
+                                            }
+                                            #ai-combined-analysis strong {
+                                                color: #183153;
+                                                font-weight: 600;
+                                            }
+                                            #ai-combined-analysis table {
+                                                width: 100%;
+                                                border-collapse: collapse;
+                                                margin: 1rem 0;
+                                            }
+                                            #ai-combined-analysis th, #ai-combined-analysis td {
+                                                border: 1px solid #dee2e6;
+                                                padding: 0.5rem;
+                                                text-align: left;
+                                            }
+                                            #ai-combined-analysis th {
+                                                background-color: #f8f9fa;
+                                                font-weight: 600;
+                                            }
+                                            #ai-combined-analysis ul {
+                                                margin: 0.5rem 0;
+                                                padding-left: 1.5rem;
+                                            }
+                                            #ai-combined-analysis li {
+                                                margin: 0.25rem 0;
+                                            }
+                                        </style>
+                                    </div>
+                                </div>
+
+                                <!-- Weekly Breakdown Table -->
+                                <div class="card mb-4" style="border-radius: 12px;">
+                                    <div class="card-body">
+                                        <h5 class="card-title mb-3">Weekly Investment Breakdown</h5>
+                                        <div class="table-responsive">
+                                            <table class="table table-striped" id="mnq-weekly-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Week</th>
+                                                        <th>Date</th>
+                                                        <th>Price</th>
+                                                        <th>Investment</th>
+                                                        <th>Contracts Bought</th>
+                                                        <th>Total Contracts</th>
+                                                        <th>Total Invested</th>
+                                                        <th>Current Value</th>
+                                                        <th>P&L</th>
+                                                        <th>Return %</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="mnq-weekly-tbody">
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Loading and Error States -->
+                                <div id="mnq-loading" class="text-center" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">Calculating MNQ investment performance...</p>
+                                </div>
+                                
+                                <div id="mnq-error" class="alert alert-danger" style="display: none;">
+                                    <strong>Error:</strong> <span id="mnq-error-message"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -816,6 +1045,7 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
             <script src="static/main.js?v=20250101&t=1704067200&nocache=true&cb=1704067200"></script>
+        <script src="static/mnq-dashboard.js"></script>
     
     <script>
         // Handle hover-triggered modals for "How it works" buttons
