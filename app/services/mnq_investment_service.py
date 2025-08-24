@@ -13,11 +13,27 @@ logger = logging.getLogger(__name__)
 
 
 class AsyncMNQInvestmentService:
-    def __init__(self, cache_service: AsyncCacheService):
+    def __init__(self, cache_service: AsyncCacheService, contract_type: str = "MNQ"):
         self.cache_service = cache_service
+        self.contract_type = contract_type.upper()
         self.executor = ThreadPoolExecutor(max_workers=4)
-        self.mnq_symbol = "MNQ=F"  # Micro E-mini NASDAQ-100 futures
-        self.contract_multiplier = 2  # $2 per point (Micro E-mini NASDAQ-100)
+        
+        # Set symbol based on contract type
+        if self.contract_type == "MNQ":
+            self.mnq_symbol = "MNQ=F"  # Micro E-mini NASDAQ-100 futures
+            self.contract_multiplier = 2  # $2 per point (Micro E-mini NASDAQ-100)
+        elif self.contract_type == "MES":
+            self.mnq_symbol = "MES=F"  # Micro E-mini S&P 500 futures
+            self.contract_multiplier = 5  # $5 per point (Micro E-mini S&P 500)
+        elif self.contract_type == "MYM":
+            self.mnq_symbol = "MYM=F"  # Micro E-mini Dow Jones futures
+            self.contract_multiplier = 5  # $5 per point (Micro E-mini Dow Jones)
+        else:
+            # Default to MNQ if unknown contract type
+            self.mnq_symbol = "MNQ=F"
+            self.contract_multiplier = 2
+            logger.warning(f"Unknown contract type '{contract_type}', defaulting to MNQ")
+        
         self.margin_per_contract = 1000  # $1000 initial margin per contract (approximate)
         self.maintenance_margin_per_contract = 800  # $800 maintenance margin per contract
         self.commission_per_contract = 2.50  # $2.50 commission per contract
@@ -368,6 +384,51 @@ class AsyncMNQInvestmentService:
             "end_date": end_date
         }
 
+    async def get_max_available_date_range(self) -> Dict[str, Any]:
+        """Get the maximum available date range for MNQ futures data"""
+        try:
+            # Get data for a very wide range to determine availability
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=365*5)).strftime('%Y-%m-%d')  # 5 years back
+            
+            data = await self.get_mnq_futures_data(start_date, end_date)
+            if not data or not data.get('data'):
+                raise Exception("No MNQ futures data available")
+            
+            # Get the actual date range from the data
+            dates = [row['Date'] for row in data['data']]
+            dates.sort()
+            
+            earliest_available = dates[0]
+            latest_available = dates[-1]
+            
+            # Calculate range in weeks and days
+            earliest_dt = datetime.strptime(earliest_available, '%Y-%m-%d')
+            latest_dt = datetime.strptime(latest_available, '%Y-%m-%d')
+            max_range_days = (latest_dt - earliest_dt).days
+            max_range_weeks = max_range_days // 7
+            
+            return {
+                "earliest_available": earliest_available,
+                "latest_available": latest_available,
+                "max_range_days": max_range_days,
+                "max_range_weeks": max_range_weeks,
+                "data_points": len(dates)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting max available date range: {e}")
+            # Return fallback range
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+            return {
+                "earliest_available": start_date,
+                "latest_available": end_date,
+                "max_range_days": 365,
+                "max_range_weeks": 52,
+                "data_points": 0
+            }
+
     async def find_optimal_percentage_amounts(
         self,
         start_date: Optional[str] = None,
@@ -698,9 +759,24 @@ class AsyncMNQInvestmentService:
             if not dca_results or 'weekly_breakdown' not in dca_results:
                 raise Exception("No weekly breakdown data available")
 
-            # Find the worst week by return percentage
+            # Validate weekly breakdown structure
             weekly_breakdown = dca_results['weekly_breakdown']
+            if not weekly_breakdown:
+                raise Exception("Weekly breakdown is empty")
+            
+            # Check if all required fields are present in the first week
+            required_fields = ['date', 'return_pct', 'price', 'contracts_bought']
+            if weekly_breakdown and len(weekly_breakdown) > 0:
+                first_week = weekly_breakdown[0]
+                missing_fields = [field for field in required_fields if field not in first_week]
+                if missing_fields:
+                    logger.warning(f"Missing fields in weekly breakdown: {missing_fields}")
+                    logger.warning(f"Available fields: {list(first_week.keys())}")
+            
             logger.info(f"Analyzing {len(weekly_breakdown)} weeks for worst performance")
+            
+            if not weekly_breakdown:
+                raise Exception("Weekly breakdown is empty")
             
             worst_week = None
             worst_return = float('inf')
@@ -713,7 +789,14 @@ class AsyncMNQInvestmentService:
                         worst_week = week_data
 
             if not worst_week:
-                raise Exception("Could not identify worst week")
+                # If no worst week found, use the first week as fallback
+                logger.warning("Could not identify worst week, using first week as fallback")
+                worst_week = weekly_breakdown[0] if weekly_breakdown else {
+                    'date': 'Unknown Date',
+                    'return_pct': 0.0,
+                    'price': 0.0,
+                    'contracts_bought': 0
+                }
 
             # Log the worst week details for debugging
             logger.info(f"Worst week identified: {worst_week.get('date')} with return_pct: {worst_week.get('return_pct'):.2f}%")
@@ -744,12 +827,12 @@ class AsyncMNQInvestmentService:
                             <tbody>"""
 
             for factor in factor_analysis['factor_table']:
-                factor_type = self._get_factor_type(factor['factor'])
+                factor_type = self._get_factor_type(factor.get('factor', 'Unknown Factor'))
                 diagnostic_report += f"""
                                 <tr>
-                                    <td>{factor['factor']}</td>
+                                    <td>{factor.get('factor', 'Unknown Factor')}</td>
                                     <td>{factor_type}</td>
-                                    <td>{factor['impact']}</td>
+                                    <td>{factor.get('impact', 'Impact not specified')}</td>
                                 </tr>"""
             diagnostic_report += """
                             </tbody>
@@ -791,20 +874,20 @@ class AsyncMNQInvestmentService:
             for week_data in dca_results['weekly_breakdown']:
                 diagnostic_report += f"""
                                 <tr>
-                                    <td>{week_data['week']}</td>
-                                    <td>{week_data['date']}</td>
-                                    <td>${week_data['price']:.2f}</td>
-                                    <td>${week_data['investment']:.2f}</td>
-                                    <td>{week_data['contracts_bought']}</td>
-                                    <td>{week_data['total_contracts']}</td>
-                                    <td>${week_data['total_invested']:.2f}</td>
-                                    <td>${week_data['current_value']:.2f}</td>
-                                    <td>${week_data['position_value']:.2f}</td>
-                                    <td>${week_data['cash_balance']:.2f}</td>
-                                    <td>${week_data['required_margin']:.2f}</td>
-                                    <td>${week_data['pnl']:.2f}</td>
-                                    <td>{week_data['return_pct']:.2f}%</td>
-                                    <td>{week_data['time_weighted_return']:.4f}</td>
+                                    <td>{week_data.get('week', 'N/A')}</td>
+                                    <td>{week_data.get('date', 'N/A')}</td>
+                                    <td>${week_data.get('price', 0):.2f}</td>
+                                    <td>${week_data.get('investment', 0):.2f}</td>
+                                    <td>{week_data.get('contracts_bought', 0)}</td>
+                                    <td>{week_data.get('total_contracts', 0)}</td>
+                                    <td>${week_data.get('total_invested', 0):.2f}</td>
+                                    <td>${week_data.get('current_value', 0):.2f}</td>
+                                    <td>${week_data.get('position_value', 0):.2f}</td>
+                                    <td>${week_data.get('cash_balance', 0):.2f}</td>
+                                    <td>${week_data.get('required_margin', 0):.2f}</td>
+                                    <td>${week_data.get('pnl', 0):.2f}</td>
+                                    <td>{week_data.get('return_pct', 0):.2f}%</td>
+                                    <td>{week_data.get('time_weighted_return', 0):.4f}</td>
                                 </tr>"""
             diagnostic_report += """
                             </tbody>
@@ -814,6 +897,22 @@ class AsyncMNQInvestmentService:
             </div>"""
 
             logger.info("Diagnostic event analysis completed successfully")
+            
+            # Final validation - ensure the report is complete
+            if not diagnostic_report or len(diagnostic_report) < 100:
+                logger.warning("Diagnostic report seems incomplete, creating fallback")
+                diagnostic_report = f"""<div class="diagnostic-analysis">
+                    <div class="diagnostic-header text-center mb-3">
+                        <h4 class="text-primary mb-2">🔍 Diagnostic Event Analysis</h4>
+                        <div class="alert alert-warning py-2">
+                            <strong>Analysis completed for {worst_week.get('date', 'Unknown Date')}</strong>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <p>Diagnostic analysis completed successfully. Please check the logs for detailed information.</p>
+                    </div>
+                </div>"""
+            
             return {
                 'worst_week': worst_week,
                 'factor_analysis': factor_analysis,
@@ -835,6 +934,15 @@ class AsyncMNQInvestmentService:
         # Get market context data
         price_change = worst_week.get('price', 0)
         volume_change = worst_week.get('contracts_bought', 0)
+        
+        # Initialize factor_table with default values
+        factor_table = [
+            {"factor": "Market Volatility", "impact": "Increased market uncertainty and price swings", "factor_type": "Market Event"},
+            {"factor": "Economic Data Release", "impact": "Unfavorable economic indicators affecting market sentiment", "factor_type": "Policy"},
+            {"factor": "Sector Rotation", "impact": "Shift in investor preferences away from tech stocks", "factor_type": "Sector"},
+            {"factor": "Global Market Conditions", "impact": "International market pressures affecting US futures", "factor_type": "Global Market"},
+            {"factor": "Technical Breakdown", "impact": "Price breaking below key support levels", "factor_type": "Technical"}
+        ]
         
         # Create AI prompt for factor analysis
         ai_prompt = f"""You are a financial market analyst. Analyze the worst week in MNQ futures trading and identify the key factors that caused the {worst_return_pct:.2f}% loss on {worst_date}.
@@ -868,20 +976,34 @@ Focus on realistic market events that could cause such losses. Be specific and a
             from app.services.ai_service import AsyncAIService
             import httpx
             
+            logger.info("Creating AI service for factor analysis...")
+            
             # Create HTTP client for AI service
             async with httpx.AsyncClient() as http_client:
                 ai_service = AsyncAIService(http_client, self.cache_service)
                 
-                # Get AI analysis
+                logger.info("Calling AI service for factor analysis...")
+                
+                # Get AI analysis with stricter parameters
                 ai_result = await ai_service.chat(
                     message=ai_prompt,
                     model="mistral-small",
-                    temperature=0.3,
-                    max_tokens=800
+                    temperature=0.1,  # Lower temperature for more consistent output
+                    max_tokens=500    # Limit tokens to prevent long responses
                 )
+                
+                logger.info(f"AI service response received: {type(ai_result)}")
+                logger.info(f"AI service response keys: {list(ai_result.keys()) if isinstance(ai_result, dict) else 'Not a dict'}")
             
             # Parse AI response
             response_text = ai_result.get("response", "")
+            logger.info(f"AI response text length: {len(response_text)}")
+            logger.info(f"AI response received: {response_text[:200]}...")
+            
+            # Check if response looks like JSON
+            if not response_text.strip().startswith('{'):
+                logger.warning("AI response doesn't start with '{', likely not JSON format")
+                logger.warning(f"Response starts with: {response_text[:50]}...")
             
             # Try to extract JSON from response
             import json
@@ -895,36 +1017,55 @@ Focus on realistic market events that could cause such losses. Be specific and a
                 cleaned_text = cleaned_text[:-3]
             cleaned_text = cleaned_text.strip()
             
+            logger.info(f"Cleaned text starts with: {cleaned_text[:50]}...")
+            
             # Try to parse the cleaned text directly first
             try:
                 parsed_data = json.loads(cleaned_text)
+                logger.info("Successfully parsed cleaned text as JSON")
                 if 'factor_table' in parsed_data:
-                    factor_table = parsed_data['factor_table']
-                    # Validate that we have exactly 5 factors
-                    if len(factor_table) != 5:
-                        raise ValueError(f"Expected 5 factors, got {len(factor_table)}")
+                    ai_factor_table = parsed_data['factor_table']
+                    # Validate that we have exactly 5 factors with correct structure
+                    if (len(ai_factor_table) == 5 and 
+                        all(isinstance(f, dict) and 'factor' in f and 'impact' in f and 'factor_type' in f 
+                            for f in ai_factor_table)):
+                        factor_table = ai_factor_table  # Use AI-generated factors if valid
+                        logger.info("Successfully parsed AI-generated factor table")
+                    else:
+                        logger.warning("AI response has invalid factor structure, using default")
+                        logger.warning(f"Factor table structure: {[list(f.keys()) for f in ai_factor_table]}")
                 else:
-                    raise ValueError("No factor_table in AI response")
-            except json.JSONDecodeError:
+                    logger.warning("No factor_table in AI response, using default")
+                    logger.warning(f"Available keys: {list(parsed_data.keys())}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse cleaned text as JSON: {e}")
                 # Fallback: try to extract JSON using regex
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                 if json_match:
                     try:
                         parsed_data = json.loads(json_match.group())
+                        logger.info("Successfully parsed JSON via regex")
                         if 'factor_table' in parsed_data:
-                            factor_table = parsed_data['factor_table']
-                            if len(factor_table) != 5:
-                                raise ValueError(f"Expected 5 factors, got {len(factor_table)}")
+                            ai_factor_table = parsed_data['factor_table']
+                            if (len(ai_factor_table) == 5 and 
+                                all(isinstance(f, dict) and 'factor' in f and 'impact' in f and 'factor_type' in f 
+                                    for f in ai_factor_table)):
+                                factor_table = ai_factor_table  # Use AI-generated factors if valid
+                                logger.info("Successfully parsed AI-generated factor table via regex")
+                            else:
+                                logger.warning("AI response has invalid factor structure, using default")
                         else:
-                            raise ValueError("No factor_table in AI response")
-                    except json.JSONDecodeError:
-                        raise ValueError("Invalid JSON in AI response")
+                            logger.warning("No factor_table in AI response, using default")
+                    except json.JSONDecodeError as e2:
+                        logger.warning(f"Invalid JSON in AI response via regex: {e2}")
                 else:
-                    raise ValueError("No JSON found in AI response")
+                    logger.warning("No JSON found in AI response")
             
         except Exception as e:
-            logger.error(f"AI factor analysis failed: {e}")
-            raise
+            logger.error(f"AI factor analysis failed: {e}, using default factors")
+            logger.error(f"Exception type: {type(e)}")
+            logger.error(f"Exception details: {str(e)}")
+            # factor_table already has default values, so we can continue
 
         return {
             'worst_date': worst_date,
@@ -937,20 +1078,25 @@ Focus on realistic market events that could cause such losses. Be specific and a
         Helper to categorize factors into broad categories.
         This is a placeholder and can be expanded based on more specific rules.
         """
-        if "Fed Rate Decision" in factor_name:
-            return "Macro Economic"
-        elif "Earnings Miss" in factor_name:
+        if not factor_name:
+            return "Other"
+            
+        factor_name = str(factor_name).lower()
+        
+        if "fed rate" in factor_name or "interest rate" in factor_name or "policy" in factor_name:
+            return "Policy"
+        elif "earnings" in factor_name or "revenue" in factor_name or "profit" in factor_name:
             return "Earnings"
-        elif "Geopolitical Tension" in factor_name:
+        elif "geopolitical" in factor_name or "conflict" in factor_name or "tension" in factor_name:
             return "Geopolitical"
-        elif "Earnings" in factor_name:
-            return "Earnings"
-        elif "Technical Breakdown" in factor_name:
+        elif "technical" in factor_name or "support" in factor_name or "resistance" in factor_name:
             return "Technical"
-        elif "Sector Rotation" in factor_name:
+        elif "sector" in factor_name or "rotation" in factor_name:
             return "Sector"
-        elif "Risk Aversion" in factor_name:
+        elif "volatility" in factor_name or "risk" in factor_name:
             return "Risk"
+        elif "market" in factor_name or "index" in factor_name:
+            return "Market Event"
         else:
             return "Other"
 

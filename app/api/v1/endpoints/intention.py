@@ -27,7 +27,7 @@ class IntentionAnalysisResponse(BaseModel):
     success: bool
     intention: str
     rationale: List[str]
-    advice: str
+    reflective_question: str
     error: Optional[str] = None
 
 @router.post("/analyze-intention", response_model=IntentionAnalysisResponse)
@@ -39,7 +39,7 @@ async def analyze_intention(
 ):
     """
     Analyze the intention of a target person based on user profile, target profile, and specific use case.
-    Uses psycho-social-bio assessment framework with DSM-5 related criteria.
+    Uses clinical psychological assessment framework with evidence-based analysis.
     """
     try:
         # Create the intention interpreter service
@@ -53,9 +53,9 @@ async def analyze_intention(
         )
         
         # Track usage
-        await usage_service.track_usage(
-            service_name="intention_interpreter",
-            operation="analyze_intention",
+        await usage_service.track_request(
+            endpoint="intention_interpreter",
+            model="mistral-small",
             success=result.get("success", False)
         )
         
@@ -64,16 +64,17 @@ async def analyze_intention(
             success=result.get("success", False),
             intention=result.get("intention", "unknown"),
             rationale=result.get("rationale", []),
-            advice=result.get("advice", ""),
+            reflective_question=result.get("reflective_question", ""),
             error=result.get("error")
         )
         
     except Exception as e:
         logger.error(f"Error in intention analysis: {str(e)}")
-        await usage_service.track_usage(
-            service_name="intention_interpreter",
-            operation="analyze_intention",
-            success=False
+        await usage_service.track_request(
+            endpoint="intention_interpreter",
+            model="mistral-small",
+            success=False,
+            error=str(e)
         )
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 

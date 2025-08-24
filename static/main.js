@@ -3006,11 +3006,11 @@ function debugBoxes() {
 
 async function analyzeIntention() {
     const userProfile = {
-        profile_text: document.getElementById('userProfile').value
+        profile: document.getElementById('userProfile').value
     };
 
     const targetPersonProfile = {
-        profile_text: document.getElementById('targetPersonProfile').value
+        profile: document.getElementById('targetPersonProfile').value
     };
 
     const useCase = document.getElementById('useCase').value;
@@ -3025,8 +3025,8 @@ async function analyzeIntention() {
         // Show loading state
         const analyzeBtn = document.querySelector('button[onclick="analyzeIntention()"]');
         const originalText = analyzeBtn.innerHTML;
-        analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
         analyzeBtn.disabled = true;
+        analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
 
         const response = await fetch('/api/v1/intention/analyze-intention', {
             method: 'POST',
@@ -3041,6 +3041,7 @@ async function analyzeIntention() {
         });
 
         const result = await response.json();
+        console.log('API Response:', result); // Debug log
 
         if (result.success) {
             displayAnalysisResults(result);
@@ -3048,63 +3049,57 @@ async function analyzeIntention() {
             throw new Error(result.detail || 'Analysis failed');
         }
 
+        // Restore button state after successful analysis
+        analyzeBtn.innerHTML = originalText;
+        analyzeBtn.disabled = false;
+
     } catch (error) {
         console.error('Error:', error);
         alert('Error analyzing intention: ' + error.message);
-    } finally {
-        // Restore button state
-        const analyzeBtn = document.querySelector('button[onclick="analyzeIntention()"]');
+        
+        // Restore button state after error
         analyzeBtn.innerHTML = originalText;
         analyzeBtn.disabled = false;
     }
 }
 
 function displayAnalysisResults(result) {
+    console.log('Displaying results:', result); // Debug log
+    
     const resultsDiv = document.getElementById('analysisResults');
     const intentionDiv = document.getElementById('intentionAssessment');
     const rationaleDiv = document.getElementById('rationaleSection');
-    const adviceDiv = document.getElementById('adviceSection');
+    
+    console.log('Found elements:', { resultsDiv, intentionDiv, rationaleDiv }); // Debug log
 
     // Display intention assessment
-    const intentionClass = result.intention_assessment === 'positive' ? 'text-success' : 
-                          result.intention_assessment === 'negative' ? 'text-danger' : 'text-warning';
+    const intentionClass = result.intention === 'positive' ? 'text-success' : 
+                          result.intention === 'negative' ? 'text-danger' : 'text-warning';
     
     intentionDiv.innerHTML = `
-        <div class="mb-3">
+        <div class="mb-2">
             <h6 class="fw-bold">Intention Assessment:</h6>
-            <span class="badge bg-${result.intention_assessment === 'positive' ? 'success' : 
-                                   result.intention_assessment === 'negative' ? 'danger' : 'warning'} fs-6">
-                ${result.intention_assessment.toUpperCase()}
+            <span class="badge bg-${result.intention === 'positive' ? 'success' : 
+                                   result.intention === 'negative' ? 'danger' : 'warning'} fs-6">
+                ${result.intention.toUpperCase()}
             </span>
-            <span class="ms-2 text-muted">(Confidence: ${result.confidence_level})</span>
         </div>
     `;
 
     // Display rationale
     if (result.rationale && result.rationale.length > 0) {
         rationaleDiv.innerHTML = `
-            <div class="mb-3">
+            <div class="mb-2">
                 <h6 class="fw-bold">Analysis Rationale:</h6>
                 <ul class="list-unstyled">
-                    ${result.rationale.map(point => `<li class="mb-2"><i class="fas fa-arrow-right text-primary me-2"></i>${point}</li>`).join('')}
+                    ${result.rationale.map(point => `<li class="mb-1"><i class="fas fa-arrow-right text-primary me-2"></i>${point}</li>`).join('')}
                 </ul>
             </div>
         `;
     }
 
-    // Display advice
-    if (result.advice && result.advice.length > 0) {
-        adviceDiv.innerHTML = `
-            <div class="mb-3">
-                <h6 class="fw-bold text-success">Warm & Positive Advice:</h6>
-                <ul class="list-unstyled">
-                    ${result.advice.map(advice => `<li class="mb-2"><i class="fas fa-heart text-success me-2"></i>${advice}</li>`).join('')}
-                </ul>
-            </div>
-        `;
-    }
+    // Reflective question section removed
 
-    // Show results
+    // Show results immediately - they're now in the same card
     resultsDiv.style.display = 'block';
-    resultsDiv.scrollIntoView({ behavior: 'smooth' });
 }
