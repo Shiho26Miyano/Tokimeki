@@ -6,6 +6,9 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+    <meta name="version" content="20250117-1704067200">
+    <meta name="last-modified" content="2025-01-17">
     <title>Tokimeki - AI-Powered Investment Analysis Platform</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
@@ -252,7 +255,10 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="rag-bi-tab" data-bs-toggle="pill" data-bs-target="#rag-bi-content" role="tab" aria-controls="rag-bi-content" aria-selected="true">📚 RAG Business Intelligence</a>
+                        <a class="nav-link active" id="intention-interpreter-tab" data-bs-toggle="pill" data-bs-target="#intention-interpreter-content" role="tab" aria-controls="intention-interpreter-content" aria-selected="true">🧠 Intention Interpreter Engine</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="rag-bi-tab" data-bs-toggle="pill" data-bs-target="#rag-bi-content" role="tab" aria-controls="rag-bi-content" aria-selected="false">📚 RAG Business Intelligence</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="deepseek-chatbot-tab" data-bs-toggle="pill" data-bs-target="#deepseek-chatbot-content" role="tab" aria-controls="deepseek-chatbot-content" aria-selected="false">🤖 Chatbot</a>
@@ -274,6 +280,7 @@
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="mnq-dashboard-tab" data-bs-toggle="pill" data-bs-target="#mnq-dashboard-content" role="tab" aria-controls="mnq-dashboard-content" aria-selected="false">🧪 Experimental Trading Hub</a>
                     </li>
+                </ul>
 
 
                 </ul>
@@ -281,7 +288,77 @@
 
             <div class="col-md-10 py-4">
                 <div class="tab-content" id="main-tab-content">
-                    <div class="tab-pane fade show active" id="rag-bi-content" role="tabpanel" aria-labelledby="rag-bi-tab">
+                    <div class="tab-pane fade show active" id="intention-interpreter-content" role="tabpanel" aria-labelledby="intention-interpreter-tab">
+                        <div class="card shadow-sm flex-fill d-flex flex-column" style="max-width: 1100px; margin: 0 auto; border-radius: 16px;">
+                            <div class="card-body d-flex flex-column" style="padding: 32px;">
+                                <div class="card-header-row mb-3">
+                                    <span class="card-title" style="font-size: 2rem; font-weight: 600; color: #183153;">
+                                        <i class="fas fa-brain"></i> Intention Interpreter Engine
+                                    </span>
+                                </div>
+                                <p class="text-muted mt-2">Analyze people's intentions using AI-powered clinical psychological assessment</p>
+                                
+                                <div class="row g-3">
+                                    <!-- Left Side - Combined Profile Card -->
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header bg-primary text-white py-1">
+                                                <h5 class="mb-0"><i class="fas fa-user-circle"></i> Profile Information</h5>
+                                            </div>
+                                            <div class="card-body p-1">
+                                                <!-- Your Profile Section -->
+                                                <div class="mb-2">
+                                                    <label for="userProfile" class="form-label mb-1 fw-bold text-primary">Your Profile (Bio-Psycho-Social):</label>
+                                                    <textarea class="form-control" id="userProfile" rows="6" 
+                                                        placeholder="Please describe your: Age, gender, occupation, education, personality traits, social context, emotional state, life circumstances, and any other relevant information about yourself.">Tom is a 22-year-old college student majoring in Mechanical Engineering, with Art History as his second major. He goes to the gym three days a week and enjoys ball games and swimming. He has kind family and friends, although his parents were strict about behavior training when he was a child.</textarea>
+                                                </div>
+                                                
+                                                <!-- Target Person Profile Section -->
+                                                <div class="mb-0">
+                                                    <label for="targetPersonProfile" class="form-label mb-1 fw-bold text-info">Target Person Profile:</label>
+                                                    <textarea class="form-control" id="targetPersonProfile" rows="6" 
+                                                        placeholder="Please describe this person: Age, gender, occupation, education, personality traits, social context, emotional state, life circumstances, how long you've known them, your relationship, and any other relevant information.">Jerry is a 22-year-old college student studying hardware engineering who enjoys hiking and outdoor activities. He has supportive family and friends, though he has faced challenges with time management. His parents are always supportive and kind. He is very assertive and highly confident.</textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Right Side - Analyze and Results -->
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header bg-success text-white py-1">
+                                                <h5 class="mb-0"><i class="fas fa-question-circle"></i> What would you like to analyze?</h5>
+                                            </div>
+                                            <div class="card-body p-1">
+                                                <div class="mb-1">
+                                                    <label for="useCase" class="form-label mb-1">Describe the situation or behavior</label>
+                                                    <textarea class="form-control" id="useCase" rows="8" 
+                                                        placeholder="Describe what this person said or did that you want to understand better. For example: 'They said they would help me move but then cancelled at the last minute' or 'They keep asking me for favors but never return the help'">Jerry judges Tom for not working hard enough on his grades and recommends study resources. Tom feels insulted and thinks Jerry always acts superior. They've been friends for 3 years since meeting in college, and they share similar interests in tech topics, sports and movies. Jerry often helps Tom study without expecting anything in return. Recently, Jerry publicly told Tom "you should work harder on your studies" which made Tom angry.</textarea>
+                                                </div>
+                                                <button type="button" class="btn btn-primary btn-lg w-100" onclick="analyzeIntention()">
+                                                    <i class="fas fa-brain"></i> Analyze Intention
+                                                </button>
+                                                
+                                                <!-- Analysis Results - Now inside the same card -->
+                                                <div id="analysisResults" class="mt-1" style="display: none;">
+                                                    <hr class="my-1">
+                                                    <div class="card-header bg-warning text-dark rounded py-1">
+                                                        <h6 class="mb-0"><i class="fas fa-chart-line"></i> Intention Analysis Results</h6>
+                                                    </div>
+                                                    <div class="mt-1">
+                                                        <div id="intentionAssessment"></div>
+                                                        <div id="rationaleSection"></div>
+                                                        <div id="reflectiveQuestionSection"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="rag-bi-content" role="tabpanel" aria-labelledby="rag-bi-tab">
                         <div id="rag-bi-root"></div>
                     </div>
                     <div class="tab-pane fade" id="ai-platform-comparables-content" role="tabpanel" aria-labelledby="ai-platform-comparables-tab">
@@ -1025,6 +1102,8 @@
                         </div>
                     </div>
 
+
+
                 </div>
             </div>
         </div>
@@ -1145,10 +1224,36 @@
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-            <script src="static/main.js?v=20250101&t=1704067200&nocache=true&cb=1704067200"></script>
+            <script src="static/main.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
         <script src="static/mnq-dashboard.js"></script>
     
     <script>
+        // Auto-clear cache and force reload
+        function forceReload() {
+            // Clear browser cache
+            if ('caches' in window) {
+                caches.keys().then(function(names) {
+                    for (let name of names) {
+                        caches.delete(name);
+                    }
+                });
+            }
+            
+            // Force reload without cache
+            window.location.reload(true);
+        }
+        
+        // Auto-clear cache on page load
+        window.addEventListener('load', function() {
+            // Clear any stored cache
+            if ('localStorage' in window) {
+                localStorage.clear();
+            }
+            if ('sessionStorage' in window) {
+                sessionStorage.clear();
+            }
+        });
+        
         // Handle hover-triggered modals for "How it works" buttons
         document.addEventListener('DOMContentLoaded', function() {
             const howItWorksButtons = document.querySelectorAll('.how-it-works-btn');

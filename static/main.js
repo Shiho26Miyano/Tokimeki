@@ -2968,3 +2968,138 @@ function isValidDate(dateStr) {
     mountRAGBI();
   });
 })();
+
+// Intention Interpreter Engine Functions
+function toggleSecondBox() {
+    const secondBox = document.querySelector('#intention-interpreter-content .card:nth-child(2)');
+    if (secondBox) {
+        if (secondBox.style.display === 'none') {
+            secondBox.style.display = 'block';
+            secondBox.style.visibility = 'visible';
+            secondBox.style.opacity = '1';
+        } else {
+            secondBox.style.display = 'none';
+        }
+    } else {
+        alert('Second box not found!');
+    }
+}
+
+function debugBoxes() {
+    const cards = document.querySelectorAll('#intention-interpreter-content .card');
+    console.log('Found cards:', cards.length);
+    cards.forEach((card, index) => {
+        console.log(`Card ${index}:`, card);
+        console.log(`Card ${index} display:`, card.style.display);
+        console.log(`Card ${index} visibility:`, card.style.visibility);
+    });
+    
+    // Force show all cards
+    cards.forEach(card => {
+        card.style.display = 'block';
+        card.style.visibility = 'visible';
+        card.style.opacity = '1';
+    });
+    
+    alert(`Found ${cards.length} cards. Check console for details.`);
+}
+
+async function analyzeIntention() {
+    const userProfile = {
+        profile: document.getElementById('userProfile').value
+    };
+
+    const targetPersonProfile = {
+        profile: document.getElementById('targetPersonProfile').value
+    };
+
+    const useCase = document.getElementById('useCase').value;
+
+    // Validation
+    if (!useCase) {
+        alert('Please describe the situation you want to analyze.');
+        return;
+    }
+
+    try {
+        // Show loading state
+        const analyzeBtn = document.querySelector('button[onclick="analyzeIntention()"]');
+        const originalText = analyzeBtn.innerHTML;
+        analyzeBtn.disabled = true;
+        analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+
+        const response = await fetch('/api/v1/intention/analyze-intention', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_profile: userProfile,
+                target_person_profile: targetPersonProfile,
+                use_case: useCase
+            })
+        });
+
+        const result = await response.json();
+        console.log('API Response:', result); // Debug log
+
+        if (result.success) {
+            displayAnalysisResults(result);
+        } else {
+            throw new Error(result.detail || 'Analysis failed');
+        }
+
+        // Restore button state after successful analysis
+        analyzeBtn.innerHTML = originalText;
+        analyzeBtn.disabled = false;
+
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error analyzing intention: ' + error.message);
+        
+        // Restore button state after error
+        analyzeBtn.innerHTML = originalText;
+        analyzeBtn.disabled = false;
+    }
+}
+
+function displayAnalysisResults(result) {
+    console.log('Displaying results:', result); // Debug log
+    
+    const resultsDiv = document.getElementById('analysisResults');
+    const intentionDiv = document.getElementById('intentionAssessment');
+    const rationaleDiv = document.getElementById('rationaleSection');
+    
+    console.log('Found elements:', { resultsDiv, intentionDiv, rationaleDiv }); // Debug log
+
+    // Display intention assessment
+    const intentionClass = result.intention === 'positive' ? 'text-success' : 
+                          result.intention === 'negative' ? 'text-danger' : 'text-warning';
+    
+    intentionDiv.innerHTML = `
+        <div class="mb-2">
+            <h6 class="fw-bold">Intention Assessment:</h6>
+            <span class="badge bg-${result.intention === 'positive' ? 'success' : 
+                                   result.intention === 'negative' ? 'danger' : 'warning'} fs-6">
+                ${result.intention.toUpperCase()}
+            </span>
+        </div>
+    `;
+
+    // Display rationale
+    if (result.rationale && result.rationale.length > 0) {
+        rationaleDiv.innerHTML = `
+            <div class="mb-2">
+                <h6 class="fw-bold">Analysis Rationale:</h6>
+                <ul class="list-unstyled">
+                    ${result.rationale.map(point => `<li class="mb-1"><i class="fas fa-arrow-right text-primary me-2"></i>${point}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    // Reflective question section removed
+
+    // Show results immediately - they're now in the same card
+    resultsDiv.style.display = 'block';
+}

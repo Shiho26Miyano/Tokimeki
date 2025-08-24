@@ -40,3 +40,83 @@ body {
     font-size: 12px;
     z-index: 1000;
 } 
+
+/* Intention Interpreter Engine Styles */
+#intention-interpreter-content {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%);
+    min-height: 100vh;
+    padding: 20px 0;
+}
+
+#intention-interpreter-content .card {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 123, 255, 0.1);
+    border-radius: 15px;
+}
+
+#intention-interpreter-content .card-header {
+    border-radius: 15px 15px 0 0 !important;
+    border: none;
+}
+
+#intention-interpreter-content .form-control,
+#intention-interpreter-content .form-select {
+    border: 2px solid #e3f2fd;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+#intention-interpreter-content .form-control:focus,
+#intention-interpreter-content .form-select:focus {
+    border-color: #2196f3;
+    box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.25);
+}
+
+#intention-interpreter-content .btn-primary {
+    background: linear-gradient(45deg, #2196f3, #1976d2);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 24px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+#intention-interpreter-content .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(33, 150, 243, 0.3);
+}
+
+#intention-interpreter-content .badge {
+    font-size: 1rem !important;
+    padding: 8px 16px;
+}
+
+#intention-interpreter-content .list-unstyled li {
+    padding: 8px 0;
+    border-left: 3px solid #e3f2fd;
+    padding-left: 15px;
+    margin-left: 10px;
+}
+
+#intention-interpreter-content .list-unstyled li:hover {
+    border-left-color: #2196f3;
+    background-color: rgba(33, 150, 243, 0.05);
+    border-radius: 0 10px 10px 0;
+}
+
+/* Force second box to be visible */
+#intention-interpreter-content .card:nth-child(2) {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    margin-top: 20px !important;
+    border: 3px solid #ff6b6b !important;
+    background-color: #fff3cd !important;
+}
+
+/* Ensure all cards in intention interpreter are visible */
+#intention-interpreter-content .card {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}

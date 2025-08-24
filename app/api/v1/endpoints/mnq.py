@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.core.dependencies import get_cache_service, get_usage_service, get_ai_service
 from app.services.mnq_investment_service import AsyncMNQInvestmentService
 from app.services.usage_service import AsyncUsageService
+from app.services.ai_service import AsyncAIService
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +21,12 @@ class MNQInvestmentRequest(BaseModel):
     weekly_amount: float = Field(default=1000.0, ge=100, le=10000, description="Weekly investment amount in USD")
     start_date: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)")
     end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)")
+    contract_type: str = Field(default="MNQ", description="Futures contract type (MNQ, MES, etc.)")
 
 class MNQOptimalAmountsRequest(BaseModel):
     start_date: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)")
     end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)")
+    contract_type: str = Field(default="MNQ", description="Futures contract type (MNQ, MES, etc.)")
     min_amount: float = Field(default=100.0, ge=50, le=5000, description="Minimum weekly investment amount to test")
     max_amount: float = Field(default=10000.0, ge=500, le=50000, description="Maximum weekly investment amount to test")
     step_size: float = Field(default=10.0, ge=10, le=1000, description="Step size between test amounts")
@@ -86,10 +89,10 @@ async def calculate_mnq_dca(
     start_time = time.time()
     
     try:
-        logger.info(f"Starting MNQ DCA calculation: ${request.weekly_amount}/week")
+        logger.info(f"Starting {request.contract_type} DCA calculation: ${request.weekly_amount}/week")
         
-        # Create MNQ service instance
-        mnq_service = AsyncMNQInvestmentService(cache_service)
+        # Create service instance with selected contract type
+        mnq_service = AsyncMNQInvestmentService(cache_service, request.contract_type)
         
         # Calculate performance
         result = await mnq_service.calculate_weekly_dca_performance(
@@ -138,18 +141,19 @@ async def get_mnq_equity(
     weekly_amount: float = 1000.0,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    contract_type: str = "MNQ",
     cache_service = Depends(get_cache_service),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
-    """Get MNQ equity curve data"""
+    """Get futures equity curve data"""
     
     start_time = time.time()
     
     try:
-        logger.info(f"Fetching MNQ equity curve: ${weekly_amount}/week")
+        logger.info(f"Fetching {contract_type} equity curve: ${weekly_amount}/week")
         
-        # Create MNQ service instance
-        mnq_service = AsyncMNQInvestmentService(cache_service)
+        # Create service instance with selected contract type
+        mnq_service = AsyncMNQInvestmentService(cache_service, contract_type)
         
         # Calculate performance to get equity curve
         result = await mnq_service.calculate_weekly_dca_performance(
@@ -195,18 +199,19 @@ async def get_mnq_metrics(
     weekly_amount: float = 1000.0,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    contract_type: str = "MNQ",
     cache_service = Depends(get_cache_service),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
-    """Get MNQ performance metrics"""
+    """Get futures performance metrics"""
     
     start_time = time.time()
     
     try:
-        logger.info(f"Fetching MNQ metrics: ${weekly_amount}/week")
+        logger.info(f"Fetching {contract_type} metrics: ${weekly_amount}/week")
         
-        # Create MNQ service instance
-        mnq_service = AsyncMNQInvestmentService(cache_service)
+        # Create service instance with selected contract type
+        mnq_service = AsyncMNQInvestmentService(cache_service, contract_type)
         
         # Calculate performance to get metrics
         result = await mnq_service.calculate_weekly_dca_performance(
@@ -255,18 +260,19 @@ async def get_mnq_positions(
     weekly_amount: float = 1000.0,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    contract_type: str = "MNQ",
     cache_service = Depends(get_cache_service),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
-    """Get MNQ position tracking data"""
+    """Get futures position tracking data"""
     
     start_time = time.time()
     
     try:
-        logger.info(f"Fetching MNQ positions: ${weekly_amount}/week")
+        logger.info(f"Fetching {contract_type} positions: ${weekly_amount}/week")
         
-        # Create MNQ service instance
-        mnq_service = AsyncMNQInvestmentService(cache_service)
+        # Create service instance with selected contract type
+        mnq_service = AsyncMNQInvestmentService(cache_service, contract_type)
         
         # Calculate performance to get weekly breakdown
         result = await mnq_service.calculate_weekly_dca_performance(
@@ -310,33 +316,42 @@ async def get_mnq_positions(
         raise HTTPException(status_code=500, detail=f"Failed to fetch positions: {str(e)}")
 
 @router.get("/available")
-async def get_mnq_info(
+async def get_futures_info(
+    contract_type: str = "MNQ",
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
-    """Get MNQ futures information"""
+    """Get futures contract information"""
     
     start_time = time.time()
     
     try:
-        logger.info("Fetching MNQ futures information")
+        logger.info(f"Fetching {contract_type} futures information")
+        
+        # Get contract configuration
+        from app.services.mnq_investment_service import AsyncMNQInvestmentService
+        contract_config = AsyncMNQInvestmentService.CONTRACT_CONFIGS.get(contract_type.upper())
+        
+        if not contract_config:
+            raise HTTPException(status_code=400, detail=f"Unsupported contract type: {contract_type}")
         
         # Track usage
         response_time = time.time() - start_time
         await usage_service.track_request(
-            endpoint="mnq_info",
+            endpoint="futures_info",
             response_time=response_time,
             success=True
         )
         
         return {
             "success": True,
-            "symbol": "MNQ=F",
-            "name": "Micro E-mini NASDAQ-100 Futures",
-            "contract_multiplier": 2,                # $2 per index point
-            "point_value_usd": 2.0,                  # helpful explicit field
-            "margin_model": "Approx. $1,000 initial / $800 maintenance per contract (varies)",
+            "contract_type": contract_type.upper(),
+            "symbol": contract_config["symbol"],
+            "name": contract_config["name"],
+            "contract_multiplier": contract_config["contract_multiplier"],
+            "point_value_usd": contract_config["contract_multiplier"],
+            "margin_model": f"Approx. ${contract_config['initial_margin']} initial / ${contract_config['maintenance_margin']} maintenance per contract (varies)",
             "trading_hours": "Sun 6:00 PM – Fri 5:00 PM ET (with daily 5–6 PM pause)",
-            "description": "Micro E-mini NASDAQ-100 futures contract, $2 per index point."
+            "description": contract_config["description"]
         }
         
     except Exception as e:
@@ -349,23 +364,74 @@ async def get_mnq_info(
             error=str(e)
         )
         
-        logger.error(f"MNQ info error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch MNQ info: {str(e)}")
+        logger.error(f"Futures info error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch futures info: {str(e)}")
 
-@router.get("/date-range")
-async def get_mnq_date_range(
-    cache_service = Depends(get_cache_service),
+@router.get("/contracts")
+async def get_available_contracts(
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
-    """Get the maximum available date range for MNQ data"""
+    """Get list of available futures contracts"""
     
     start_time = time.time()
     
     try:
-        logger.info("Fetching MNQ available date range")
+        logger.info("Fetching available futures contracts")
         
-        # Create MNQ service instance
-        mnq_service = AsyncMNQInvestmentService(cache_service)
+        # Get contract configurations
+        from app.services.mnq_investment_service import AsyncMNQInvestmentService
+        contract_configs = AsyncMNQInvestmentService.CONTRACT_CONFIGS
+        
+        # Track usage
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="futures_contracts",
+            response_time=response_time,
+            success=True
+        )
+        
+        return {
+            "success": True,
+            "contracts": [
+                {
+                    "type": contract_type,
+                    "symbol": config["symbol"],
+                    "name": config["name"],
+                    "contract_multiplier": config["contract_multiplier"],
+                    "description": config["description"]
+                }
+                for contract_type, config in contract_configs.items()
+            ]
+        }
+        
+    except Exception as e:
+        # Track failed request
+        response_time = time.time() - start_time
+        await usage_service.track_request(
+            endpoint="futures_contracts",
+            response_time=response_time,
+            success=False,
+            error=str(e)
+        )
+        
+        logger.error(f"Futures contracts error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch futures contracts: {str(e)}")
+
+@router.get("/date-range")
+async def get_futures_date_range(
+    contract_type: str = "MNQ",
+    cache_service = Depends(get_cache_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get the maximum available date range for futures data"""
+    
+    start_time = time.time()
+    
+    try:
+        logger.info(f"Fetching {contract_type} available date range")
+        
+        # Create service instance with selected contract type
+        mnq_service = AsyncMNQInvestmentService(cache_service, contract_type)
         
         # Get available date range
         date_range = await mnq_service.get_max_available_date_range()
@@ -407,10 +473,10 @@ async def find_optimal_mnq_amounts(
     start_time = time.time()
     
     try:
-        logger.info(f"Finding optimal MNQ investment amounts: ${request.min_amount}-${request.max_amount}, step ${request.step_size}")
+        logger.info(f"Finding optimal {request.contract_type} investment amounts: ${request.min_amount}-${request.max_amount}, step ${request.step_size}")
         
-        # Create MNQ service instance
-        mnq_service = AsyncMNQInvestmentService(cache_service)
+        # Create service instance with selected contract type
+        mnq_service = AsyncMNQInvestmentService(cache_service, request.contract_type)
         
         # Find optimal amounts
         result = await mnq_service.find_optimal_percentage_amounts(
@@ -476,7 +542,8 @@ async def generate_mnq_analysis(
         # First, calculate optimal amounts to get real top 5 performers
         from app.services.mnq_investment_service import AsyncMNQInvestmentService
         
-        mnq_service = AsyncMNQInvestmentService(cache_service)
+        # Use MNQ as default for analysis (can be made configurable later)
+        mnq_service = AsyncMNQInvestmentService(cache_service, "MNQ")
         
         # Use the improved service to find optimal amounts (real calculations)
         logger.info("Finding optimal amounts via service (real calculations)...")
@@ -634,18 +701,20 @@ IMPORTANT: Use ONLY the actual calculated data provided above in the "Top 5 Week
 async def generate_mnq_diagnostic_analysis(
     request: MNQAnalysisRequest,
     cache_service = Depends(get_cache_service),
-    usage_service: AsyncUsageService = Depends(get_usage_service)
+    usage_service: AsyncUsageService = Depends(get_usage_service),
+    ai_service: AsyncAIService = Depends(get_ai_service)
 ):
     """Generate diagnostic event analysis identifying worst week and factor impacts"""
     
     start_time = time.time()
     
     try:
-        logger.info(f"Generating diagnostic analysis for MNQ strategy: ${request.weekly_amount}/week")
+        logger.info(f"Generating diagnostic analysis for futures strategy: ${request.weekly_amount}/week")
         
         from app.services.mnq_investment_service import AsyncMNQInvestmentService
         
-        mnq_service = AsyncMNQInvestmentService(cache_service)
+        # Use MNQ as default for diagnostic analysis (can be made configurable later)
+        mnq_service = AsyncMNQInvestmentService(cache_service, "MNQ")
         
         # Generate diagnostic event analysis
         diagnostic_result = await mnq_service.generate_diagnostic_event_analysis(
