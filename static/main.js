@@ -2968,3 +2968,143 @@ function isValidDate(dateStr) {
     mountRAGBI();
   });
 })();
+
+// Intention Interpreter Engine Functions
+function toggleSecondBox() {
+    const secondBox = document.querySelector('#intention-interpreter-content .card:nth-child(2)');
+    if (secondBox) {
+        if (secondBox.style.display === 'none') {
+            secondBox.style.display = 'block';
+            secondBox.style.visibility = 'visible';
+            secondBox.style.opacity = '1';
+        } else {
+            secondBox.style.display = 'none';
+        }
+    } else {
+        alert('Second box not found!');
+    }
+}
+
+function debugBoxes() {
+    const cards = document.querySelectorAll('#intention-interpreter-content .card');
+    console.log('Found cards:', cards.length);
+    cards.forEach((card, index) => {
+        console.log(`Card ${index}:`, card);
+        console.log(`Card ${index} display:`, card.style.display);
+        console.log(`Card ${index} visibility:`, card.style.visibility);
+    });
+    
+    // Force show all cards
+    cards.forEach(card => {
+        card.style.display = 'block';
+        card.style.visibility = 'visible';
+        card.style.opacity = '1';
+    });
+    
+    alert(`Found ${cards.length} cards. Check console for details.`);
+}
+
+async function analyzeIntention() {
+    const userProfile = {
+        profile_text: document.getElementById('userProfile').value
+    };
+
+    const targetPersonProfile = {
+        profile_text: document.getElementById('targetPersonProfile').value
+    };
+
+    const useCase = document.getElementById('useCase').value;
+
+    // Validation
+    if (!useCase) {
+        alert('Please describe the situation you want to analyze.');
+        return;
+    }
+
+    try {
+        // Show loading state
+        const analyzeBtn = document.querySelector('button[onclick="analyzeIntention()"]');
+        const originalText = analyzeBtn.innerHTML;
+        analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+        analyzeBtn.disabled = true;
+
+        const response = await fetch('/api/v1/intention/analyze-intention', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_profile: userProfile,
+                target_person_profile: targetPersonProfile,
+                use_case: useCase
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            displayAnalysisResults(result);
+        } else {
+            throw new Error(result.detail || 'Analysis failed');
+        }
+
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error analyzing intention: ' + error.message);
+    } finally {
+        // Restore button state
+        const analyzeBtn = document.querySelector('button[onclick="analyzeIntention()"]');
+        analyzeBtn.innerHTML = originalText;
+        analyzeBtn.disabled = false;
+    }
+}
+
+function displayAnalysisResults(result) {
+    const resultsDiv = document.getElementById('analysisResults');
+    const intentionDiv = document.getElementById('intentionAssessment');
+    const rationaleDiv = document.getElementById('rationaleSection');
+    const adviceDiv = document.getElementById('adviceSection');
+
+    // Display intention assessment
+    const intentionClass = result.intention_assessment === 'positive' ? 'text-success' : 
+                          result.intention_assessment === 'negative' ? 'text-danger' : 'text-warning';
+    
+    intentionDiv.innerHTML = `
+        <div class="mb-3">
+            <h6 class="fw-bold">Intention Assessment:</h6>
+            <span class="badge bg-${result.intention_assessment === 'positive' ? 'success' : 
+                                   result.intention_assessment === 'negative' ? 'danger' : 'warning'} fs-6">
+                ${result.intention_assessment.toUpperCase()}
+            </span>
+            <span class="ms-2 text-muted">(Confidence: ${result.confidence_level})</span>
+        </div>
+    `;
+
+    // Display rationale
+    if (result.rationale && result.rationale.length > 0) {
+        rationaleDiv.innerHTML = `
+            <div class="mb-3">
+                <h6 class="fw-bold">Analysis Rationale:</h6>
+                <ul class="list-unstyled">
+                    ${result.rationale.map(point => `<li class="mb-2"><i class="fas fa-arrow-right text-primary me-2"></i>${point}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    // Display advice
+    if (result.advice && result.advice.length > 0) {
+        adviceDiv.innerHTML = `
+            <div class="mb-3">
+                <h6 class="fw-bold text-success">Warm & Positive Advice:</h6>
+                <ul class="list-unstyled">
+                    ${result.advice.map(advice => `<li class="mb-2"><i class="fas fa-heart text-success me-2"></i>${advice}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    // Show results
+    resultsDiv.style.display = 'block';
+    resultsDiv.scrollIntoView({ behavior: 'smooth' });
+}
