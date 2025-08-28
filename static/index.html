@@ -241,6 +241,32 @@
             border-radius: 12px;
             margin: 4px 0;
         }
+        
+        /* Chart container fixes */
+        #fq-price-chart, #fq-performance-chart, #fq-distribution-chart {
+            max-height: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            width: auto !important;
+        }
+        
+        .card-body canvas {
+            display: block !important;
+            max-height: 300px !important;
+            max-width: 100% !important;
+        }
+        
+        #fq-price-chart {
+            max-height: 300px !important;
+        }
+        
+        #fq-performance-chart {
+            max-height: 250px !important;
+        }
+        
+        #fq-distribution-chart {
+            max-height: 300px !important;
+        }
     </style>
 </head>
 <body>
@@ -1118,6 +1144,17 @@
                                                 FutureQuant Trader Dashboard
                                             </h2>
                                             <p class="text-muted mb-0">Distributional Futures Trading Platform - Research, Backtesting & Paper Trading</p>
+                                            
+                                            <!-- Quick Start Guide -->
+                                            <div class="alert alert-info mt-3 mb-0">
+                                                <h6><i class="fas fa-info-circle"></i> Quick Start Guide:</h6>
+                                                <ol class="mb-0 small">
+                                                    <li><strong>Select a Symbol</strong> (e.g., ES for S&P 500 futures)</li>
+                                                    <li><strong>Choose a Strategy</strong> based on your risk tolerance</li>
+                                                    <li><strong>View Charts</strong> to analyze market data</li>
+                                                    <li><strong>Train Models</strong> or run backtests to test strategies</li>
+                                                </ol>
+                                            </div>
                                         </div>
                                         <div class="col-md-4 text-end">
                                             <div class="d-flex gap-2 justify-content-end">
@@ -1191,7 +1228,10 @@
                                             </div>
                                         </div>
                                         <div class="card-body">
-                                            <canvas id="fq-price-chart" height="300"></canvas>
+                                            <canvas id="fq-price-chart" height="300" style="max-height: 300px; width: 100%;"></canvas>
+                                            <div class="mt-2">
+                                                <button class="btn btn-sm btn-outline-secondary" onclick="forceFutureQuantCharts()">Force Chart Init</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1201,7 +1241,10 @@
                                             <h6 class="mb-0">Return Distribution</h6>
                                         </div>
                                         <div class="card-body">
-                                            <canvas id="fq-distribution-chart" height="300"></canvas>
+                                            <canvas id="fq-distribution-chart" height="300" style="max-height: 300px; width: 100%;"></canvas>
+                                            <div class="mt-2">
+                                                <button class="btn btn-sm btn-outline-secondary" onclick="forceFutureQuantCharts()">Force Chart Init</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1259,7 +1302,7 @@
                                             <h6 class="mb-0">Performance Chart</h6>
                                         </div>
                                         <div class="card-body">
-                                            <canvas id="fq-performance-chart" height="250"></canvas>
+                                            <canvas id="fq-performance-chart" height="250" style="max-height: 250px; width: 100%;"></canvas>
                                         </div>
                                     </div>
                                 </div>
@@ -1448,7 +1491,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
             <script src="static/main.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
         <script src="static/mnq-dashboard.js"></script>
-        <script src="static/futurequant-dashboard.js"></script>
+                        <script src="static/futurequant-dashboard.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
     
     <script>
         // Auto-clear cache and force reload
