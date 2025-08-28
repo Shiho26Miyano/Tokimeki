@@ -3,6 +3,10 @@ API v1 router configuration
 """
 from fastapi import APIRouter
 from .endpoints import chat, stocks, sentiment, speech, monitoring, rag, mnq, intention
+from .endpoints.futurequant import (
+    data_router, features_router, models_router, 
+    signals_router, backtests_router, paper_trading_router
+)
 
 # Create main API router
 api_router = APIRouter()
@@ -16,6 +20,14 @@ api_router.include_router(monitoring.router, prefix="/monitoring", tags=["monito
 api_router.include_router(rag.router, prefix="/rag", tags=["rag"])
 api_router.include_router(mnq.router, prefix="/mnq", tags=["mnq"])
 api_router.include_router(intention.router, prefix="/intention", tags=["intention_interpreter_engine"])
+
+# Include FutureQuant Trader endpoints
+api_router.include_router(data_router, prefix="/futurequant/data", tags=["futurequant_data"])
+api_router.include_router(features_router, prefix="/futurequant/features", tags=["futurequant_features"])
+api_router.include_router(models_router, prefix="/futurequant/models", tags=["futurequant_models"])
+api_router.include_router(signals_router, prefix="/futurequant/signals", tags=["futurequant_signals"])
+api_router.include_router(backtests_router, prefix="/futurequant/backtests", tags=["futurequant_backtests"])
+api_router.include_router(paper_trading_router, prefix="/futurequant/paper-trading", tags=["futurequant_paper_trading"])
 
 # Add API version info
 @api_router.get("/")
@@ -32,7 +44,15 @@ async def api_info():
             "monitoring": "/monitoring",
             "rag": "/rag",
             "mnq": "/mnq",
-            "intention": "/intention"
+            "intention": "/intention",
+            "futurequant": {
+                "data": "/futurequant/data",
+                "features": "/futurequant/features",
+                "models": "/futurequant/models",
+                "signals": "/futurequant/signals",
+                "backtests": "/futurequant/backtests",
+                "paper_trading": "/futurequant/paper-trading"
+            }
         }
     }
 
@@ -94,6 +114,7 @@ async def test_api():
             "chat": "/api/v1/chat",
             "rag": "/api/v1/rag",
             "monitoring": "/api/v1/monitoring",
-            "mnq": "/api/v1/mnq"
+            "mnq": "/api/v1/mnq",
+            "futurequant": "/api/v1/futurequant"
         }
     } 

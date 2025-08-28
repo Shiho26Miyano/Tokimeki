@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # ML models
     sentiment_model: str = "distilbert-base-uncased-finetuned-sst-2-english"
     
+    # FutureQuant Trader settings
+    futurequant_database_url: Optional[str] = os.getenv("FUTUREQUANT_DATABASE_URL")
+    mlflow_tracking_uri: Optional[str] = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    mlflow_registry_uri: Optional[str] = os.getenv("MLFLOW_REGISTRY_URI", "http://localhost:5000")
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": False,
