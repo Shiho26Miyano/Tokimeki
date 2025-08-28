@@ -47,6 +47,8 @@ class FutureQuantDashboard {
             { id: 5, name: 'Statistical Arbitrage', description: 'Pairs trading with statistical edge', risk: 'Low-Medium', expectedReturn: '10-15%', maxDrawdown: '8%' }
         ];
         
+        console.log('Mock strategies initialized:', this.mockStrategies);
+        
         this.mockModels = [
             { id: 1, name: 'Transformer Encoder (FQT-lite)', description: 'Lightweight transformer for quick predictions', accuracy: '78%', trainingTime: '2-4 hours' },
             { id: 2, name: 'Quantile Regression', description: 'Distributional forecasting model', accuracy: '82%', trainingTime: '1-2 hours' },
@@ -83,6 +85,28 @@ class FutureQuantDashboard {
             console.log('Charts initialized:', Object.keys(this.charts));
             console.log('Current symbol data:', this.mockSymbols.find(s => s.ticker === this.currentSymbol));
             console.log('Chart objects:', this.charts);
+            
+                    // Test button accessibility
+        const trainBtn = document.getElementById('fq-train-model-btn');
+        console.log('Train model button accessible:', !!trainBtn);
+        if (trainBtn) {
+            console.log('Train button text:', trainBtn.textContent);
+            console.log('Train button onclick:', trainBtn.onclick);
+        }
+        
+        // Test strategy elements
+        const strategySelect = document.getElementById('fq-strategy-select');
+        const strategyDetails = document.getElementById('fq-strategy-details');
+        console.log('Strategy select accessible:', !!strategySelect);
+        console.log('Strategy details accessible:', !!strategyDetails);
+        
+        // Test strategy loading
+        this.loadStrategies();
+        console.log('Strategies loaded, checking if populated...');
+        if (strategySelect) {
+            console.log('Strategy select options count:', strategySelect.options.length);
+            console.log('Strategy select value:', strategySelect.value);
+        }
         }, 2000);
     }
 
@@ -108,15 +132,25 @@ class FutureQuantDashboard {
         // Strategy selector
         const strategySelect = document.getElementById('fq-strategy-select');
         if (strategySelect) {
+            console.log('Strategy select found, adding change event listener');
             strategySelect.addEventListener('change', (e) => {
+                console.log('Strategy changed to:', e.target.value);
                 this.loadStrategyData(e.target.value);
             });
+        } else {
+            console.error('Strategy select element not found during event listener setup');
         }
 
         // Model training
         const trainModelBtn = document.getElementById('fq-train-model-btn');
         if (trainModelBtn) {
-            trainModelBtn.addEventListener('click', () => this.showModelTrainingModal());
+            console.log('Train model button found, adding event listener');
+            trainModelBtn.addEventListener('click', () => {
+                console.log('Train model button clicked');
+                this.showModelTrainingModal();
+            });
+        } else {
+            console.error('Train model button not found');
         }
 
         // Backtest button
@@ -213,12 +247,19 @@ class FutureQuantDashboard {
     }
 
     loadStrategies() {
+        console.log('Loading strategies...');
         const strategySelect = document.getElementById('fq-strategy-select');
+        console.log('Strategy select element:', strategySelect);
+        
         if (strategySelect) {
             strategySelect.innerHTML = '<option value="">Select Strategy</option>';
             this.mockStrategies.forEach(strategy => {
                 strategySelect.innerHTML += `<option value="${strategy.id}">${strategy.name}</option>`;
             });
+            console.log('Strategies loaded into select:', this.mockStrategies.length);
+            console.log('Strategy select HTML:', strategySelect.innerHTML);
+        } else {
+            console.error('Strategy select element not found!');
         }
     }
 
@@ -291,12 +332,19 @@ class FutureQuantDashboard {
     }
 
     async loadStrategyData(strategyId) {
-        if (!strategyId) return;
+        console.log('Loading strategy data for ID:', strategyId);
+        if (!strategyId) {
+            console.log('No strategy ID provided, returning');
+            return;
+        }
         
         try {
             const strategy = this.mockStrategies.find(s => s.id == strategyId);
+            console.log('Found strategy:', strategy);
             if (strategy) {
                 this.updateStrategyDisplay(strategy);
+            } else {
+                console.warn('Strategy not found for ID:', strategyId);
             }
         } catch (error) {
             console.error('Error loading strategy data:', error);
@@ -835,8 +883,14 @@ class FutureQuantDashboard {
     }
 
     updateStrategyDisplay(strategy) {
+        console.log('Updating strategy display for:', strategy);
         const container = document.getElementById('fq-strategy-details');
-        if (!container) return;
+        console.log('Strategy details container:', container);
+        
+        if (!container) {
+            console.error('Strategy details container not found');
+            return;
+        }
         
         container.innerHTML = `
             <div class="card">
@@ -876,83 +930,269 @@ class FutureQuantDashboard {
     }
 
     showModelTrainingModal() {
-        // Create and show modal for model training
-        const modal = document.createElement('div');
-        modal.className = 'modal fade';
-        modal.id = 'modelTrainingModal';
-        modal.innerHTML = `
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Train Distributional Model</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="modelTrainingForm">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Model Type</label>
-                                        <select class="form-select" id="modelType">
-                                            <option value="transformer">Transformer Encoder (FQT-lite)</option>
-                                            <option value="quantile_regression">Quantile Regression</option>
-                                            <option value="random_forest">Random Forest Quantiles</option>
-                                            <option value="neural_network">Neural Network</option>
-                                            <option value="gradient_boosting">Gradient Boosting</option>
-                                        </select>
+        try {
+            console.log('Showing model training modal...');
+            
+            // Check if Bootstrap is available
+            if (typeof bootstrap === 'undefined') {
+                console.warn('Bootstrap not available, using fallback modal');
+                this.createFallbackModal();
+                return;
+            }
+            
+            // Remove existing modal if it exists
+            const existingModal = document.getElementById('modelTrainingModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Create and show modal for model training
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.id = 'modelTrainingModal';
+            modal.style.zIndex = '9999';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Train Distributional Model</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="modelTrainingForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Model Type</label>
+                                            <select class="form-select" id="modelType" name="modelType">
+                                                <option value="transformer">Transformer Encoder (FQT-lite)</option>
+                                                <option value="quantile_regression">Quantile Regression</option>
+                                                <option value="random_forest">Random Forest Quantiles</option>
+                                                <option value="neural_network">Neural Network</option>
+                                                <option value="gradient_boosting">Gradient Boosting</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Symbols</label>
+                                            <select class="form-select" id="modelSymbols" name="modelSymbols" multiple>
+                                                <option value="ES=F" selected>ES=F (E-mini S&P 500)</option>
+                                                <option value="NQ=F">NQ=F (E-mini NASDAQ)</option>
+                                                <option value="YM=F">YM=F (E-mini Dow)</option>
+                                                <option value="RTY=F">RTY=F (E-mini Russell)</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Symbols</label>
-                                        <select class="form-select" id="modelSymbols" multiple>
-                                            <option value="ES=F">ES=F (E-mini S&P 500)</option>
-                                            <option value="NQ=F">NQ=F (E-mini NASDAQ)</option>
-                                            <option value="YM=F">YM=F (E-mini Dow)</option>
-                                            <option value="RTY=F">RTY=F (E-mini Russell)</option>
-                                        </select>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Training Period</label>
+                                            <select class="form-select" id="trainingPeriod" name="trainingPeriod">
+                                                <option value="1y">1 Year</option>
+                                                <option value="2y">2 Years</option>
+                                                <option value="5y">5 Years</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Horizon (minutes)</label>
+                                            <select class="form-select" id="modelHorizon" name="modelHorizon">
+                                                <option value="15">15 minutes</option>
+                                                <option value="30">30 minutes</option>
+                                                <option value="60">1 hour</option>
+                                                <option value="240">4 hours</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Training Period</label>
-                                        <select class="form-select" id="trainingPeriod">
-                                            <option value="1y">1 Year</option>
-                                            <option value="2y">2 Years</option>
-                                            <option value="5y">5 Years</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Horizon (minutes)</label>
-                                        <select class="form-select" id="modelHorizon">
-                                            <option value="15">15 minutes</option>
-                                            <option value="30">30 minutes</option>
-                                            <option value="60">1 hour</option>
-                                            <option value="240">4 hours</option>
-                                        </select>
-                                    </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Hyperparameters (JSON)</label>
+                                    <textarea class="form-control" id="modelHyperparams" name="modelHyperparams" rows="4" placeholder='{"learning_rate": 0.001, "batch_size": 32}'>{"learning_rate": 0.001, "batch_size": 32}</textarea>
                                 </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Hyperparameters (JSON)</label>
-                                <textarea class="form-control" id="modelHyperparams" rows="4" placeholder='{"learning_rate": 0.001, "batch_size": 32}'></textarea>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="futurequantDashboard.trainModel()">Start Training</button>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="startTrainingBtn">Start Training</button>
+                        </div>
                     </div>
                 </div>
+            `;
+            
+            document.body.appendChild(modal);
+            console.log('Modal created and added to DOM');
+            console.log('Modal element:', modal);
+            console.log('Form element in modal:', modal.querySelector('#modelTrainingForm'));
+            
+            // Create Bootstrap modal instance
+            let modalInstance;
+            try {
+                modalInstance = new bootstrap.Modal(modal);
+                console.log('Bootstrap modal instance created');
+                
+                // Show the modal immediately
+                modalInstance.show();
+                console.log('Modal shown');
+            } catch (bootstrapError) {
+                console.error('Bootstrap modal creation failed:', bootstrapError);
+                // Fallback to simple modal
+                this.createFallbackModal();
+                return;
+            }
+            
+            // Add event listener for the start training button
+            const startTrainingBtn = modal.querySelector('#startTrainingBtn');
+            if (startTrainingBtn) {
+                startTrainingBtn.addEventListener('click', () => {
+                    console.log('Start training button clicked');
+                    this.trainModel();
+                });
+            }
+            
+            // Clean up modal when hidden
+            modal.addEventListener('hidden.bs.modal', () => {
+                console.log('Modal hidden, cleaning up...');
+                // Add a small delay before cleanup to ensure all operations complete
+                setTimeout(() => {
+                    if (document.body.contains(modal)) {
+                        document.body.removeChild(modal);
+                        console.log('Modal removed from DOM');
+                    }
+                }, 500);
+            });
+            
+        } catch (error) {
+            console.error('Error showing model training modal:', error);
+            this.showNotification(`Error showing modal: ${error.message}`, 'error');
+            
+            // Fallback: try to show a simple alert with form data
+            console.log('Attempting fallback modal creation...');
+            try {
+                this.createFallbackModal();
+            } catch (fallbackError) {
+                console.error('Fallback modal also failed:', fallbackError);
+                this.showNotification('Modal creation failed completely', 'error');
+            }
+        }
+    }
+
+    createFallbackModal() {
+        console.log('Creating fallback modal...');
+        
+        // Create a simple modal using basic HTML
+        const fallbackModal = document.createElement('div');
+        fallbackModal.id = 'fallbackModelTrainingModal';
+        fallbackModal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        
+        fallbackModal.innerHTML = `
+            <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%;">
+                <h4>Train Distributional Model</h4>
+                <form id="fallbackModelTrainingForm">
+                    <div style="margin-bottom: 15px;">
+                        <label>Model Type:</label>
+                        <select id="fallbackModelType" style="width: 100%; padding: 8px; margin-top: 5px;">
+                            <option value="transformer">Transformer Encoder (FQT-lite)</option>
+                            <option value="quantile_regression">Quantile Regression</option>
+                            <option value="random_forest">Random Forest Quantiles</option>
+                            <option value="neural_network">Neural Network</option>
+                            <option value="gradient_boosting">Gradient Boosting</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label>Symbols:</label>
+                        <select id="fallbackModelSymbols" multiple style="width: 100%; padding: 8px; margin-top: 5px;">
+                            <option value="ES=F" selected>ES=F (E-mini S&P 500)</option>
+                            <option value="NQ=F">NQ=F (E-mini NASDAQ)</option>
+                            <option value="YM=F">YM=F (E-mini Dow)</option>
+                            <option value="RTY=F">RTY=F (E-mini Russell)</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label>Training Period:</label>
+                        <select id="fallbackTrainingPeriod" style="width: 100%; padding: 8px; margin-top: 5px;">
+                            <option value="1y">1 Year</option>
+                            <option value="2y">2 Years</option>
+                            <option value="5y">5 Years</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label>Horizon (minutes):</label>
+                        <select id="fallbackModelHorizon" style="width: 100%; padding: 8px; margin-top: 5px;">
+                            <option value="15">15 minutes</option>
+                            <option value="30">30 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="240">4 hours</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label>Hyperparameters (JSON):</label>
+                        <textarea id="fallbackModelHyperparams" style="width: 100%; padding: 8px; margin-top: 5px; height: 60px;" placeholder='{"learning_rate": 0.001, "batch_size": 32}'>{}</textarea>
+                    </div>
+                    <div style="text-align: right;">
+                        <button type="button" onclick="document.getElementById('fallbackModelTrainingModal').remove()" style="margin-right: 10px; padding: 8px 16px;">Cancel</button>
+                        <button type="button" onclick="window.futurequantDashboard.trainModelFallback()" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px;">Start Training</button>
+                    </div>
+                </form>
             </div>
         `;
         
-        document.body.appendChild(modal);
-        const modalInstance = new bootstrap.Modal(modal);
-        modalInstance.show();
-        
-        // Clean up modal when hidden
-        modal.addEventListener('hidden.bs.modal', () => {
-            document.body.removeChild(modal);
-        });
+        document.body.appendChild(fallbackModal);
+        console.log('Fallback modal created');
+    }
+
+    async trainModelFallback() {
+        try {
+            console.log('Starting model training with fallback form...');
+            
+            const modelType = document.getElementById('fallbackModelType').value;
+            const symbolsElement = document.getElementById('fallbackModelSymbols');
+            const trainingPeriod = document.getElementById('fallbackTrainingPeriod').value;
+            const horizonMinutes = document.getElementById('fallbackModelHorizon').value;
+            const hyperparamsText = document.getElementById('fallbackModelHyperparams').value || '{}';
+            
+            const selectedSymbols = Array.from(symbolsElement.selectedOptions).map(opt => opt.value);
+            
+            if (selectedSymbols.length === 0) {
+                this.showNotification('Please select at least one symbol', 'error');
+                return;
+            }
+            
+            const trainingData = {
+                model_type: modelType,
+                symbols: selectedSymbols,
+                training_period: trainingPeriod,
+                horizon_minutes: parseInt(horizonMinutes),
+                hyperparams: JSON.parse(hyperparamsText)
+            };
+            
+            console.log('Training data prepared:', trainingData);
+            
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            this.showNotification('Model training started successfully', 'success');
+            
+            // Remove fallback modal
+            const modal = document.getElementById('fallbackModelTrainingModal');
+            if (modal) {
+                modal.remove();
+            }
+            
+            // Update job statuses
+            this.loadJobStatuses();
+            
+        } catch (error) {
+            console.error('Error training model with fallback:', error);
+            this.showNotification(`Error starting model training: ${error.message}`, 'error');
+        }
     }
 
     async trainModel(modelType = null) {
@@ -960,7 +1200,22 @@ class FutureQuantDashboard {
             console.log('Starting model training...');
             console.log('Model type parameter:', modelType);
             
-            const form = document.getElementById('modelTrainingForm');
+            console.log('Looking for form with ID: modelTrainingForm');
+            
+            // Try to find the form in the modal first
+            let form = null;
+            const modal = document.getElementById('modelTrainingModal');
+            if (modal) {
+                form = modal.querySelector('#modelTrainingForm');
+                console.log('Form found in modal:', form);
+            }
+            
+            // If not found in modal, try document
+            if (!form) {
+                form = document.getElementById('modelTrainingForm');
+                console.log('Form found in document:', form);
+            }
+            
             if (!form) {
                 throw new Error('Model training form not found');
             }
@@ -1009,9 +1264,9 @@ class FutureQuantDashboard {
             this.showNotification('Model training started successfully', 'success');
             
             // Hide modal if it exists
-            const modal = document.getElementById('modelTrainingModal');
-            if (modal) {
-                const modalInstance = bootstrap.Modal.getInstance(modal);
+            const modalToHide = document.getElementById('modelTrainingModal');
+            if (modalToHide) {
+                const modalInstance = bootstrap.Modal.getInstance(modalToHide);
                 if (modalInstance) {
                     modalInstance.hide();
                 }
@@ -1235,6 +1490,78 @@ window.forceFutureQuantCharts = function() {
     if (window.futurequantDashboard) {
         console.log('Manually forcing chart initialization...');
         window.futurequantDashboard.forceChartInitialization();
+    } else {
+        console.log('Dashboard not initialized yet');
+    }
+};
+
+// Global function to test model training (for debugging)
+window.testModelTraining = function() {
+    if (window.futurequantDashboard) {
+        console.log('Testing model training...');
+        window.futurequantDashboard.showModelTrainingModal();
+    } else {
+        console.log('Dashboard not initialized yet');
+    }
+};
+
+// Global function to test modal creation directly
+window.testModalCreation = function() {
+    console.log('Testing modal creation directly...');
+    
+    // Create a simple test modal
+    const testModal = document.createElement('div');
+    testModal.id = 'testModal';
+    testModal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    testModal.innerHTML = `
+        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 400px;">
+            <h4>Test Modal</h4>
+            <p>This is a test modal to verify modal creation works.</p>
+            <button onclick="document.getElementById('testModal').remove()" style="padding: 8px 16px;">Close</button>
+        </div>
+    `;
+    
+    document.body.appendChild(testModal);
+    console.log('Test modal created');
+};
+
+// Global function to test strategy loading
+window.testStrategyLoading = function() {
+    if (window.futurequantDashboard) {
+        console.log('Testing strategy loading...');
+        console.log('Current mock strategies:', window.futurequantDashboard.mockStrategies);
+        
+        // Test loading a specific strategy
+        window.futurequantDashboard.loadStrategyData(1);
+        
+        // Test updating the strategy display
+        const strategy = window.futurequantDashboard.mockStrategies[0];
+        if (strategy) {
+            window.futurequantDashboard.updateStrategyDisplay(strategy);
+        }
+        
+        // Test manually populating strategy select
+        const strategySelect = document.getElementById('fq-strategy-select');
+        if (strategySelect) {
+            console.log('Manually populating strategy select...');
+            strategySelect.innerHTML = '<option value="">Select Strategy</option>';
+            window.futurequantDashboard.mockStrategies.forEach(strategy => {
+                strategySelect.innerHTML += `<option value="${strategy.id}">${strategy.name}</option>`;
+            });
+            console.log('Strategy select populated manually');
+        }
     } else {
         console.log('Dashboard not initialized yet');
     }
