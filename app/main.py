@@ -11,14 +11,14 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import time
 
-from .core.config import settings
-from .core.middleware import setup_middleware
-from .core.dependencies import get_cache_service, get_usage_service, get_ai_service, get_stock_service
-from .api.v1.api import api_router
-from .services.ai_service import AsyncAIService
-from .services.stock_service import AsyncStockService
-from .services.usage_service import AsyncUsageService
-from .services.cache_service import AsyncCacheService
+from app.core.config import settings
+from app.core.middleware import setup_middleware
+from app.core.dependencies import get_cache_service, get_usage_service, get_ai_service, get_stock_service
+from app.api.v1.api import api_router
+from app.services.ai_service import AsyncAIService
+from app.services.stock_service import AsyncStockService
+from app.services.usage_service import AsyncUsageService
+from app.services.cache_service import AsyncCacheService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
