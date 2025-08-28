@@ -3,7 +3,7 @@ FutureQuant Trader Signal Generation Endpoints
 """
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Path
 from pydantic import BaseModel, Field
 
 from app.services.futurequant.signal_service import FutureQuantSignalService
@@ -114,7 +114,7 @@ async def get_trading_strategies(
 
 @router.get("/strategies/{strategy_name}")
 async def get_strategy_details(
-    strategy_name: str,
+    strategy_name: str = Path(..., description="Strategy name"),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
     """Get detailed information about a specific strategy"""

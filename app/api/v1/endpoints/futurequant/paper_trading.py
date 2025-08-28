@@ -3,7 +3,7 @@ FutureQuant Trader Paper Trading Endpoints
 """
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Path
 from pydantic import BaseModel, Field
 
 from app.services.futurequant.paper_broker_service import FutureQuantPaperBrokerService
@@ -81,7 +81,7 @@ async def start_paper_trading(
 
 @router.post("/stop/{session_id}", response_model=dict)
 async def stop_paper_trading(
-    session_id: str,
+    session_id: str = Path(..., description="Paper trading session ID"),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
     """Stop a paper trading session"""
@@ -122,7 +122,7 @@ async def stop_paper_trading(
 
 @router.get("/sessions/{session_id}/status", response_model=dict)
 async def get_session_status(
-    session_id: str,
+    session_id: str = Path(..., description="Paper trading session ID"),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
     """Get status of a paper trading session"""
@@ -248,7 +248,7 @@ async def get_active_sessions(
 
 @router.post("/sessions/{session_id}/close-all", response_model=dict)
 async def close_all_positions(
-    session_id: str,
+    session_id: str = Path(..., description="Paper trading session ID"),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
     """Close all positions in a paper trading session"""

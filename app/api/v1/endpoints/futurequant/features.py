@@ -3,7 +3,7 @@ FutureQuant Trader Feature Engineering Endpoints
 """
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Path
 from pydantic import BaseModel, Field
 
 from app.services.futurequant.feature_service import FutureQuantFeatureService
@@ -35,6 +35,13 @@ class FeatureComputeResponse(BaseModel):
     start_date: str
     end_date: str
     interval: str
+
+class FeatureBatchRequest(BaseModel):
+    symbols: List[str] = Field(..., description="List of symbols to compute features for")
+    start_date: str = Field(..., description="Start date (YYYY-MM-DD)")
+    end_date: str = Field(..., description="End date (YYYY-MM-DD)")
+    recipe: str = Field(default="basic", description="Feature recipe")
+    interval: str = Field(default="1d", description="Data interval")
 
 @router.post("/compute", response_model=FeatureComputeResponse)
 async def compute_features(
@@ -123,7 +130,7 @@ async def get_feature_recipes(
 
 @router.get("/recipes/{recipe_name}")
 async def get_feature_recipe_details(
-    recipe_name: str,
+    recipe_name: str = Path(..., description="Feature recipe name"),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
     """Get detailed information about a specific feature recipe"""
@@ -221,11 +228,7 @@ async def get_feature_status(
 
 @router.post("/batch")
 async def compute_features_batch(
-    symbols: List[str] = Field(..., description="List of symbols to compute features for"),
-    start_date: str = Field(..., description="Start date (YYYY-MM-DD)"),
-    end_date: str = Field(..., description="End date (YYYY-MM-DD)"),
-    recipe: str = Field(default="basic", description="Feature recipe"),
-    interval: str = Field(default="1d", description="Data interval"),
+    request: FeatureBatchRequest,
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
     """Compute features for multiple symbols in batch"""
@@ -236,14 +239,14 @@ async def compute_features_batch(
         results = {}
         total_features = 0
         
-        for symbol in symbols:
+        for symbol in request.symbols:
             try:
                 result = await feature_service.compute_features(
                     symbol=symbol,
-                    start_date=start_date,
-                    end_date=end_date,
-                    recipe=recipe,
-                    interval=interval
+                    start_date=request.start_date,
+                    end_date=request.end_date,
+                    recipe=request.recipe,
+                    interval=request.interval
                 )
                 
                 results[symbol] = result
@@ -262,14 +265,14 @@ async def compute_features_batch(
         
         summary = {
             "success": True,
-            "total_symbols": len(symbols),
+            "total_symbols": len(request.symbols),
             "successful_symbols": len(successful_symbols),
             "failed_symbols": len(failed_symbols),
             "total_features_computed": total_features,
-            "recipe": recipe,
-            "interval": interval,
-            "start_date": start_date,
-            "end_date": end_date,
+            "recipe": request.recipe,
+            "interval": request.interval,
+            "start_date": request.start_date,
+            "end_date": request.end_date,
             "results": results
         }
         

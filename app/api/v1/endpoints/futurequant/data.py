@@ -3,7 +3,7 @@ FutureQuant Trader Data Ingestion Endpoints
 """
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Path, Query
 from pydantic import BaseModel, Field
 
 from app.services.futurequant.data_service import FutureQuantDataService
@@ -135,7 +135,7 @@ async def get_futures_symbols(
 
 @router.get("/symbols/{symbol}/info", response_model=SymbolInfoResponse)
 async def get_symbol_info(
-    symbol: str,
+    symbol: str = Path(..., description="Futures symbol ticker"),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
     """Get information about a specific futures symbol"""
@@ -172,8 +172,8 @@ async def get_symbol_info(
 
 @router.get("/symbols/{symbol}/latest", response_model=List[LatestDataResponse])
 async def get_latest_data(
-    symbol: str,
-    limit: int = Field(default=100, ge=1, le=1000, description="Number of latest bars to return"),
+    symbol: str = Path(..., description="Futures symbol ticker"),
+    limit: int = Query(default=100, ge=1, le=1000, description="Number of latest bars to return"),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
     """Get latest price data for a symbol"""
