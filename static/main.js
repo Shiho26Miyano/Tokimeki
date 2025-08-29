@@ -3022,8 +3022,14 @@ async function analyzeIntention() {
     }
 
     try {
-        // Show loading state
-        const analyzeBtn = document.querySelector('button[onclick="analyzeIntention()"]');
+        // Show progress indicator and hide results
+        const progressDiv = document.getElementById('analysisProgress');
+        const resultsDiv = document.getElementById('analysisResults');
+        if (progressDiv) progressDiv.style.display = 'block';
+        if (resultsDiv) resultsDiv.style.display = 'none';
+        
+        // Show loading state on button
+        const analyzeBtn = document.getElementById('analyzeBtn');
         const originalText = analyzeBtn.innerHTML;
         analyzeBtn.disabled = true;
         analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
@@ -3049,17 +3055,18 @@ async function analyzeIntention() {
             throw new Error(result.detail || 'Analysis failed');
         }
 
-        // Restore button state after successful analysis
-        analyzeBtn.innerHTML = originalText;
-        analyzeBtn.disabled = false;
-
     } catch (error) {
         console.error('Error:', error);
         alert('Error analyzing intention: ' + error.message);
-        
-        // Restore button state after error
-        analyzeBtn.innerHTML = originalText;
-        analyzeBtn.disabled = false;
+    } finally {
+        // Always restore button state and hide progress
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        if (analyzeBtn) {
+            analyzeBtn.innerHTML = '<i class="fas fa-brain"></i> Analyze Intention';
+            analyzeBtn.disabled = false;
+        }
+        const progressDiv = document.getElementById('analysisProgress');
+        if (progressDiv) progressDiv.style.display = 'none';
     }
 }
 

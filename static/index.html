@@ -602,9 +602,21 @@
                                                     <textarea class="form-control" id="useCase" rows="8" 
                                                         placeholder="Describe what this person said or did that you want to understand better. For example: 'They said they would help me move but then cancelled at the last minute' or 'They keep asking me for favors but never return the help'">Jerry and Tom have been collaborating on a major engineering project for two months. They worked equally on research, design, coding, and testing phases. During the final presentation to stakeholders, Jerry was given the opportunity to present their joint work. However, Jerry presented the entire project as his own individual achievement, using "I" statements throughout the presentation and never mentioning Tom's contributions, collaborative work, or shared effort. When asked about team composition, Jerry responded that he "led the project" and "handled the technical challenges." Tom was present during the presentation but was not acknowledged or given credit for his substantial contributions to the project's success.</textarea>
                                                 </div>
-                                                <button type="button" class="btn btn-primary btn-lg w-100" onclick="analyzeIntention()">
+                                                <button type="button" class="btn btn-primary btn-lg w-100" id="analyzeBtn" onclick="analyzeIntention()">
                                                     <i class="fas fa-brain"></i> Analyze Intention
                                                 </button>
+                                                
+                                                <!-- Progress Indicator -->
+                                                <div id="analysisProgress" class="mt-3" style="display: none;">
+                                                    <div class="alert alert-info">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                                                <span class="visually-hidden">Loading...</span>
+                                                            </div>
+                                                            <span>Analyzing intention... This should take 5-15 seconds.</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 
                                                 <!-- Analysis Results - Now inside the same card -->
                                                 <div id="analysisResults" class="mt-1" style="display: none;">
