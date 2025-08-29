@@ -133,12 +133,47 @@ class FutureQuantDashboard {
         const strategySelect = document.getElementById('fq-strategy-select');
         if (strategySelect) {
             console.log('Strategy select found, adding change event listener');
+            
+            // Add click handler for debugging
+            strategySelect.addEventListener('click', (e) => {
+                console.log('Strategy select clicked!');
+                console.log('Current options count:', e.target.options.length);
+                console.log('Current HTML:', e.target.innerHTML);
+            });
+            
+            // Add change handler
             strategySelect.addEventListener('change', (e) => {
                 console.log('Strategy changed to:', e.target.value);
                 this.loadStrategyData(e.target.value);
             });
+            
+            // Add focus handler
+            strategySelect.addEventListener('focus', (e) => {
+                console.log('Strategy select focused');
+                console.log('Options available:', e.target.options.length);
+            });
         } else {
             console.error('Strategy select element not found during event listener setup');
+        }
+        
+        // Train button
+        const trainBtn = document.getElementById('fq-train-model-btn');
+        if (trainBtn) {
+            trainBtn.addEventListener('click', () => {
+                this.showTrainingInterface();
+            });
+        }
+        
+        // Trade button
+        const tradeBtn = document.getElementById('fq-start-paper-trading-btn');
+        if (tradeBtn) {
+            console.log('Trade button found, adding event listener');
+            tradeBtn.addEventListener('click', () => {
+                console.log('Trade button clicked!');
+                this.showTradingInterface();
+            });
+        } else {
+            console.error('Trade button not found!');
         }
 
         // Model training
@@ -159,11 +194,11 @@ class FutureQuantDashboard {
             backtestBtn.addEventListener('click', () => this.runBacktest());
         }
 
-        // Paper trading
-        const startPaperTradingBtn = document.getElementById('fq-start-paper-trading-btn');
-        if (startPaperTradingBtn) {
-            startPaperTradingBtn.addEventListener('click', () => this.startPaperTrading());
-        }
+        // Paper trading - using the showTradingInterface method instead
+        // const startPaperTradingBtn = document.getElementById('fq-start-paper-trading-btn');
+        // if (startPaperTradingBtn) {
+        //     startPaperTradingBtn.addEventListener('click', () => this.startPaperTrading());
+        // }
 
         const stopPaperTradingBtn = document.getElementById('fq-stop-paper-trading-btn');
         if (stopPaperTradingBtn) {
@@ -248,16 +283,37 @@ class FutureQuantDashboard {
 
     loadStrategies() {
         console.log('Loading strategies...');
+        console.log('Available mock strategies:', this.mockStrategies);
+        
         const strategySelect = document.getElementById('fq-strategy-select');
         console.log('Strategy select element:', strategySelect);
         
         if (strategySelect) {
-            strategySelect.innerHTML = '<option value="">Select Strategy</option>';
+            // Clear existing options and add default
+            strategySelect.innerHTML = '<option value="">Aggressive Mean Reversion</option>';
             this.mockStrategies.forEach(strategy => {
-                strategySelect.innerHTML += `<option value="${strategy.id}">${strategy.name}</option>`;
+                const option = `<option value="${strategy.id}">${strategy.name}</option>`;
+                strategySelect.innerHTML += option;
+                console.log('Added strategy option:', option);
             });
             console.log('Strategies loaded into select:', this.mockStrategies.length);
             console.log('Strategy select HTML:', strategySelect.innerHTML);
+            
+            // Verify the options were added
+            console.log('Final strategy select options count:', strategySelect.options.length);
+            for (let i = 0; i < strategySelect.options.length; i++) {
+                console.log(`Option ${i}:`, strategySelect.options[i].text, 'Value:', strategySelect.options[i].value);
+            }
+            
+            // Automatically select and display the first strategy (Aggressive Mean Reversion)
+            if (this.mockStrategies.length > 0) {
+                const firstStrategy = this.mockStrategies[0];
+                strategySelect.value = firstStrategy.id;
+                console.log('Auto-selecting strategy:', firstStrategy.name);
+                
+                // Trigger the change event to load strategy details
+                this.loadStrategyData(firstStrategy.id);
+            }
         } else {
             console.error('Strategy select element not found!');
         }
@@ -349,6 +405,253 @@ class FutureQuantDashboard {
         } catch (error) {
             console.error('Error loading strategy data:', error);
         }
+    }
+    
+    updateStrategyDisplay(strategy) {
+        console.log('Updating strategy display for:', strategy.name);
+        const strategyDetails = document.getElementById('fq-strategy-details');
+        
+        if (strategyDetails) {
+            // Create detailed strategy information
+            let strategyInfo = '';
+            
+            if (strategy.name === 'Aggressive Mean Reversion') {
+                strategyInfo = `
+                    <div class="alert alert-info mb-2">
+                        <h6 class="text-primary mb-2"><i class="fas fa-chart-line"></i> ${strategy.name}</h6>
+                        <p class="small mb-2"><strong>Strategy Type:</strong> Mean Reversion with High Risk Tolerance</p>
+                        <p class="small mb-2"><strong>Best For:</strong> Volatile markets, short-term trades, experienced traders</p>
+                        <p class="small mb-2"><strong>Risk Level:</strong> <span class="badge bg-danger">High</span></p>
+                        <p class="small mb-0"><strong>Timeframe:</strong> 5 minutes to 1 hour</p>
+                    </div>
+                    <div class="small text-muted">
+                        <strong>How it works:</strong> Identifies when prices move too far from their average and bets they'll return to normal levels. 
+                        Uses aggressive position sizing for maximum profit potential.
+                    </div>
+                `;
+            } else {
+                strategyInfo = `
+                    <div class="alert alert-secondary mb-2">
+                        <h6 class="text-secondary mb-2"><i class="fas fa-chart-line"></i> ${strategy.name}</h6>
+                        <p class="small mb-0">Strategy details will be displayed here.</p>
+                    </div>
+                `;
+            }
+            
+            strategyDetails.innerHTML = strategyInfo;
+            console.log('Strategy display updated');
+        } else {
+            console.error('Strategy details element not found');
+        }
+    }
+    
+    showTrainingInterface() {
+        console.log('Showing training interface...');
+        
+        // Create and show training modal
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'trainingModal';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-brain"></i> AI Model Training
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Training Configuration</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">Model Type</label>
+                                    <select class="form-select">
+                                        <option>Neural Network</option>
+                                        <option>Random Forest</option>
+                                        <option>Gradient Boosting</option>
+                                        <option>LSTM</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Training Period</label>
+                                    <select class="form-select">
+                                        <option>Last 6 months</option>
+                                        <option>Last 1 year</option>
+                                        <option>Last 2 years</option>
+                                        <option>All available data</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Features</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" checked>
+                                        <label class="form-check-label">Price indicators</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" checked>
+                                        <label class="form-check-label">Volume indicators</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" checked>
+                                        <label class="form-check-label">Volatility indicators</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Training Progress</h6>
+                                <div class="text-center p-4">
+                                    <div class="spinner-border text-primary mb-3" role="status">
+                                        <span class="visually-hidden">Training...</span>
+                                    </div>
+                                    <h6>Training in Progress...</h6>
+                                    <div class="progress mb-3">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                             style="width: 45%">45%</div>
+                                    </div>
+                                    <p class="text-muted small">Epoch 23/50 - Loss: 0.0234</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary">Start Training</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Show the modal
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+        
+        // Clean up when modal is hidden
+        modal.addEventListener('hidden.bs.modal', () => {
+            document.body.removeChild(modal);
+        });
+    }
+    
+    showTradingInterface() {
+        console.log('Showing trading interface...');
+        
+        // Create and show trading modal
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'tradingModal';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-play"></i> Paper Trading Session
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">Account Balance</h6>
+                                        <h4 class="text-success">$100,000</h4>
+                                        <small class="text-muted">Virtual Money</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">Current P&L</h6>
+                                        <h4 class="text-primary">+$2,450</h4>
+                                        <small class="text-muted">Today's Gain</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="card-body">
+                                        <h6 class="text-muted">Open Positions</h6>
+                                        <h4 class="text-info">3</h4>
+                                        <small class="text-muted">Active Trades</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">Win Rate</h6>
+                                        <h4 class="text-warning">68%</h4>
+                                        <small class="text-muted">Successful Trades</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6>Live Trading Chart</h6>
+                                <div class="border rounded p-3" style="height: 300px; background: #f8f9fa;">
+                                    <div class="text-center text-muted pt-5">
+                                        <i class="fas fa-chart-line fa-3x mb-3"></i>
+                                        <p>Real-time price chart with trade signals</p>
+                                        <small>Chart will show live data and entry/exit points</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Recent Trades</h6>
+                                <div class="list-group">
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>ES Long</strong><br>
+                                            <small class="text-muted">Entry: $4,250</small>
+                                        </div>
+                                        <span class="badge bg-success">+$125</span>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>NQ Short</strong><br>
+                                            <small class="text-muted">Entry: $15,800</small>
+                                        </div>
+                                        <span class="badge bg-danger">-$85</span>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>YM Long</strong><br>
+                                            <small class="text-body">
+                                            <small class="text-muted">Entry: $33,450</small>
+                                        </div>
+                                        <span class="badge bg-success">+$210</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-danger">
+                            <i class="fas fa-stop"></i> Stop Trading
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Show the modal
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+        
+        // Clean up when modal is hidden
+        modal.addEventListener('hidden.bs.modal', () => {
+            document.body.removeChild(modal);
+        });
     }
 
     generateMockPriceData() {
@@ -1437,6 +1740,15 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, checking for Chart.js...');
     console.log('Chart.js available:', typeof Chart !== 'undefined');
     
+    // Initialize Bootstrap tooltips
+    if (typeof bootstrap !== 'undefined') {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        console.log('Bootstrap tooltips initialized');
+    }
+    
     if (typeof Chart !== 'undefined') {
         console.log('Chart.js found, setting up dashboard initialization...');
         // Don't initialize immediately - wait for tab to be active
@@ -1448,13 +1760,31 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof Chart !== 'undefined') {
                 console.log('Chart.js now available, setting up dashboard initialization...');
                 clearInterval(checkChart);
-                setupDashboardInitialization();
             }
         }, 100);
     }
 });
 
 function setupDashboardInitialization() {
+    // Initialize dashboard immediately for better responsiveness
+    if (!window.futurequantDashboard) {
+        console.log('Creating FutureQuant Dashboard immediately...');
+        window.futurequantDashboard = new FutureQuantDashboard();
+        window.futurequantDashboard.init();
+        
+        // Force load strategies and symbols immediately
+        setTimeout(() => {
+            if (window.futurequantDashboard.loadStrategies) {
+                console.log('Loading strategies immediately...');
+                window.futurequantDashboard.loadStrategies();
+            }
+            if (window.futurequantDashboard.loadSymbols) {
+                console.log('Loading symbols immediately...');
+                window.futurequantDashboard.loadSymbols();
+            }
+        }, 500);
+    }
+    
     // Wait for FutureQuant tab to be shown before initializing dashboard
     const futurequantTab = document.getElementById('futurequant-dashboard-tab');
     if (futurequantTab) {
@@ -1462,23 +1792,30 @@ function setupDashboardInitialization() {
         
         // Listen for tab shown event
         futurequantTab.addEventListener('shown.bs.tab', function() {
-            console.log('FutureQuant tab shown, initializing dashboard...');
+            console.log('FutureQuant tab shown, ensuring dashboard is initialized...');
             if (!window.futurequantDashboard) {
                 window.futurequantDashboard = new FutureQuantDashboard();
-            } else {
-                console.log('Dashboard exists, reinitializing charts...');
-                window.futurequantDashboard.initializeCharts();
+                window.futurequantDashboard.init();
+            }
+            // Force refresh of strategies and symbols when tab is shown
+            if (window.futurequantDashboard.loadStrategies) {
+                window.futurequantDashboard.loadStrategies();
+            }
+            if (window.futurequantDashboard.loadSymbols) {
+                window.futurequantDashboard.loadSymbols();
             }
         });
         
         // Also check if tab is already active
         if (futurequantTab.classList.contains('active')) {
-            console.log('FutureQuant tab already active, initializing dashboard...');
-            window.futurequantDashboard = new FutureQuantDashboard();
+            console.log('FutureQuant tab already active, ensuring dashboard is initialized...');
+            if (!window.futurequantDashboard) {
+                window.futurequantDashboard = new FutureQuantDashboard();
+                window.futurequantDashboard.init();
+            }
         }
     } else {
-        console.error('FutureQuant tab not found, initializing dashboard immediately...');
-        window.futurequantDashboard = new FutureQuantDashboard();
+        console.error('FutureQuant tab not found, dashboard already initialized...');
     }
 }
 
@@ -1535,6 +1872,133 @@ window.testModalCreation = function() {
     
     document.body.appendChild(testModal);
     console.log('Test modal created');
+};
+
+// Global function to initialize the dashboard
+window.initializeFutureQuantDashboard = function() {
+    console.log('Manually initializing FutureQuant Dashboard...');
+    if (!window.futurequantDashboard) {
+        window.futurequantDashboard = new FutureQuantDashboard();
+    }
+    window.futurequantDashboard.init();
+    
+    // Force load strategies and symbols
+    if (window.futurequantDashboard.loadStrategies) {
+        window.futurequantDashboard.loadStrategies();
+    }
+    if (window.futurequantDashboard.loadSymbols) {
+        window.futurequantDashboard.loadSymbols();
+    }
+    
+    console.log('Dashboard initialization complete');
+};
+
+// Fallback initialization after a delay to ensure everything loads
+setTimeout(() => {
+    if (!window.futurequantDashboard) {
+        console.log('Fallback initialization of FutureQuant Dashboard...');
+        window.initializeFutureQuantDashboard();
+    } else {
+        // Force load strategies even if dashboard exists
+        console.log('Dashboard exists, forcing strategy load...');
+        if (window.futurequantDashboard.loadStrategies) {
+            window.futurequantDashboard.loadStrategies();
+        }
+    }
+}, 3000);
+
+// Additional fallback for strategies
+setTimeout(() => {
+    console.log('Final strategy loading attempt...');
+    const strategySelect = document.getElementById('fq-strategy-select');
+    if (strategySelect && strategySelect.options.length <= 1) {
+        console.log('Strategy select still empty, forcing manual population...');
+        window.debugStrategyButton();
+    }
+}, 5000);
+
+// Global function to force load strategies
+window.forceLoadStrategies = function() {
+    console.log('Force loading strategies...');
+    if (window.futurequantDashboard && window.futurequantDashboard.loadStrategies) {
+        window.futurequantDashboard.loadStrategies();
+        console.log('Strategies loaded');
+    } else {
+        console.log('Dashboard not ready, initializing first...');
+        window.initializeFutureQuantDashboard();
+    }
+};
+
+// Global function to debug strategy button
+window.debugStrategyButton = function() {
+    console.log('=== DEBUGGING STRATEGY BUTTON ===');
+    
+    // Check if dashboard exists
+    console.log('Dashboard exists:', !!window.futurequantDashboard);
+    
+    // Check strategy select element
+    const strategySelect = document.getElementById('fq-strategy-select');
+    console.log('Strategy select element found:', !!strategySelect);
+    if (strategySelect) {
+        console.log('Strategy select HTML:', strategySelect.outerHTML);
+        console.log('Strategy select options count:', strategySelect.options.length);
+        console.log('Strategy select value:', strategySelect.value);
+    }
+    
+    // Check if strategies are loaded
+    if (window.futurequantDashboard) {
+        console.log('Mock strategies available:', window.futurequantDashboard.mockStrategies);
+        console.log('Mock strategies count:', window.futurequantDashboard.mockStrategies.length);
+    }
+    
+    // Try to force load strategies
+    if (window.futurequantDashboard && window.futurequantDashboard.loadStrategies) {
+        console.log('Calling loadStrategies...');
+        window.futurequantDashboard.loadStrategies();
+    } else {
+        console.log('loadStrategies method not available');
+    }
+    
+    // Manual population test
+    if (strategySelect) {
+        console.log('Manually populating strategy select...');
+        strategySelect.innerHTML = '<option value="">Aggressive Mean Reversion</option>';
+        strategySelect.innerHTML += '<option value="1">Conservative Momentum</option>';
+        strategySelect.innerHTML += '<option value="2">Moderate Trend Following</option>';
+        strategySelect.innerHTML += '<option value="3">Aggressive Mean Reversion</option>';
+        strategySelect.innerHTML += '<option value="4">Volatility Breakout</option>';
+        strategySelect.innerHTML += '<option value="5">Statistical Arbitrage</option>';
+        console.log('Manual population complete. Options count:', strategySelect.options.length);
+    }
+    
+    console.log('=== END DEBUG ===');
+};
+
+// Global function to test trade button
+window.testTradeButton = function() {
+    console.log('=== TESTING TRADE BUTTON ===');
+    
+    // Check if dashboard exists
+    console.log('Dashboard exists:', !!window.futurequantDashboard);
+    
+    // Check trade button element
+    const tradeBtn = document.getElementById('fq-start-paper-trading-btn');
+    console.log('Trade button element found:', !!tradeBtn);
+    if (tradeBtn) {
+        console.log('Trade button HTML:', tradeBtn.outerHTML);
+        console.log('Trade button onclick:', tradeBtn.onclick);
+        console.log('Trade button event listeners:', tradeBtn);
+    }
+    
+    // Try to manually trigger the trading interface
+    if (window.futurequantDashboard && window.futurequantDashboard.showTradingInterface) {
+        console.log('Calling showTradingInterface directly...');
+        window.futurequantDashboard.showTradingInterface();
+    } else {
+        console.log('showTradingInterface method not available');
+    }
+    
+    console.log('=== END TRADE TEST ===');
 };
 
 // Global function to test strategy loading

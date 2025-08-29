@@ -98,6 +98,115 @@ body {
     margin-left: 10px;
 }
 
+/* FutureQuant Dashboard Compact Styles */
+#futurequant-dashboard-content .card {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+}
+
+#futurequant-dashboard-content .card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+#futurequant-dashboard-content .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    font-weight: 600;
+}
+
+#futurequant-dashboard-content .form-select {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 0.875rem;
+}
+
+#futurequant-dashboard-content .form-select option[value=""] {
+    color: #6c757d;
+    font-style: normal;
+    background-color: #ffffff;
+}
+
+#futurequant-dashboard-content .btn {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+#futurequant-dashboard-content .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+#futurequant-dashboard-content .text-primary {
+    color: #0d6efd !important;
+}
+
+#futurequant-dashboard-content .text-info {
+    color: #0dcaf0 !important;
+}
+
+#futurequant-dashboard-content .form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+#futurequant-dashboard-content .card-body {
+    padding: 0.75rem;
+}
+
+#futurequant-dashboard-content .card-header {
+    padding: 0.5rem 0.75rem;
+}
+
+/* Workflow Guide Styles */
+#futurequant-dashboard-content .border-info {
+    border-color: #0dcaf0 !important;
+}
+
+#futurequant-dashboard-content .bg-info {
+    background-color: #0dcaf0 !important;
+}
+
+#futurequant-dashboard-content .border.rounded {
+    transition: all 0.2s ease;
+}
+
+#futurequant-dashboard-content .border.rounded:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+#futurequant-dashboard-content .fa-2x {
+    font-size: 1.5rem;
+}
+
+/* Tooltip Styles */
+.tooltip {
+    font-size: 0.875rem;
+}
+
+.tooltip-inner {
+    max-width: 300px;
+    padding: 0.5rem 0.75rem;
+    background-color: #212529;
+    border-radius: 6px;
+}
+
+/* Quick Guide Alert */
+#futurequant-dashboard-content .alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+    font-size: 0.875rem;
+}
+
+#futurequant-dashboard-content .alert-info strong {
+    color: #0c5460;
+}
+
 #intention-interpreter-content .list-unstyled li:hover {
     border-left-color: #2196f3;
     background-color: rgba(33, 150, 243, 0.05);
