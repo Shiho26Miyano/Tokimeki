@@ -1823,6 +1823,19 @@
             tabElements.forEach(tab => {
                 tab.addEventListener('shown.bs.tab', function(e) {
                     console.log('Tab shown:', e.target.textContent);
+                    
+                    // Auto-trigger analysis when Intention Interpreter tab is shown
+                    if (e.target.id === 'intention-interpreter-tab') {
+                        console.log('Intention Interpreter tab shown - auto-triggering analysis...');
+                        // Small delay to ensure the tab content is fully loaded
+                        setTimeout(() => {
+                            if (typeof analyzeIntention === 'function') {
+                                analyzeIntention();
+                            } else {
+                                console.warn('analyzeIntention function not found');
+                            }
+                        }, 500);
+                    }
                 });
             });
             
