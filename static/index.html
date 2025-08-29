@@ -317,35 +317,43 @@
                 <div class="tab-content" id="main-tab-content">
                     <div class="tab-pane fade show active" id="futurequant-dashboard-content" role="tabpanel" aria-labelledby="futurequant-dashboard-tab">
                         <div id="futurequant-dashboard-root">
-                            <!-- FutureQuant Dashboard Header -->
-                            <div class="card shadow-sm mb-4">
-                                <div class="card-body">
+                            <!-- Compact Header -->
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-body py-3">
                                     <div class="row align-items-center">
                                         <div class="col-md-8">
-                                            <h2 class="mb-2">
+                                            <h3 class="mb-1">
                                                 <i class="fas fa-chart-line text-primary"></i> 
-                                                FutureQuant Trader Dashboard
-                                            </h2>
-                                            <p class="text-muted mb-0">Distributional Futures Trading Platform - Research, Backtesting & Paper Trading</p>
+                                                FutureQuant Trader
+                                            </h3>
+                                            <p class="text-muted mb-0 small">Futures Trading Platform</p>
                                             
-                                            <!-- Quick Start Guide -->
-                                            <div class="alert alert-info mt-3 mb-0">
-                                                <h6><i class="fas fa-info-circle"></i> Quick Start Guide:</h6>
-                                                <ol class="mb-0 small">
-                                                    <li><strong>Select a Symbol</strong> (e.g., ES for S&P 500 futures)</li>
-                                                    <li><strong>Choose a Strategy</strong> based on your risk tolerance</li>
-                                                    <li><strong>View Charts</strong> to analyze market data</li>
-                                                    <li><strong>Train Models</strong> or run backtests to test strategies</li>
-                                                </ol>
-                                            </div>
+                                                                        <!-- Quick Guide -->
+                            <div class="alert alert-info mt-2 mb-0 py-2 small">
+                                <i class="fas fa-info-circle"></i> <strong>How to use:</strong> 
+                                1) Select a <strong>Symbol</strong> (e.g., ES for S&P 500 futures) 
+                                2) Choose a <strong>Strategy</strong> 
+                                3) Click <strong>Train</strong> to build AI models or <strong>Trade</strong> to start paper trading
+                            </div>
+                            
+                            <!-- Backend Algorithm Info -->
+                            <div class="alert alert-secondary mt-2 mb-0 py-2 small">
+                                <i class="fas fa-microchip"></i> <strong>How It Works:</strong> 
+                                <span class="text-muted">Our AI system learns from historical market data to predict future price movements. 
+                                It combines multiple prediction methods and technical analysis tools to make smarter trading decisions.</span>
+                            </div>
                                         </div>
                                         <div class="col-md-4 text-end">
                                             <div class="d-flex gap-2 justify-content-end">
-                                                <button class="btn btn-outline-primary btn-sm" id="fq-ingest-data-btn">
-                                                    <i class="fas fa-download"></i> Ingest Data
+                                                <button class="btn btn-outline-primary btn-sm" id="fq-ingest-data-btn" 
+                                                        data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                        title="Download and store market data for analysis">
+                                                    <i class="fas fa-download"></i> Data
                                                 </button>
-                                                <button class="btn btn-outline-success btn-sm" id="fq-compute-features-btn">
-                                                    <i class="fas fa-cogs"></i> Compute Features
+                                                <button class="btn btn-outline-success btn-sm" id="fq-compute-features-btn"
+                                                        data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                        title="Calculate technical indicators and features from market data">
+                                                    <i class="fas fa-cogs"></i> Features
                                                 </button>
                                             </div>
                                         </div>
@@ -353,199 +361,242 @@
                                 </div>
                             </div>
 
-                            <!-- Market Overview Section -->
-                            <div class="row mb-4">
-                                <div class="col-md-3">
-                                    <div class="card text-center">
-                                        <div class="card-body">
-                                            <h6 class="card-title text-muted">Current Price</h6>
-                                            <h3 class="text-primary" id="fq-current-price">$0.00</h3>
-                                            <small class="text-muted" id="fq-price-change">+0.00 (0.00%)</small>
-                                        </div>
-                                    </div>
+                            <!-- Compact Controls Row -->
+                            <div class="row mb-3">
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-1">Symbol</label>
+                                    <select class="form-select form-select-sm" id="fq-symbol-select"
+                                            data-bs-toggle="tooltip" data-bs-placement="top" 
+                                            title="Futures contract symbols (ES=S&P500, NQ=Nasdaq, YM=Dow)">
+                                        <option value="">Select</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-1">ES, NQ, YM</small>
                                 </div>
-                                <div class="col-md-3">
-                                    <div class="card text-center">
-                                        <div class="card-body">
-                                            <h6 class="card-title text-muted">Volume</h6>
-                                            <h3 class="text-info" id="fq-volume">0</h3>
-                                            <small class="text-muted">Contracts</small>
-                                        </div>
-                                    </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-1">Strategy</label>
+                                    <select class="form-select form-select-sm" id="fq-strategy-select"
+                                            data-bs-toggle="tooltip" data-bs-placement="top" 
+                                            title="Trading strategy based on risk tolerance and market approach">
+                                        <option value="">Aggressive Mean Reversion</option>
+                                    </select>
                                 </div>
-                                <div class="col-md-3">
-                                    <div class="card text-center">
-                                        <div class="card-body">
-                                            <h6 class="card-title text-muted">Strategy</h6>
-                                            <select class="form-select form-select-sm" id="fq-strategy-select">
-                                                <option value="">Select Strategy</option>
-                                            </select>
-                                        </div>
-                                    </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-1">Timeframe</label>
+                                    <select class="form-select form-select-sm" id="fq-timeframe-select">
+                                        <option value="1d">1D</option>
+                                        <option value="1h">1H</option>
+                                        <option value="15m">15M</option>
+                                        <option value="5m">5M</option>
+                                    </select>
                                 </div>
-                                <div class="col-md-3">
-                                    <div class="card text-center">
-                                        <div class="card-body">
-                                            <h6 class="card-title text-muted">Symbol</h6>
-                                            <select class="form-select form-select-sm" id="fq-symbol-select">
-                                                <option value="">Select Symbol</option>
-                                            </select>
-                                        </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-1">Price</label>
+                                    <div class="text-primary fw-bold" id="fq-current-price">$0.00</div>
+                                    <small class="text-muted" id="fq-price-change">+0.00%</small>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-1">Volume</label>
+                                    <div class="text-info fw-bold" id="fq-volume">0</div>
+                                    <small class="text-muted">Contracts</small>
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <div class="d-grid gap-1 w-100">
+                                        <button class="btn btn-primary btn-sm" id="fq-train-model-btn"
+                                                data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                title="Train AI models using historical data to predict market movements">
+                                            <i class="fas fa-brain"></i> Train
+                                        </button>
+                                        <button class="btn btn-success btn-sm" id="fq-start-paper-trading-btn"
+                                                data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                title="Start paper trading session to test strategies with virtual money">
+                                            <i class="fas fa-play"></i> Trade
+                                        </button>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Charts Section -->
-                            <div class="row mb-4">
+                            <!-- Main Charts Row -->
+                            <div class="row mb-3">
                                 <div class="col-md-8">
                                     <div class="card">
-                                        <div class="card-header">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <h6 class="mb-0">Price Chart</h6>
-                                                <select class="form-select form-select-sm" id="fq-timeframe-select" style="width: auto;">
-                                                    <option value="1d">1 Day</option>
-                                                    <option value="1h">1 Hour</option>
-                                                    <option value="15m">15 Min</option>
-                                                    <option value="5m">5 Min</option>
-                                                </select>
+                                        <div class="card-header py-2">
+                                            <h6 class="mb-0">Price Chart</h6>
+                                        </div>
+                                        <div class="card-body py-2">
+                                            <canvas id="fq-price-chart" height="250" style="max-height: 250px; width: 100%;"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-header py-2">
+                                            <h6 class="mb-0">Distribution</h6>
+                                        </div>
+                                        <div class="card-body py-2">
+                                            <canvas id="fq-distribution-chart" height="250" style="max-height: 250px; width: 100%;"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- What Happens When You Click Section -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="card">
+                                        <div class="card-header py-2">
+                                            <h6 class="mb-0"><i class="fas fa-question-circle text-info"></i> What Happens When You Click...</h6>
+                                        </div>
+                                        <div class="card-body py-2">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="border-end pe-3">
+                                                        <h6 class="text-primary"><i class="fas fa-brain"></i> Train Button</h6>
+                                                        <ul class="small text-muted mb-0">
+                                                            <li>Opens model training interface</li>
+                                                            <li>Uses historical data to build AI models</li>
+                                                            <li>Creates predictive algorithms for trading</li>
+                                                            <li>Shows training progress and results</li>
+                                                            <li>Models can be used for backtesting</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="ps-3">
+                                                        <h6 class="text-success"><i class="fas fa-play"></i> Trade Button</h6>
+                                                        <ul class="small text-muted mb-0">
+                                                            <li>Starts paper trading session</li>
+                                                            <li>Uses virtual money (no real risk)</li>
+                                                            <li>Applies selected strategy automatically</li>
+                                                            <li>Shows real-time position updates</li>
+                                                            <li>Track performance and P&L</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div class="card-body">
-                                            <canvas id="fq-price-chart" height="300" style="max-height: 300px; width: 100%;"></canvas>
-                                            <div class="mt-2">
-                                                <button class="btn btn-sm btn-outline-secondary" onclick="forceFutureQuantCharts()">Force Chart Init</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Compact Action Row -->
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-header py-2">
+                                            <h6 class="mb-0">Quick Actions</h6>
+                                        </div>
+                                        <div class="card-body py-2">
+                                            <div class="d-grid gap-1">
+                                                <button class="btn btn-outline-primary btn-sm" id="fq-backtest-btn"
+                                                        data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                        title="Test your strategy on historical data to see how it would have performed">
+                                                    <i class="fas fa-chart-bar"></i> Backtest
+                                                </button>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="debugStrategyButton()"
+                                                        data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                        title="Debug and troubleshoot strategy loading issues">
+                                                    Debug Strategy
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">Return Distribution</h6>
+                                        <div class="card-header py-2">
+                                            <h6 class="mb-0">Strategy Info</h6>
                                         </div>
-                                        <div class="card-body">
-                                            <canvas id="fq-distribution-chart" height="300" style="max-height: 300px; width: 100%;"></canvas>
-                                            <div class="mt-2">
-                                                <button class="btn btn-sm btn-outline-secondary" onclick="forceFutureQuantCharts()">Force Chart Init</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Trading Controls Section -->
-                            <div class="row mb-4">
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">Model Training</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="d-grid gap-2">
-                                                <button class="btn btn-primary" id="fq-train-model-btn">
-                                                    <i class="fas fa-brain"></i> Train New Model
-                                                </button>
-                                                <button class="btn btn-outline-primary" id="fq-backtest-btn">
-                                                    <i class="fas fa-chart-bar"></i> Run Backtest
-                                                </button>
-                                                <button class="btn btn-outline-secondary btn-sm" onclick="testModalCreation()">
-                                                    Test Modal
-                                                </button>
-                                                <button class="btn btn-outline-secondary btn-sm" onclick="testModelTraining()">
-                                                    Test Training
-                                                </button>
-                                                <button class="btn btn-outline-secondary btn-sm" onclick="testStrategyLoading()">
-                                                    Test Strategy
-                                                </button>
-                                            </div>
-                                            <div id="fq-model-types" class="row mt-3">
-                                                <!-- Model types will be populated here -->
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="card-title mb-0">Paper Trading</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="d-grid gap-2">
-                                                <button class="btn btn-success" id="fq-start-paper-trading-btn">
-                                                    <i class="fas fa-play"></i> Start Session
-                                                </button>
-                                                <button class="btn btn-danger" id="fq-stop-paper-trading-btn">
-                                                    <i class="fas fa-stop"></i> Stop Session
-                                                </button>
-                                            </div>
-                                            <div id="fq-paper-trading-sessions" class="row mt-3">
-                                                <!-- Active sessions will be populated here -->
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Performance & Analysis Section -->
-                            <div class="row mb-4">
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">Performance Chart</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <canvas id="fq-performance-chart" height="250" style="max-height: 250px; width: 100%;"></canvas>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">Strategy Details</h6>
-                                        </div>
-                                        <div class="card-body">
+                                        <div class="card-body py-2">
                                             <div id="fq-strategy-details">
-                                                <p class="text-muted">Select a strategy to view details</p>
+                                                <p class="text-muted small">Select a strategy to view details</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-header py-2">
+                                            <h6 class="mb-0">Status</h6>
+                                        </div>
+                                        <div class="card-body py-2">
+                                            <div id="fq-job-statuses">
+                                                <p class="text-muted small">No active jobs</p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Recent Activity Section -->
-                            <div class="row mb-4">
-                                <div class="col-md-4">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">Recent Signals</h6>
+                            
+                            <!-- Workflow Guide -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="card border-info">
+                                        <div class="card-header py-2 bg-info text-white">
+                                            <h6 class="mb-0"><i class="fas fa-lightbulb"></i> Trading Workflow</h6>
                                         </div>
-                                        <div class="card-body">
-                                            <div id="fq-recent-signals">
-                                                <!-- Recent signals will be populated here -->
+                                        <div class="card-body py-2">
+                                            <div class="row text-center">
+                                                <div class="col-md-3">
+                                                    <div class="border rounded p-2 bg-light">
+                                                        <i class="fas fa-download text-primary fa-2x mb-2"></i>
+                                                        <h6 class="mb-1">1. Get Data</h6>
+                                                        <small class="text-muted">Download market data</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="border rounded p-2 bg-light">
+                                                        <i class="fas fa-cogs text-success fa-2x mb-2"></i>
+                                                        <h6 class="mb-1">2. Build Features</h6>
+                                                        <small class="text-muted">Calculate indicators</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="border rounded p-2 bg-light">
+                                                        <i class="fas fa-brain text-primary fa-2x mb-2"></i>
+                                                        <h6 class="mb-1">3. Train Models</h6>
+                                                        <small class="text-muted">AI learns patterns</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <div class="border rounded p-2 bg-light">
+                                                        <i class="fas fa-play text-success fa-2x mb-2"></i>
+                                                        <h6 class="mb-1">4. Start Trading</h6>
+                                                        <small class="text-muted">Paper trade safely</small>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">Job Status</h6>
+                            </div>
+                            
+                            <!-- Technical Algorithm Details -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="card border-dark">
+                                        <div class="card-header py-2 bg-dark text-white">
+                                            <h6 class="mb-0"><i class="fas fa-microchip"></i> What Makes It Smart</h6>
                                         </div>
-                                        <div class="card-body">
-                                            <div id="fq-job-statuses">
-                                                <!-- Job statuses will be populated here -->
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">Backtest Config</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div id="fq-backtest-config">
-                                                <!-- Backtest configuration will be populated here -->
+                                        <div class="card-body py-2">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <h6 class="text-primary"><i class="fas fa-brain"></i> AI Learning</h6>
+                                                    <ul class="small text-muted mb-0">
+                                                        <li><strong>Smart Models:</strong> AI that gets better over time</li>
+                                                        <li><strong>Multiple Approaches:</strong> Combines different prediction methods</li>
+                                                        <li><strong>Probability Estimates:</strong> Shows confidence in predictions</li>
+                                                        <li><strong>Market Patterns:</strong> Recognizes 50+ trading signals</li>
+                                                    </ul>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <h6 class="text-success"><i class="fas fa-chart-line"></i> Trading Strategy</h6>
+                                                    <ul class="small text-muted mb-0">
+                                                        <li><strong>Pattern Recognition:</strong> Finds when prices are too high/low</li>
+                                                        <li><strong>Trend Following:</strong> Rides market momentum</li>
+                                                        <li><strong>Risk Control:</strong> Manages position sizes and losses</li>
+                                                        <li><strong>Fast Signals:</strong> Updates predictions every second</li>
+                                                    </ul>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
