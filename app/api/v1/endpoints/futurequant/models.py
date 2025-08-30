@@ -2,7 +2,7 @@
 FutureQuant Trader ML Model Endpoints
 """
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel, Field
 
@@ -261,6 +261,77 @@ async def get_model_status(
         await usage_service.track_request(
             endpoint="futurequant_get_model_status",
             response_time=0.0,  # Placeholder
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/train-brpc")
+async def train_model_brpc(
+    model_config: Dict[str, Any],
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Train model using BRPC for high performance"""
+    try:
+        model_service = FutureQuantModelService()
+        result = await model_service.train_model_brpc(model_config)
+        
+        if result["success"]:
+            await usage_service.track_request(
+                endpoint="futurequant_train_model_brpc",
+                response_time=0.0,
+                success=True
+            )
+        else:
+            await usage_service.track_request(
+                endpoint="futurequant_train_model_brpc",
+                response_time=0.0,
+                success=False,
+                error=result.get("error", "Unknown error")
+            )
+        
+        return result
+    except Exception as e:
+        logger.error(f"BRPC model training error: {str(e)}")
+        await usage_service.track_request(
+            endpoint="futurequant_train_model_brpc",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/predict-brpc")
+async def predict_brpc(
+    model_id: str,
+    input_data: Dict[str, Any],
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Make predictions using BRPC"""
+    try:
+        model_service = FutureQuantModelService()
+        result = await model_service.predict_brpc(model_id, input_data)
+        
+        if result["success"]:
+            await usage_service.track_request(
+                endpoint="futurequant_predict_brpc",
+                response_time=0.0,
+                success=True
+            )
+        else:
+            await usage_service.track_request(
+                endpoint="futurequant_predict_brpc",
+                response_time=0.0,
+                success=False,
+                error=result.get("error", "Unknown error")
+            )
+        
+        return result
+    except Exception as e:
+        logger.error(f"BRPC prediction error: {str(e)}")
+        await usage_service.track_request(
+            endpoint="futurequant_predict_brpc",
+            response_time=0.0,
             success=False,
             error=str(e)
         )

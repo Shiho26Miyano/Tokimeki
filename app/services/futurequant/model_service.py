@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.models.trading_models import Symbol, Bar, Feature, Forecast, Model
 from app.models.database import get_db
+from app.services.brpc_service import get_brpc_service
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ class FutureQuantModelService:
         }
         
         self.horizons = [60, 240, 1440]  # 1h, 4h, 1d in minutes
+        self.brpc_service = get_brpc_service()
         
     async def train_model(
         self,
@@ -726,3 +728,69 @@ class FutureQuantModelService:
         except Exception as e:
             db.rollback()
             raise e
+    
+    async def train_model_brpc(self, model_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Train model using BRPC for high performance"""
+        try:
+            request_data = {
+                "model_type": model_config.get("model_type", "Neural Network"),
+                "training_data": model_config.get("training_data", {}),
+                "hyperparameters": model_config.get("hyperparameters", {}),
+                "strategy_id": model_config.get("strategy_id", 1),
+                "symbol": model_config.get("symbol", "ES"),
+                "timeframe": model_config.get("timeframe", "1d")
+            }
+            
+            response = await self.brpc_service.call_method(
+                method_name="train_model",
+                request_data=request_data
+            )
+            
+            if response and "error" not in response:
+                return {
+                    "success": True,
+                    "model_id": response.get("model_id"),
+                    "training_status": response.get("status"),
+                    "message": response.get("message"),
+                    "estimated_completion": response.get("estimated_completion"),
+                    "brpc_mode": self.brpc_service.is_available()
+                }
+            else:
+                return {
+                    "success": False, 
+                    "error": response.get("error", "BRPC call failed"),
+                    "brpc_mode": False
+                }
+                
+        except Exception as e:
+            logger.error(f"Model training via BRPC failed: {e}")
+            return {"success": False, "error": str(e), "brpc_mode": False}
+    
+    async def predict_brpc(self, model_id: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Make predictions using BRPC"""
+        try:
+            request_data = {
+                "model_id": model_id,
+                "input_data": input_data
+            }
+            
+            response = await self.brpc_service.call_method(
+                method_name="predict",
+                request_data=request_data
+            )
+            
+            if response and "error" not in response:
+                return {
+                    "success": True,
+                    "prediction": response.get("prediction"),
+                    "confidence": response.get("confidence"),
+                    "model_id": response.get("model_id"),
+                    "timestamp": response.get("timestamp"),
+                    "brpc_mode": self.brpc_service.is_available()
+                }
+            else:
+                return {"success": False, "error": response.get("error", "Prediction failed")}
+                
+        except Exception as e:
+            logger.error(f"Prediction via BRPC failed: {e}")
+            return {"success": False, "error": str(e)}
