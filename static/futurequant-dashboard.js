@@ -424,9 +424,16 @@ class FutureQuantDashboard {
                         <p class="small mb-2"><strong>Risk Level:</strong> <span class="badge bg-danger">High</span></p>
                         <p class="small mb-0"><strong>Timeframe:</strong> 5 minutes to 1 hour</p>
                     </div>
-                    <div class="small text-muted">
+                    <div class="small text-muted mb-2">
                         <strong>How it works:</strong> Identifies when prices move too far from their average and bets they'll return to normal levels. 
                         Uses aggressive position sizing for maximum profit potential.
+                    </div>
+                    <div class="alert alert-warning mb-0 py-2 small">
+                        <i class="fas fa-graduation-cap"></i> <strong>Research:</strong> Based on 
+                        <a href="https://arxiv.org/abs/2505.05595" target="_blank" class="text-decoration-none">
+                            FutureQuant Transformer
+                        </a> 
+                        achieving 0.1193% avg gain per 30-min trade.
                     </div>
                 `;
             } else {
@@ -517,7 +524,7 @@ class FutureQuantDashboard {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary">Start Training</button>
+                        <button type="button" class="btn btn-primary" onclick="startTrainingBRPC()">Start Training</button>
                     </div>
                 </div>
             </div>
@@ -2000,6 +2007,75 @@ window.testTradeButton = function() {
     
     console.log('=== END TRADE TEST ===');
 };
+
+// BRPC Training Function
+async function startTrainingBRPC() {
+    try {
+        const trainingConfig = {
+            model_type: document.querySelector('#trainingModal select')?.value || 'Neural Network',
+            strategy_id: document.getElementById('fq-strategy-select')?.value || 1,
+            symbol: document.getElementById('fq-symbol-select')?.value || 'ES',
+            timeframe: document.getElementById('fq-timeframe-select')?.value || '1d',
+            hyperparameters: {
+                epochs: 100,
+                batch_size: 32,
+                learning_rate: 0.001
+            }
+        };
+        
+        console.log('Starting BRPC training with config:', trainingConfig);
+        
+        const response = await fetch('/api/v1/futurequant/models/train-brpc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(trainingConfig)
+        });
+        
+        const result = await response.json();
+        console.log('BRPC training result:', result);
+        
+        if (result.success) {
+            showTrainingProgressBRPC(result);
+        } else {
+            showTrainingError(result.error);
+        }
+    } catch (error) {
+        console.error('BRPC training failed:', error);
+        showTrainingError('Training failed: ' + error.message);
+    }
+}
+
+function showTrainingProgressBRPC(result) {
+    const progressDiv = document.getElementById('trainingProgress');
+    if (progressDiv) {
+        progressDiv.innerHTML = `
+            <div class="alert alert-success">
+                <h6><i class="fas fa-rocket"></i> BRPC Training Started!</h6>
+                <p><strong>Model ID:</strong> ${result.model_id}</p>
+                <p><strong>Status:</strong> ${result.training_status}</p>
+                <p><strong>Estimated Time:</strong> ${result.estimated_completion}</p>
+                <p><strong>Mode:</strong> ${result.brpc_mode ? 'High-Performance BRPC' : 'Fallback HTTP'}</p>
+                <div class="progress mt-2">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">0%</div>
+                </div>
+            </div>
+        `;
+        progressDiv.style.display = 'block';
+    }
+}
+
+function showTrainingError(error) {
+    const progressDiv = document.getElementById('trainingProgress');
+    if (progressDiv) {
+        progressDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <h6><i class="fas fa-exclamation-triangle"></i> Training Error</h6>
+                <p>${error}</p>
+            </div>
+        `;
+        progressDiv.style.display = 'block';
+    }
+}
 
 // Global function to test strategy loading
 window.testStrategyLoading = function() {

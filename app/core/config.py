@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: Optional[str] = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
     mlflow_registry_uri: Optional[str] = os.getenv("MLFLOW_REGISTRY_URI", "http://localhost:5000")
     
+    # BRPC Configuration
+    BRPC_ENABLED: bool = True
+    BRPC_SERVER_ADDRESS: str = "localhost:8001"
+    BRPC_SERVICE_NAME: str = "futurequant_service"
+    BRPC_TIMEOUT: int = 5000  # milliseconds
+    BRPC_MAX_RETRIES: int = 3
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": False,
