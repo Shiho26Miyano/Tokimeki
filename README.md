@@ -18,7 +18,7 @@ Tokimeki/
 │   ├── services/                 # Business logic services
 │   │   ├── ai_service.py        # AI integration (OpenRouter)
 │   │   ├── brpc_service.py      # High-performance BRPC service
-│   │   ├── intention_interpreter_service.py  # Clinical psychological analysis service
+
 │   │   ├── mnq_investment_service.py  # Investment analysis service
 │   │   ├── stock_service.py     # Market data service
 │   │   ├── cache_service.py     # Redis caching layer
@@ -29,7 +29,7 @@ Tokimeki/
 │           ├── api.py           # Main router configuration
 │           └── endpoints/       # Feature-specific endpoints
 │               ├── chat.py      # AI chat interface
-│               ├── intention.py # Intention Interpreter Engine
+
 │               ├── mnq.py       # Investment analysis endpoints
 │               ├── stocks.py    # Market data endpoints
 │               ├── rag.py       # RAG system endpoints
@@ -114,7 +114,7 @@ PORT=8080
 ### API Endpoints
 
 1. **AI Chat**: `/api/v1/chat` - Interactive AI conversations
-2. **Intention Interpreter**: `/api/v1/intention/analyze-intention` - Clinical psychological analysis of human intentions
+
 3. **Market Data**: `/api/v1/stocks` - Stock market information
 4. **Investment Analysis**: `/api/v1/mnq` - Investment strategy endpoints
 5. **RAG System**: `/api/v1/rag` - Retrieval-augmented generation
@@ -146,34 +146,7 @@ PORT=8080
 - **DeepSeek Chat**: Conversational AI capabilities
 - **Llama 3.1 405B**: Large language model support
 
-### Intention Interpreter Engine
 
-The **Intention Interpreter Engine** is a clinical psychological analysis tool that provides evidence-based assessment of human intentions using AI-powered psychological frameworks.
-
-#### Features
-- **Clinical Psychological Assessment**: Uses DSM-5 diagnostic points and academic psychological language
-- **Behavioral Pattern Analysis**: Detects inconsistencies between words and actions
-- **Negative Behavior Flagging**: Automatically identifies concerning patterns (bullying, drug use, aggression, etc.)
-- **Human Dignity Focus**: Emphasizes respect and dignity in psychological analysis
-- **Theoretical Framework Integration**: References attachment theory, social learning theory, cognitive behavioral theory, and more
-
-#### Analysis Components
-1. **Intention Assessment**: Determines if intentions are positive, negative, or neutral
-2. **Clinical Rationale**: Provides 3-5 bullet points with psychological theory citations
-3. **Behavioral Consistency**: Evaluates alignment between stated intentions and actual actions
-4. **Psychological Implications**: Uses clinical terminology to describe concerning patterns
-
-#### Use Cases
-- **Relationship Analysis**: Understanding intentions in interpersonal dynamics
-- **Behavioral Assessment**: Identifying concerning patterns and red flags
-- **Psychological Evaluation**: Clinical analysis of human behavior and motivations
-- **Communication Analysis**: Assessing consistency between words and actions
-
-#### Technical Implementation
-- **FastAPI Endpoint**: `/api/v1/intention/analyze-intention`
-- **AI Model**: Mistral Small with clinical psychological prompting
-- **Response Format**: Structured JSON with intention, rationale, and clinical analysis
-- **Real-time Processing**: Immediate analysis with loading states and error handling
 
 ## 🤝 Contributing
 

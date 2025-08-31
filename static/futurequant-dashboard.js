@@ -175,6 +175,18 @@ class FutureQuantDashboard {
         } else {
             console.error('Trade button not found!');
         }
+        
+        // Features button
+        const featuresBtn = document.getElementById('fq-compute-features-btn');
+        if (featuresBtn) {
+            console.log('Features button found, adding event listener');
+            featuresBtn.addEventListener('click', () => {
+                console.log('Features button clicked!');
+                this.showFeaturesComputation();
+            });
+        } else {
+            console.error('Features button not found!');
+        }
 
         // Model training
         const trainModelBtn = document.getElementById('fq-train-model-btn');
@@ -2105,4 +2117,33 @@ window.testStrategyLoading = function() {
     } else {
         console.log('Dashboard not initialized yet');
     }
+};
+
+// Features computation completion function
+window.completeFeaturesComputation = function() {
+    console.log('Completing features computation...');
+    
+    // Update the features button to show completion
+    const featuresBtn = document.getElementById('fq-compute-features-btn');
+    if (featuresBtn) {
+        featuresBtn.innerHTML = '<i class="fas fa-check"></i> Features Ready';
+        featuresBtn.className = 'btn btn-success btn-sm';
+        featuresBtn.disabled = true;
+    }
+    
+    // Update status indicator
+    const statusIndicator = document.querySelector('.text-warning');
+    if (statusIndicator) {
+        statusIndicator.innerHTML = '<i class="fas fa-check-circle"></i> Features: Ready for Training';
+        statusIndicator.className = 'text-success';
+    }
+    
+    // Close the modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('featuresModal'));
+    if (modal) {
+        modal.hide();
+    }
+    
+    // Show success message
+    alert('Features computation completed! You can now click "Train" to build AI models.');
 };
