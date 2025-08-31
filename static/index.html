@@ -283,9 +283,7 @@
                     <li class="nav-item" role="presentation">
                         <a class="nav-link active" id="futurequant-dashboard-tab" data-bs-toggle="pill" data-bs-target="#futurequant-dashboard-content" role="tab" aria-controls="futurequant-dashboard-content" aria-selected="true">📊 FutureQuant Trader</a>
                     </li>
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="intention-interpreter-tab" data-bs-toggle="pill" data-bs-target="#intention-interpreter-content" role="tab" aria-controls="intention-interpreter-content" aria-selected="false">🧠 Intention Interpreter Engine</a>
-                    </li>
+
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="rag-bi-tab" data-bs-toggle="pill" data-bs-target="#rag-bi-content" role="tab" aria-controls="rag-bi-content" aria-selected="false">📚 RAG Business Intelligence</a>
                     </li>
@@ -350,19 +348,29 @@
                                 <a href="https://arxiv.org/abs/2505.05595" target="_blank" class="text-decoration-none fw-bold">
                                     FutureQuant Transformer
                                 </a>
-                                <span class="text-muted"> by Guo et al. (2025) - Distribution-based futures trading strategy achieving 0.1193% average gain per 30-minute trade.</span>
+                                <span class="text-muted"> - Distribution-based futures trading strategy achieving 0.1193% average gain per 30-minute trade.</span>
+                            </div>
+                            
+                            <!-- Data Source Information -->
+                            <div class="alert alert-info mt-2 mb-0 py-2 small">
+                                <i class="fas fa-clock"></i> <strong>Market Data Fetching:</strong> 
+                                <span class="text-muted">Click "Fetch Data" to download market data from </span>
+                                <a href="https://finance.yahoo.com/" target="_blank" class="text-decoration-none fw-bold">
+                                    Yahoo Finance
+                                </a>
+                                <span class="text-muted"> via yfinance library. Data is based on US market hours (9:30 AM - 4:00 PM ET) and includes real-time prices, volume, and historical data for futures contracts (ES, NQ, YM).</span>
                             </div>
                                         </div>
                                         <div class="col-md-4 text-end">
                                             <div class="d-flex gap-2 justify-content-end">
                                                 <button class="btn btn-outline-primary btn-sm" id="fq-ingest-data-btn" 
                                                         data-bs-toggle="tooltip" data-bs-placement="top" 
-                                                        title="Download and store market data for analysis">
-                                                    <i class="fas fa-download"></i> Data
+                                                        title="Fetch latest market data from Yahoo Finance. Data is based on US market hours (9:30 AM - 4:00 PM ET). Click to download current day's data.">
+                                                    <i class="fas fa-download"></i> Fetch Data
                                                 </button>
                                                 <button class="btn btn-outline-success btn-sm" id="fq-compute-features-btn"
                                                         data-bs-toggle="tooltip" data-bs-placement="top" 
-                                                        title="Calculate technical indicators and features from market data">
+                                                        title="Compute 50+ technical indicators (RSI, MACD, Bollinger Bands, ATR, etc.) from raw market data. This creates the features needed for AI model training and prediction.">
                                                     <i class="fas fa-cogs"></i> Features
                                                 </button>
                                             </div>
@@ -421,6 +429,15 @@
                                                 title="Start paper trading session to test strategies with virtual money">
                                             <i class="fas fa-play"></i> Trade
                                         </button>
+                                        <div class="text-center mt-1">
+                                            <small class="text-info">
+                                                <i class="fas fa-download"></i> Data: Click to Fetch
+                                            </small>
+                                            <br>
+                                            <small class="text-warning">
+                                                <i class="fas fa-cogs"></i> Features: Click to Compute
+                                            </small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -594,7 +611,7 @@
                                                     <p class="small text-muted mb-2">
                                                         This trading system implements the distribution-based strategy from the research paper 
                                                         <strong>"Trading Under Uncertainty: A Distribution-Based Strategy for Futures Markets Using FutureQuant Transformer"</strong>
-                                                        by Wenhao Guo, Yuda Wang, Zeqiao Huang, Changjiang Zhang, and Shumin Ma.
+
                                                     </p>
                                                     <div class="d-flex align-items-center gap-3">
                                                         <a href="https://arxiv.org/abs/2505.05595" target="_blank" class="btn btn-outline-warning btn-sm">
@@ -612,6 +629,48 @@
                                                         <li><strong>Innovation:</strong> Distribution-based forecasting</li>
                                                         <li><strong>Technology:</strong> Attention mechanism transformer</li>
                                                         <li><strong>Markets:</strong> Futures with LOB data</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Data & Features Pipeline -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div class="card border-primary">
+                                        <div class="card-header py-2 bg-primary text-white">
+                                            <h6 class="mb-0"><i class="fas fa-database"></i> Data & Features Pipeline</h6>
+                                        </div>
+                                        <div class="card-body py-2">
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <h6 class="text-primary mb-2">Data Sources</h6>
+                                                    <ul class="small text-muted mb-0">
+                                                        <li><strong>Primary:</strong> Yahoo Finance (yfinance library)</li>
+                                                        <li><strong>Futures:</strong> ES (S&P 500), NQ (Nasdaq), YM (Dow)</li>
+                                                        <li><strong>Timeframes:</strong> 1D, 1H, 15M, 5M intervals</li>
+                                                        <li><strong>Data Types:</strong> OHLCV, volume, market cap</li>
+                                                    </ul>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <h6 class="text-success mb-2">Manual Data Flow</h6>
+                                                    <ul class="small text-muted mb-0">
+                                                        <li><strong>Click Fetch:</strong> Download from Yahoo Finance</li>
+                                                        <li><strong>Market Hours:</strong> 9:30 AM - 4:00 PM ET</li>
+                                                        <li><strong>Store:</strong> Local SQLite database</li>
+                                                        <li><strong>Ready:</strong> Data available for features</li>
+                                                    </ul>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <h6 class="text-warning mb-2">Features Computation</h6>
+                                                    <ul class="small text-muted mb-0">
+                                                        <li><strong>Click Features:</strong> Computes 50+ technical indicators</li>
+                                                        <li><strong>Indicators:</strong> RSI, MACD, Bollinger Bands, ATR</li>
+                                                        <li><strong>Purpose:</strong> Creates AI training features</li>
+                                                        <li><strong>Output:</strong> Ready for model training</li>
                                                     </ul>
                                                 </div>
                                             </div>
@@ -655,90 +714,7 @@
                         </div>
                     </div>
                     
-                    <!-- Intention Interpreter Engine Content -->
-                    <div class="tab-pane fade" id="intention-interpreter-content" role="tabpanel" aria-labelledby="intention-interpreter-tab">
-                        <div class="card shadow-sm flex-fill d-flex flex-column" style="max-width: 1100px; margin: 0 auto; border-radius: 16px;">
-                            <div class="card-body d-flex flex-column" style="padding: 32px;">
-                                <div class="card-header-row mb-3">
-                                    <span class="card-title" style="font-size: 2rem; font-weight: 600; color: #183153;">
-                                        <i class="fas fa-brain"></i> Intention Interpreter Engine
-                                    </span>
-                                </div>
-                                <p class="text-muted mt-2">Analyze people's intentions using AI-powered clinical psychological assessment</p>
-                                
-                                <div class="row g-3">
-                                    <!-- Left Side - Combined Profile Card -->
-                                    <div class="col-md-6">
-                                        <div class="card">
-                                            <div class="card-header bg-primary text-white py-1">
-                                                <h5 class="mb-0"><i class="fas fa-user-circle"></i> Profile Information</h5>
-                                            </div>
-                                            <div class="card-body p-1">
-                                                <!-- Your Profile Section -->
-                                                <div class="mb-2">
-                                                    <label for="userProfile" class="form-label mb-1 fw-bold text-primary">Your Profile (Bio-Psycho-Social):</label>
-                                                    <textarea class="form-control" id="userProfile" rows="6" 
-                                                        placeholder="Please describe your: Age, gender, occupation, education, personality traits, social context, emotional state, life circumstances, and any other relevant information about yourself.">Tom is a 22-year-old college student majoring in Mechanical Engineering, with Art History as his second major. He goes to the gym three days a week and enjoys ball games and swimming. He has kind family and friends, although his parents were strict about behavior training when he was a child.</textarea>
-                                                </div>
-                                                
-                                                <!-- Target Person Profile Section -->
-                                                <div class="mb-0">
-                                                    <label for="targetPersonProfile" class="form-label mb-1 fw-bold text-info">Target Person Profile:</label>
-                                                    <textarea class="form-control" id="targetPersonProfile" rows="6" 
-                                                        placeholder="Please describe this person: Age, gender, occupation, education, personality traits, social context, emotional state, life circumstances, how long you've known them, your relationship, and any other relevant information.">Jerry is a 22-year-old college student studying hardware engineering who enjoys hiking and outdoor activities. He has supportive family and friends, though he has faced challenges with time management. His parents are always supportive and kind. He is very assertive and highly confident.</textarea>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    <!-- Right Side - Analyze and Results -->
-                                    <div class="col-md-6">
-                                        <div class="card">
-                                            <div class="card-header bg-success text-white py-1">
-                                                <h5 class="mb-0"><i class="fas fa-question-circle"></i> What would you like to analyze?</h5>
-                                            </div>
-                                            <div class="card-body p-1">
-                                                <div class="mb-1">
-                                                    <label for="useCase" class="form-label mb-1">Describe the situation or behavior</label>
-                                                    <textarea class="form-control" id="useCase" rows="8" 
-                                                        placeholder="Describe what this person said or did that you want to understand better. For example: 'They said they would help me move but then cancelled at the last minute' or 'They keep asking me for favors but never return the help'">Jerry and Tom have been collaborating on a major engineering project for two months. They worked equally on research, design, coding, and testing phases. During the final presentation to stakeholders, Jerry was given the opportunity to present their joint work. However, Jerry presented the entire project as his own individual achievement, using "I" statements throughout the presentation and never mentioning Tom's contributions, collaborative work, or shared effort. When asked about team composition, Jerry responded that he "led the project" and "handled the technical challenges." Tom was present during the presentation but was not acknowledged or given credit for his substantial contributions to the project's success.</textarea>
-                                                </div>
-                                                <button type="button" class="btn btn-primary btn-lg w-100" id="analyzeBtn" onclick="analyzeIntention()">
-                                                    <i class="fas fa-brain"></i> Analyze Intention
-                                                </button>
-                                                
-                                                <!-- Progress Indicator -->
-                                                <div id="analysisProgress" class="mt-3" style="display: none;">
-                                                    <div class="alert alert-info">
-                                                        <div class="d-flex align-items-center">
-                                                            <div class="spinner-border spinner-border-sm me-2" role="status">
-                                                                <span class="visually-hidden">Loading...</span>
-                                                            </div>
-                                                            <span>Analyzing intention... This should take 5-15 seconds.</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <!-- Analysis Results - Now inside the same card -->
-                                                <div id="analysisResults" class="mt-1" style="display: none;">
-                                                    <hr class="my-1">
-                                                    <div class="card-header bg-warning text-dark rounded py-1">
-                                                        <h6 class="mb-0"><i class="fas fa-chart-line"></i> Intention Analysis Results</h6>
-                                                    </div>
-                                                    <div class="mt-1">
-                                                        <div id="intentionAssessment"></div>
-                                                        <div id="rationaleSection"></div>
-                                                        <div id="reflectiveQuestionSection"></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <div class="tab-pane fade" id="rag-bi-content" role="tabpanel" aria-labelledby="rag-bi-tab">
                         <div id="rag-bi-root"></div>
                     </div>
@@ -1937,18 +1913,7 @@
                 tab.addEventListener('shown.bs.tab', function(e) {
                     console.log('Tab shown:', e.target.textContent);
                     
-                    // Auto-trigger analysis when Intention Interpreter tab is shown
-                    if (e.target.id === 'intention-interpreter-tab') {
-                        console.log('Intention Interpreter tab shown - auto-triggering analysis...');
-                        // Small delay to ensure the tab content is fully loaded
-                        setTimeout(() => {
-                            if (typeof analyzeIntention === 'function') {
-                                analyzeIntention();
-                            } else {
-                                console.warn('analyzeIntention function not found');
-                            }
-                        }, 500);
-                    }
+
                 });
             });
             

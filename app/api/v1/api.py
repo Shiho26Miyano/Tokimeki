@@ -2,7 +2,7 @@
 API v1 router configuration
 """
 from fastapi import APIRouter
-from .endpoints import chat, stocks, sentiment, speech, monitoring, rag, mnq, intention
+from .endpoints import chat, stocks, sentiment, speech, monitoring, rag, mnq
 from .endpoints.futurequant import (
     data_router, features_router, models_router, 
     signals_router, backtests_router, paper_trading_router
@@ -19,7 +19,7 @@ api_router.include_router(speech.router, prefix="/speech", tags=["speech"])
 api_router.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
 api_router.include_router(rag.router, prefix="/rag", tags=["rag"])
 api_router.include_router(mnq.router, prefix="/mnq", tags=["mnq"])
-api_router.include_router(intention.router, prefix="/intention", tags=["intention_interpreter_engine"])
+
 
 # Include FutureQuant Trader endpoints
 api_router.include_router(data_router, prefix="/futurequant/data", tags=["futurequant_data"])
@@ -44,7 +44,7 @@ async def api_info():
             "monitoring": "/monitoring",
             "rag": "/rag",
             "mnq": "/mnq",
-            "intention": "/intention",
+    
             "futurequant": {
                 "data": "/futurequant/data",
                 "features": "/futurequant/features",
