@@ -7,6 +7,7 @@ from .endpoints.futurequant import (
     data_router, features_router, models_router, 
     signals_router, backtests_router, paper_trading_router
 )
+from .endpoints import quantitative_analysis, websocket
 
 # Create main API router
 api_router = APIRouter()
@@ -28,6 +29,12 @@ api_router.include_router(models_router, prefix="/futurequant/models", tags=["fu
 api_router.include_router(signals_router, prefix="/futurequant/signals", tags=["futurequant_signals"])
 api_router.include_router(backtests_router, prefix="/futurequant/backtests", tags=["futurequant_backtests"])
 api_router.include_router(paper_trading_router, prefix="/futurequant/paper-trading", tags=["futurequant_paper_trading"])
+
+# Include Quantitative Analysis endpoints
+api_router.include_router(quantitative_analysis.router, prefix="/quantitative-analysis", tags=["quantitative_analysis"])
+
+# Include WebSocket endpoints
+api_router.include_router(websocket.router, tags=["websocket"])
 
 # Add API version info
 @api_router.get("/")
@@ -52,7 +59,9 @@ async def api_info():
                 "signals": "/futurequant/signals",
                 "backtests": "/futurequant/backtests",
                 "paper_trading": "/futurequant/paper-trading"
-            }
+            },
+            "quantitative_analysis": "/quantitative-analysis",
+            "websocket": "/ws"
         }
     }
 

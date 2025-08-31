@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FutureQuant Enhanced Trading Terminal</title>
+    
+    <!-- Bootstrap CSS for enhanced styling -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Chart.js for advanced charting -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS for Bloomberg-style theme -->
+    <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #404040;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --text-muted: #888888;
+            --accent-primary: #00d4aa;
+            --accent-secondary: #ff6b35;
+            --accent-warning: #ffd700;
+            --accent-danger: #ff4757;
+            --accent-success: #2ed573;
+            --border-color: #404040;
+            --shadow-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        .dashboard-container {
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .dashboard-header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 60px;
+        }
+        
+        .dashboard-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent-primary);
+            margin: 0;
+        }
+        
+        .header-controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        
+        .symbol-search {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .symbol-search input {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            min-width: 120px;
+        }
+        
+        .symbol-search input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.2);
+        }
+        
+        .timeframe-selector select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-warning);
+        }
+        
+        .status-indicator.connected {
+            background: var(--accent-success);
+        }
+        
+        .status-indicator.disconnected {
+            background: var(--accent-danger);
+        }
+        
+        .dashboard-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr 1fr;
+            gap: 8px;
+            padding: 8px;
+            overflow: hidden;
+        }
+        
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-header {
+            background: var(--bg-tertiary);
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 40px;
+        }
+        
+        .panel-header h3 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .panel-controls {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .panel-content {
+            flex: 1;
+            padding: 12px;
+            overflow: auto;
+        }
+        
+        /* Panel positioning */
+        .market-panel {
+            grid-column: 1;
+            grid-row: 1;
+        }
+        
+        .price-chart {
+            grid-column: 2;
+            grid-row: 1;
+        }
+        
+        .distribution-chart {
+            grid-column: 3;
+            grid-row: 1;
+        }
+        
+        .performance-chart {
+            grid-column: 1;
+            grid-row: 2;
+        }
+        
+        .strategies {
+            grid-column: 2;
+            grid-row: 2;
+        }
+        
+        .models {
+            grid-column: 3;
+            grid-row: 2;
+        }
+        
+        .trade-monitor {
+            grid-column: 1;
+            grid-row: 3;
+        }
+        
+        .jobs {
+            grid-column: 2;
+            grid-row: 3;
+        }
+        
+        .notifications {
+            grid-column: 3;
+            grid-row: 3;
+        }
+        
+        /* Buttons */
+        .btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn:hover {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border-color: var(--accent-primary);
+        }
+        
+        .btn-primary {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border-color: var(--accent-primary);
+        }
+        
+        .btn-primary:hover {
+            background: var(--accent-primary);
+            opacity: 0.9;
+        }
+        
+        .btn-success {
+            background: var(--accent-success);
+            color: var(--bg-primary);
+            border-color: var(--accent-success);
+        }
+        
+        .btn-success:hover {
+            background: var(--accent-success);
+            opacity: 0.9;
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border-color: var(--border-color);
+        }
+        
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        
+        /* Tables */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        
+        .table th,
+        .table td {
+            padding: 6px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .table th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 10px;
+        }
+        
+        .table tbody tr:hover {
+            background: var(--bg-tertiary);
+            cursor: pointer;
+        }
+        
+        .market-row {
+            transition: background-color 0.2s;
+        }
+        
+        .market-row:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .price-cell {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .change-cell.positive {
+            color: var(--accent-success);
+        }
+        
+        .change-cell.negative {
+            color: var(--accent-danger);
+        }
+        
+        /* Charts */
+        .chart-container {
+            width: 100%;
+            height: 100%;
+            min-height: 200px;
+            position: relative;
+        }
+        
+        .chart-container canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        
+        /* Forms */
+        .form-control {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            width: 100%;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.2);
+        }
+        
+        /* Strategy details */
+        .strategy-selector {
+            margin-bottom: 16px;
+        }
+        
+        .strategy-details {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+        
+        .strategy-info h4 {
+            margin: 0 0 8px 0;
+            color: var(--accent-primary);
+        }
+        
+        .strategy-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        
+        .metric label {
+            color: var(--text-secondary);
+        }
+        
+        .risk-low { color: var(--accent-success); }
+        .risk-medium { color: var(--accent-warning); }
+        .risk-high { color: var(--accent-danger); }
+        
+        .strategy-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        /* Models */
+        .models-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .model-item {
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            border-left: 3px solid var(--accent-primary);
+        }
+        
+        .model-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .model-header h4 {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+        
+        .model-status {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+        
+        .status-trained { background: var(--accent-success); color: var(--bg-primary); }
+        .status-training { background: var(--accent-warning); color: var(--bg-primary); }
+        .status-pending { background: var(--accent-secondary); color: var(--bg-primary); }
+        
+        .model-item p {
+            margin: 0 0 8px 0;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        
+        .model-metrics {
+            display: flex;
+            gap: 12px;
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+        
+        /* Jobs */
+        .jobs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .job-item {
+            padding: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+        
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        
+        .job-header h4 {
+            margin: 0;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        
+        .job-status {
+            font-size: 9px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            text-transform: uppercase;
+        }
+        
+        .status-running { background: var(--accent-warning); color: var(--bg-primary); }
+        .status-completed { background: var(--accent-success); color: var(--bg-primary); }
+        .status-pending { background: var(--accent-secondary); color: var(--bg-primary); }
+        
+        .job-progress {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .progress-bar {
+            flex: 1;
+            height: 4px;
+            background: var(--bg-primary);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-primary);
+            transition: width 0.3s ease;
+        }
+        
+        .job-item small {
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+        
+        /* Notifications */
+        .notifications-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .notification {
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            border-left: 3px solid;
+        }
+        
+        .notification-info {
+            background: rgba(0, 212, 170, 0.1);
+            border-left-color: var(--accent-primary);
+        }
+        
+        .notification-success {
+            background: rgba(46, 213, 115, 0.1);
+            border-left-color: var(--accent-success);
+        }
+        
+        .notification-warning {
+            background: rgba(255, 215, 0, 0.1);
+            border-left-color: var(--accent-warning);
+        }
+        
+        .notification-error {
+            background: rgba(255, 71, 87, 0.1);
+            border-left-color: var(--accent-danger);
+        }
+        
+        .notification-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .notification-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+            margin-left: 8px;
+        }
+        
+        .notification-close:hover {
+            color: var(--text-primary);
+        }
+        
+        /* Tabs */
+        .trade-tabs {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .nav-tabs {
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 12px;
+        }
+        
+        .nav-tabs .nav-link {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        
+        .nav-tabs .nav-link.active {
+            color: var(--accent-primary);
+            border-bottom: 2px solid var(--accent-primary);
+        }
+        
+        .tab-content {
+            flex: 1;
+            overflow: auto;
+        }
+        
+        .tab-pane {
+            display: none;
+        }
+        
+        .tab-pane.active {
+            display: block;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto auto auto auto auto;
+            }
+            
+            .header-panel {
+                grid-column: 1 / -1;
+                grid-row: 1;
+            }
+            
+            .market-panel {
+                grid-column: 1;
+                grid-row: 2;
+            }
+            
+            .price-chart {
+                grid-column: 2;
+                grid-row: 2;
+            }
+            
+            .distribution-chart {
+                grid-column: 1;
+                grid-row: 3;
+            }
+            
+            .performance-chart {
+                grid-column: 2;
+                grid-row: 3;
+            }
+            
+            .strategies {
+                grid-column: 1;
+                grid-row: 4;
+            }
+            
+            .models {
+                grid-column: 2;
+                grid-row: 4;
+            }
+            
+            .trade-monitor {
+                grid-column: 1;
+                grid-row: 5;
+            }
+            
+            .jobs {
+                grid-column: 2;
+                grid-row: 5;
+            }
+            
+            .notifications {
+                grid-column: 1 / -1;
+                grid-row: 6;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+            
+            .header-controls {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .symbol-search {
+                flex-direction: column;
+            }
+        }
+        
+        /* Loading states */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: var(--text-muted);
+        }
+        
+        .loading::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top: 2px solid var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">
+                <i class="fas fa-chart-line"></i>
+                FutureQuant Enhanced Trading Terminal
+            </h1>
+            <div class="header-controls">
+                <div class="symbol-search">
+                    <input type="text" id="symbol-search" placeholder="Symbol (S)" class="form-control">
+                    <button id="symbol-search-btn" class="btn btn-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <div class="timeframe-selector">
+                    <select id="timeframe-select" class="form-control">
+                        <option value="1m">1m</option>
+                        <option value="5m">5m</option>
+                        <option value="15m">15m</option>
+                        <option value="1h">1h</option>
+                        <option value="1d" selected>1d</option>
+                    </select>
+                </div>
+                <div class="connection-status">
+                    <span id="connection-indicator" class="status-indicator"></span>
+                    <span id="connection-text">Connecting...</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid" id="futurequant-dashboard">
+            <!-- Panels will be dynamically created by JavaScript -->
+            <div class="loading">Initializing dashboard...</div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Enhanced Dashboard JavaScript -->
+    <script src="futurequant-dashboard-enhanced.js"></script>
+    
+    <!-- Initialize dashboard -->
+    <script>
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM ready, checking for dashboard initialization...');
+            
+            // Check if dashboard is already initialized
+            if (window.futureQuantDashboard) {
+                console.log('Dashboard already initialized');
+                return;
+            }
+            
+            // Initialize enhanced dashboard
+            try {
+                window.futureQuantDashboard = new FutureQuantEnhancedDashboard();
+                console.log('Enhanced dashboard initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize enhanced dashboard:', error);
+                
+                // Fallback to basic dashboard
+                const dashboard = document.getElementById('futurequant-dashboard');
+                if (dashboard) {
+                    dashboard.innerHTML = `
+                        <div class="panel" style="grid-column: 1 / -1; grid-row: 1 / -1;">
+                            <div class="panel-header">
+                                <h3>Dashboard Error</h3>
+                            </div>
+                            <div class="panel-content">
+                                <p>Failed to initialize enhanced dashboard. Please check the console for errors.</p>
+                                <button class="btn btn-primary" onclick="location.reload()">Reload Page</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        });
+        
+        // Global error handler
+        window.addEventListener('error', function(event) {
+            console.error('Global error:', event.error);
+        });
+        
+        // Unhandled promise rejection handler
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+        });
+    </script>
+</body>
+</html>

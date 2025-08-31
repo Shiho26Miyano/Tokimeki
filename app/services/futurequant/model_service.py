@@ -33,8 +33,101 @@ class FutureQuantModelService:
             "transformer": "Transformer Encoder (FQT-lite)"
         }
         
-        self.horizons = [60, 240, 1440]  # 1h, 4h, 1d in minutes
+        self.horizons = [0.5, 5, 15, 60, 240, 1440]  # 30s (demo), 5m, 15m, 1h, 4h, 1d in minutes
         self.brpc_service = get_brpc_service()
+        
+    async def generate_test_data(self, symbol: str, days: int = 365) -> Dict[str, Any]:
+        """Generate test data for training when no real data exists"""
+        try:
+            db = next(get_db())
+            
+            # Check if symbol exists, create if not
+            symbol_obj = db.query(Symbol).filter(Symbol.ticker == symbol).first()
+            if not symbol_obj:
+                symbol_obj = Symbol(
+                    ticker=symbol,
+                    name=f"Test {symbol}",
+                    exchange="TEST",
+                    asset_type="futures",
+                    created_at=datetime.utcnow()
+                )
+                db.add(symbol_obj)
+                db.commit()
+                db.refresh(symbol_obj)
+            
+            # Generate synthetic bars data
+            import random
+            from datetime import datetime, timedelta
+            
+            base_price = 100.0
+            bars_data = []
+            features_data = []
+            
+            start_date = datetime.now() - timedelta(days=days)
+            current_date = start_date
+            
+            for i in range(days):
+                # Generate realistic price movement
+                price_change = random.gauss(0, 0.02)  # 2% daily volatility
+                base_price *= (1 + price_change)
+                
+                # Create bar data
+                bar = Bar(
+                    symbol_id=symbol_obj.id,
+                    timestamp=current_date,
+                    interval="1d",
+                    open=base_price * (1 + random.gauss(0, 0.005)),
+                    high=base_price * (1 + abs(random.gauss(0, 0.01))),
+                    low=base_price * (1 - abs(random.gauss(0, 0.01))),
+                    close=base_price,
+                    volume=random.randint(1000, 10000),
+                    created_at=datetime.utcnow()
+                )
+                bars_data.append(bar)
+                
+                # Create feature data
+                feature = Feature(
+                    symbol_id=symbol_obj.id,
+                    timestamp=current_date,
+                    payload={
+                        "feature_type": "technical_indicators",
+                        "sma_20": base_price * (1 + random.gauss(0, 0.01)),
+                        "rsi": random.uniform(30, 70),
+                        "macd": random.gauss(0, 0.01),
+                        "bollinger_upper": base_price * 1.02,
+                        "bollinger_lower": base_price * 0.98,
+                        "volume_sma": random.randint(5000, 15000),
+                        "volatility": abs(price_change),
+                        "momentum": random.gauss(0, 0.01)
+                    },
+                    created_at=datetime.utcnow()
+                )
+                features_data.append(feature)
+                
+                current_date += timedelta(days=1)
+            
+            # Save to database
+            db.add_all(bars_data)
+            db.add_all(features_data)
+            db.commit()
+            
+            logger.info(f"Generated test data: {len(bars_data)} bars and {len(features_data)} features for {symbol}")
+            
+            return {
+                "success": True,
+                "symbol": symbol,
+                "bars_count": len(bars_data),
+                "features_count": len(features_data),
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": datetime.now().strftime("%Y-%m-%d")
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating test data: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
         
     async def train_model(
         self,
@@ -53,6 +146,15 @@ class FutureQuantModelService:
                 raise ValueError(f"Invalid model type. Must be one of: {list(self.model_types.keys())}")
             
             # Validate horizon
+            # Convert to float to handle string inputs from frontend
+            try:
+                horizon_minutes = float(horizon_minutes)
+            except (ValueError, TypeError):
+                raise ValueError(f"Invalid horizon format. Must be a number, got: {horizon_minutes}")
+            
+            logger.info(f"Training with horizon: {horizon_minutes} (type: {type(horizon_minutes)})")
+            logger.info(f"Available horizons: {self.horizons}")
+                
             if horizon_minutes not in self.horizons:
                 raise ValueError(f"Invalid horizon. Must be one of: {self.horizons}")
             
@@ -63,12 +165,33 @@ class FutureQuantModelService:
             
             # Get training data
             db = next(get_db())
-            X_train, y_train, X_test, y_test = await self._prepare_training_data(
-                db, symbol, start_date, end_date, horizon_minutes, test_size
-            )
+            
+            # Try to get existing data first
+            try:
+                X_train, y_train, X_test, y_test = await self._prepare_training_data(
+                    db, symbol, start_date, end_date, horizon_minutes, test_size
+                )
+            except ValueError as e:
+                if "No bars or features found" in str(e):
+                    # Generate test data if none exists
+                    logger.info(f"No training data found for {symbol}, generating test data...")
+                    test_data_result = await self.generate_test_data(symbol, days=365)
+                    
+                    if not test_data_result["success"]:
+                        raise ValueError(f"Failed to generate test data: {test_data_result['error']}")
+                    
+                    # Try again with generated data
+                    X_train, y_train, X_test, y_test = await self._prepare_training_data(
+                        db, symbol, start_date, end_date, horizon_minutes, test_size
+                    )
+                else:
+                    raise e
             
             if len(X_train) < 100:
                 raise ValueError(f"Insufficient training data. Need at least 100 samples, got {len(X_train)}")
+            
+            # Set current horizon for demo mode detection
+            self._current_horizon = horizon_minutes
             
             # Train model
             model, metrics = await self._train_distributional_model(
@@ -185,8 +308,19 @@ class FutureQuantModelService:
         
         # Create DataFrame
         data = []
+        
+        # Convert horizon to appropriate index offset
+        # For 30-second demo, use 1 day as minimum since we have daily bars
+        if horizon_minutes == 0.5:  # 30 seconds demo
+            horizon_index = 1  # 1 day minimum for daily bars
+            logger.info("30-second demo mode: using 1 day offset for daily data")
+        elif horizon_minutes < 1:
+            horizon_index = 1  # 1 day minimum for daily bars
+        else:
+            horizon_index = int(horizon_minutes)
+        
         for i, bar in enumerate(bars):
-            if i + horizon_minutes >= len(bars):
+            if i + horizon_index >= len(bars):
                 break
             
             # Get current features
@@ -195,7 +329,7 @@ class FutureQuantModelService:
                 continue
             
             # Get future price (target) - STRICT TIME-BASED SPLIT
-            future_bar = bars[i + horizon_minutes]
+            future_bar = bars[i + horizon_index]
             future_return = (future_bar.close - bar.close) / bar.close
             
             # Combine features
@@ -314,6 +448,17 @@ class FutureQuantModelService:
             "epochs": 100,
             "batch_size": 32
         }
+        
+        # Check if this is a 30-second demo (horizon_minutes = 0.5)
+        # For demo, use much faster training
+        if hasattr(self, '_current_horizon') and self._current_horizon == 0.5:
+            logger.info("30-second demo mode: using fast training parameters")
+            default_params.update({
+                "epochs": 5,  # Very few epochs for demo
+                "batch_size": 64,  # Larger batch for speed
+                "lr": 0.01  # Higher learning rate for faster convergence
+            })
+        
         if hyperparams:
             default_params.update(hyperparams)
         

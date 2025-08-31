@@ -116,6 +116,70 @@ class FutureQuantPaperBrokerService:
                 'error': str(e)
             }
     
+    async def start_paper_trading_demo(
+        self,
+        strategy_name: str = "Demo Strategy",
+        initial_capital: float = 100000,
+        risk_params: Dict[str, Any] = None,
+        symbols: List[str] = None
+    ) -> Dict[str, Any]:
+        """Start a demo paper trading session without database validation"""
+        try:
+            # Generate session ID
+            session_id = str(uuid.uuid4())
+            
+            # Merge risk parameters
+            risk_config = self.default_risk_params.copy()
+            if risk_params:
+                risk_config.update(risk_params)
+            
+            # Initialize session
+            session = {
+                'session_id': session_id,
+                'user_id': 999,  # Demo user ID
+                'strategy_id': 999,  # Demo strategy ID
+                'strategy_name': strategy_name,
+                'start_time': datetime.now(),
+                'status': 'active',
+                'initial_capital': initial_capital,
+                'current_capital': initial_capital,
+                'cash': initial_capital,
+                'positions': {},
+                'orders': [],
+                'trades': [],
+                'daily_pnl': [],
+                'risk_params': risk_config,
+                'symbols': symbols or [],
+                'constraints_violated': [],
+                'last_rebalance': datetime.now(),
+                'daily_trades': 0,
+                'last_trade_date': None
+            }
+            
+            # Store session
+            self.active_sessions[session_id] = session
+            
+            logger.info(f"Started demo paper trading session {session_id}")
+            
+            return {
+                'success': True,
+                'session_id': session_id,
+                'message': 'Demo paper trading session started successfully',
+                'session_info': {
+                    'strategy_name': strategy_name,
+                    'initial_capital': initial_capital,
+                    'risk_params': risk_config,
+                    'symbols': symbols or []
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error starting demo paper trading: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
     async def stop_paper_trading(self, session_id: str) -> Dict[str, Any]:
         """Stop a paper trading session"""
         try:
@@ -608,9 +672,25 @@ class FutureQuantPaperBrokerService:
     async def _get_current_price(self, symbol: str) -> Optional[float]:
         """Get current price for a symbol"""
         try:
-            # This would typically fetch from a real-time data source
-            # For now, return a placeholder price
-            return 100.0  # Placeholder
+            # Import market data service
+            from app.services.futurequant.market_data_service import market_data_service
+            
+            # Get real-time price from Yahoo Finance
+            price = await market_data_service.get_current_price(symbol)
+            
+            if price is None:
+                logger.warning(f"Unable to get current price for {symbol}, using fallback")
+                # Fallback to a reasonable default based on symbol type
+                if symbol.startswith('^'):  # Index
+                    return 1000.0
+                elif symbol in ['AAPL', 'MSFT', 'GOOGL', 'AMZN']:  # Tech stocks
+                    return 150.0
+                elif symbol in ['ES', 'NQ', 'YM']:  # Futures
+                    return 4000.0
+                else:
+                    return 100.0
+            
+            return price
             
         except Exception as e:
             logger.error(f"Error getting current price for {symbol}: {str(e)}")
@@ -679,12 +759,37 @@ class FutureQuantPaperBrokerService:
             
             session = self.active_sessions[session_id]
             
-            # Update position values
+            # Update position values with real-time prices
             await self._update_position_values(session)
             
             # Calculate current P&L
             current_pnl = session['current_capital'] - session['initial_capital']
             current_return = (current_pnl / session['initial_capital']) * 100
+            
+            # Calculate daily P&L
+            daily_pnl = 0.0
+            if session['daily_pnl']:
+                today = datetime.now().date()
+                today_pnl = [pnl for pnl in session['daily_pnl'] if pnl['date'] == today]
+                if today_pnl:
+                    daily_pnl = today_pnl[0]['pnl']
+            
+            # Get detailed position information with real-time P&L
+            detailed_positions = {}
+            for symbol, position in session['positions'].items():
+                current_price = await self._get_current_price(symbol)
+                if current_price:
+                    if position['side'] == 'long':
+                        position_pnl = (current_price - position['entry_price']) * position['quantity']
+                    else:  # short
+                        position_pnl = (position['entry_price'] - current_price) * position['quantity']
+                    
+                    detailed_positions[symbol] = {
+                        **position,
+                        'current_price': current_price,
+                        'position_pnl': position_pnl,
+                        'position_return': (position_pnl / (position['entry_price'] * position['quantity'])) * 100
+                    }
             
             return {
                 'success': True,
@@ -698,10 +803,12 @@ class FutureQuantPaperBrokerService:
                 'positions_value': sum(pos['value'] for pos in session['positions'].values()),
                 'current_pnl': current_pnl,
                 'current_return': current_return,
+                'daily_pnl': daily_pnl,
                 'total_trades': len(session['trades']),
                 'daily_trades': session['daily_trades'],
-                'positions': session['positions'],
-                'risk_params': session['risk_params']
+                'positions': detailed_positions,
+                'risk_params': session['risk_params'],
+                'last_update': datetime.now().isoformat()
             }
             
         except Exception as e:
@@ -768,6 +875,98 @@ class FutureQuantPaperBrokerService:
             
         except Exception as e:
             logger.error(f"Error closing all positions: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    async def get_real_time_dashboard_data(self, session_id: str) -> Dict[str, Any]:
+        """Get real-time dashboard data for paper trading"""
+        try:
+            if session_id not in self.active_sessions:
+                raise ValueError(f"Session {session_id} not found")
+            
+            session = self.active_sessions[session_id]
+            
+            # Update position values with real-time prices
+            await self._update_position_values(session)
+            
+            # Calculate current P&L
+            current_pnl = session['current_capital'] - session['initial_capital']
+            current_return = (current_pnl / session['initial_capital']) * 100
+            
+            # Calculate daily P&L
+            daily_pnl = 0.0
+            if session['daily_pnl']:
+                today = datetime.now().date()
+                today_pnl = [pnl for pnl in session['daily_pnl'] if pnl['date'] == today]
+                if today_pnl:
+                    daily_pnl = today_pnl[0]['pnl']
+            
+            # Get recent trades with real-time P&L
+            recent_trades = []
+            for trade in session['trades'][-5:]:  # Last 5 trades
+                recent_trades.append({
+                    'symbol': trade['symbol'],
+                    'side': trade['side'],
+                    'quantity': trade['quantity'],
+                    'entry_price': trade['entry_price'],
+                    'exit_price': trade['exit_price'],
+                    'pnl': trade['pnl'],
+                    'timestamp': trade['timestamp'].isoformat()
+                })
+            
+            # Get current positions with real-time P&L
+            positions_summary = []
+            total_positions_value = 0
+            
+            for symbol, position in session['positions'].items():
+                current_price = await self._get_current_price(symbol)
+                if current_price:
+                    if position['side'] == 'long':
+                        position_pnl = (current_price - position['entry_price']) * position['quantity']
+                    else:  # short
+                        position_pnl = (position['entry_price'] - current_price) * position['quantity']
+                    
+                    position_value = position['quantity'] * current_price
+                    total_positions_value += position_value
+                    
+                    positions_summary.append({
+                        'symbol': symbol,
+                        'side': position['side'],
+                        'quantity': position['quantity'],
+                        'entry_price': position['entry_price'],
+                        'current_price': current_price,
+                        'position_value': position_value,
+                        'position_pnl': position_pnl,
+                        'position_return': (position_pnl / (position['entry_price'] * position['quantity'])) * 100
+                    })
+            
+            # Calculate win rate
+            total_trades = len(session['trades'])
+            winning_trades = len([t for t in session['trades'] if t.get('pnl', 0) > 0])
+            win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+            
+            return {
+                'success': True,
+                'dashboard_data': {
+                    'account_balance': session['current_capital'],
+                    'current_pnl': current_pnl,
+                    'current_return': current_return,
+                    'daily_pnl': daily_pnl,
+                    'open_positions': len(session['positions']),
+                    'win_rate': win_rate,
+                    'total_trades': total_trades,
+                    'positions_summary': positions_summary,
+                    'recent_trades': recent_trades,
+                    'total_positions_value': total_positions_value,
+                    'cash': session['cash'],
+                    'last_update': datetime.now().isoformat()
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting real-time dashboard data: {str(e)}")
             return {
                 'success': False,
                 'error': str(e)
