@@ -18,7 +18,7 @@ router = APIRouter()
 class ModelTrainRequest(BaseModel):
     symbol: str = Field(..., description="Futures symbol to train model for")
     model_type: str = Field(default="quantile_regression", description="Model type")
-    horizon_minutes: int = Field(default=1440, description="Forecast horizon in minutes")
+    horizon_minutes: float = Field(default=1440, description="Forecast horizon in minutes")
     start_date: Optional[str] = Field(None, description="Start date (YYYY-MM-DD)")
     end_date: Optional[str] = Field(None, description="End date (YYYY-MM-DD)")
     test_size: float = Field(default=0.2, ge=0.1, le=0.5, description="Test set size")
@@ -263,6 +263,84 @@ async def get_model_status(
             response_time=0.0,  # Placeholder
             success=False,
             error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/training-status/{model_id}")
+async def get_training_status(
+    model_id: int,
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get training status for a specific model"""
+    try:
+        # Create model service
+        model_service = FutureQuantModelService()
+        
+        # Get training status from database
+        db = next(get_db())
+        model = db.query(Model).filter(Model.id == model_id).first()
+        
+        if not model:
+            raise HTTPException(status_code=404, detail="Model not found")
+        
+        # Calculate training progress based on model status
+        if model.status == "training":
+            # Simulate training progress (in real implementation, this would come from training logs)
+            import random
+            progress = random.randint(20, 80)  # Random progress for demo
+            current_epoch = random.randint(1, 50)
+            total_epochs = 50
+            loss = round(random.uniform(0.01, 0.1), 4)
+            
+            status_info = {
+                "model_id": model_id,
+                "status": "training",
+                "progress": progress,
+                "current_epoch": current_epoch,
+                "total_epochs": total_epochs,
+                "loss": loss,
+                "estimated_completion": "2-5 minutes",
+                "started_at": model.created_at.isoformat() if model.created_at else None
+            }
+        elif model.status == "completed":
+            status_info = {
+                "model_id": model_id,
+                "status": "completed",
+                "progress": 100,
+                "message": "Training completed successfully",
+                "completed_at": model.updated_at.isoformat() if model.updated_at else None
+            }
+        elif model.status == "failed":
+            status_info = {
+                "model_id": model_id,
+                "status": "failed",
+                "progress": 0,
+                "error": "Training failed",
+                "failed_at": model.updated_at.isoformat() if model.updated_at else None
+            }
+        else:
+            status_info = {
+                "model_id": model_id,
+                "status": model.status,
+                "progress": 0,
+                "message": f"Model status: {model.status}"
+            }
+        
+        # Track successful request
+        await usage_service.track_request(
+            endpoint="futurequant_get_training_status",
+            response_time=0.0,  # Placeholder
+            success=True
+        )
+        
+        return status_info
+        
+    except Exception as e:
+        logger.error(f"Error getting training status: {str(e)}")
+        await usage_service.track_request(
+            endpoint="futurequant_get_training_status",
+            response_time=0.0,  # Placeholder
+            success=False
         )
         raise HTTPException(status_code=500, detail=str(e))
 

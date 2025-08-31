@@ -613,9 +613,11 @@ class FutureQuantFeatureService:
                 feature = Feature(
                     symbol_id=symbol_id,
                     timestamp=timestamp,
-                    recipe_name=recipe_name,
-                    feature_data=json.dumps(feature_data),
-                    computed_at=datetime.now()
+                    payload={
+                        "recipe_name": recipe_name,
+                        "features": feature_data,
+                        "computed_at": datetime.now().isoformat()
+                    }
                 )
                 
                 db.add(feature)

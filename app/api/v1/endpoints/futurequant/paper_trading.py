@@ -3,12 +3,16 @@ FutureQuant Trader Paper Trading Endpoints
 """
 import logging
 from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Path
 from pydantic import BaseModel, Field
 
 from app.services.futurequant.paper_broker_service import FutureQuantPaperBrokerService
 from app.services.usage_service import AsyncUsageService
 from app.core.dependencies import get_usage_service
+
+# Create a shared instance of the paper broker service
+paper_broker_service = FutureQuantPaperBrokerService()
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +43,12 @@ async def start_paper_trading(
 ):
     """Start a new paper trading session"""
     try:
-        # Create paper broker service
-        paper_broker = FutureQuantPaperBrokerService()
-        
-        # Start session
-        result = await paper_broker.start_paper_trading(
-            model_id=request.model_id,
+        # Start session using shared service
+        result = await paper_broker_service.start_paper_trading(
+            user_id=1,  # Default user ID
             strategy_id=request.strategy_id,
-            symbols=request.symbols,
             initial_capital=request.initial_capital,
-            session_name=request.session_name
+            symbols=request.symbols
         )
         
         if result["success"]:
@@ -79,6 +79,47 @@ async def start_paper_trading(
         )
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/start-demo", response_model=dict)
+async def start_demo_paper_trading(
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Start a demo paper trading session without database requirements"""
+    try:
+        # Start demo session using shared service with futures focus
+        result = await paper_broker_service.start_paper_trading_demo(
+            strategy_name="Futures Trading Strategy",
+            initial_capital=100000,
+            symbols=['ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'CL=F', 'GC=F']  # Futures symbols
+        )
+        
+        if result["success"]:
+            # Track successful request
+            await usage_service.track_request(
+                endpoint="futurequant_start_demo_paper_trading",
+                response_time=0.0,  # Placeholder
+                success=True
+            )
+        else:
+            # Track failed request
+            await usage_service.track_request(
+                endpoint="futurequant_start_demo_paper_trading",
+                response_time=0.0,  # Placeholder
+                success=False,
+                error=result.get("error", "Unknown error")
+            )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Demo paper trading start error: {str(e)}")
+        await usage_service.track_request(
+            endpoint="futurequant_start_demo_paper_trading",
+            response_time=0.0,  # Placeholder
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/stop/{session_id}", response_model=dict)
 async def stop_paper_trading(
     session_id: str = Path(..., description="Paper trading session ID"),
@@ -86,11 +127,8 @@ async def stop_paper_trading(
 ):
     """Stop a paper trading session"""
     try:
-        # Create paper broker service
-        paper_broker = FutureQuantPaperBrokerService()
-        
-        # Stop session
-        result = await paper_broker.stop_paper_trading(session_id)
+        # Stop session using shared service
+        result = await paper_broker_service.stop_paper_trading(session_id)
         
         if result["success"]:
             # Track successful request
@@ -127,11 +165,8 @@ async def get_session_status(
 ):
     """Get status of a paper trading session"""
     try:
-        # Create paper broker service
-        paper_broker = FutureQuantPaperBrokerService()
-        
-        # Get status
-        result = await paper_broker.get_session_status(session_id)
+        # Get status using shared service
+        result = await paper_broker_service.get_session_status(session_id)
         
         if result["success"]:
             # Track successful request
@@ -168,11 +203,8 @@ async def place_order(
 ):
     """Place an order in paper trading"""
     try:
-        # Create paper broker service
-        paper_broker = FutureQuantPaperBrokerService()
-        
-        # Place order
-        result = await paper_broker.place_order(
+        # Place order using shared service
+        result = await paper_broker_service.place_order(
             session_id=request.session_id,
             symbol=request.symbol,
             side=request.side,
@@ -217,11 +249,8 @@ async def get_active_sessions(
 ):
     """Get list of active paper trading sessions"""
     try:
-        # Create paper broker service
-        paper_broker = FutureQuantPaperBrokerService()
-        
-        # Get active sessions
-        sessions = await paper_broker.get_active_sessions()
+        # Get active sessions using shared service
+        sessions = await paper_broker_service.get_active_sessions()
         
         # Track successful request
         await usage_service.track_request(
@@ -253,11 +282,8 @@ async def close_all_positions(
 ):
     """Close all positions in a paper trading session"""
     try:
-        # Create paper broker service
-        paper_broker = FutureQuantPaperBrokerService()
-        
-        # Close all positions
-        result = await paper_broker.close_all_positions(session_id)
+        # Close all positions using shared service
+        result = await paper_broker_service.close_all_positions(session_id)
         
         if result["success"]:
             # Track successful request
@@ -330,6 +356,103 @@ async def get_paper_trading_status(
         logger.error(f"Error getting paper trading status: {str(e)}")
         await usage_service.track_request(
             endpoint="futurequant_get_paper_trading_status",
+            response_time=0.0,  # Placeholder
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/sessions/{session_id}/dashboard", response_model=dict)
+async def get_session_dashboard(
+    session_id: str = Path(..., description="Paper trading session ID"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get real-time dashboard data for a paper trading session"""
+    try:
+        # Get dashboard data using shared service
+        result = await paper_broker_service.get_real_time_dashboard_data(session_id)
+        
+        if result["success"]:
+            # Track successful request
+            await usage_service.track_request(
+                endpoint="futurequant_get_session_dashboard",
+                response_time=0.0,  # Placeholder
+                success=True
+            )
+        else:
+            # Track failed request
+            await usage_service.track_request(
+                endpoint="futurequant_get_session_dashboard",
+                response_time=0.0,  # Placeholder
+                success=False,
+                error=result.get("error", "Unknown error")
+            )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting session dashboard: {str(e)}")
+        await usage_service.track_request(
+            endpoint="futurequant_get_session_dashboard",
+            response_time=0.0,  # Placeholder
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/market-data/{symbol}", response_model=dict)
+async def get_market_data(
+    symbol: str = Path(..., description="Symbol to get market data for"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get real-time market data for a symbol"""
+    try:
+        # Import market data service
+        from app.services.futurequant.market_data_service import market_data_service
+        
+        # Get current price
+        current_price = await market_data_service.get_current_price(symbol)
+        
+        # Get symbol info
+        symbol_info = await market_data_service.get_symbol_info(symbol)
+        
+        # Get historical data for chart
+        historical_data = await market_data_service.get_historical_data(symbol, period="1d", interval="5m")
+        
+        if current_price is not None:
+            # Track successful request
+            await usage_service.track_request(
+                endpoint="futurequant_get_market_data",
+                response_time=0.0,  # Placeholder
+                success=True
+            )
+            
+            return {
+                "success": True,
+                "symbol": symbol,
+                "current_price": current_price,
+                "symbol_info": symbol_info,
+                "historical_data": historical_data.to_dict('records') if historical_data is not None else [],
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            # Track failed request
+            await usage_service.track_request(
+                endpoint="futurequant_get_market_data",
+                response_time=0.0,  # Placeholder
+                success=False,
+                error="Unable to fetch market data"
+            )
+            
+            return {
+                "success": False,
+                "error": "Unable to fetch market data for symbol"
+            }
+        
+    except Exception as e:
+        logger.error(f"Error getting market data for {symbol}: {str(e)}")
+        await usage_service.track_request(
+            endpoint="futurequant_get_market_data",
             response_time=0.0,  # Placeholder
             success=False,
             error=str(e)

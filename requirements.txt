@@ -42,6 +42,15 @@ apscheduler==3.10.4
 minio==7.2.0
 boto3==1.34.34
 
+# Quantitative Finance Libraries
+vectorbt==0.28.1  # Vectorized backtesting and analysis
+qf-lib==4.0.3     # Quantitative Finance Library
+empyrical==0.5.5  # Financial risk and performance analytics
+alphalens==0.4.0  # Alpha factor analysis
+arch==6.2.0       # Autoregressive conditional heteroskedasticity models
+statsmodels==0.14.1  # Statistical models and tests
+scipy==1.15.3     # Scientific computing
+
 # Development dependencies
 pytest==7.4.3
 pytest-asyncio==0.21.1 

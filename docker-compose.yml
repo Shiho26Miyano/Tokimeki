@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  futurequant:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://futurequant:password@db:5432/futurequant
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=development
+    volumes:
+      - ./app:/app/app
+      - ./static:/app/static
+      - ./config.py:/app/config.py
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    networks:
+      - futurequant-network
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=futurequant
+      - POSTGRES_USER=futurequant
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - futurequant-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - futurequant-network
+
+  mlflow:
+    image: python:3.11-slim
+    working_dir: /mlflow
+    command: >
+      bash -c "pip install mlflow &&
+               mlflow server --host 0.0.0.0 --port 5000 --default-artifact-root /mlflow/artifacts"
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    restart: unless-stopped
+    networks:
+      - futurequant-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./static:/usr/share/nginx/html
+    depends_on:
+      - futurequant
+    restart: unless-stopped
+    networks:
+      - futurequant-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  mlflow_data:
+
+networks:
+  futurequant-network:
+    driver: bridge

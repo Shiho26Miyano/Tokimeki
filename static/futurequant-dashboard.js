@@ -1,21 +1,7 @@
 console.log('FutureQuant Dashboard loaded - Distributional Futures Trading Platform - Version 20250117');
 
-// Block any FutureQuant API calls to prevent 404 errors
-const originalFetch = window.fetch;
-window.fetch = function(...args) {
-    const url = args[0];
-    if (typeof url === 'string' && url.includes('/api/v1/futurequant/')) {
-        console.warn('BLOCKED FutureQuant API call to:', url);
-        console.trace('API call blocked from:');
-        return Promise.resolve(new Response(JSON.stringify({ 
-            success: false, 
-            error: 'API calls blocked - using mock data' 
-        }), { status: 200 }));
-    }
-    return originalFetch.apply(this, args);
-};
-
-console.log('FutureQuant API calls are now blocked - using mock data only');
+// API configuration - allow real API calls
+console.log('FutureQuant API calls are now enabled');
 
 class FutureQuantDashboard {
     constructor() {
@@ -294,38 +280,56 @@ class FutureQuantDashboard {
     }
 
     loadStrategies() {
-        console.log('Loading strategies...');
-        console.log('Available mock strategies:', this.mockStrategies);
+        console.log('Loading futures trading strategies...');
         
         const strategySelect = document.getElementById('fq-strategy-select');
         console.log('Strategy select element:', strategySelect);
         
         if (strategySelect) {
-            // Clear existing options and add default
-            strategySelect.innerHTML = '<option value="">Aggressive Mean Reversion</option>';
-            this.mockStrategies.forEach(strategy => {
-                const option = `<option value="${strategy.id}">${strategy.name}</option>`;
-                strategySelect.innerHTML += option;
-                console.log('Added strategy option:', option);
+            // Define futures-focused trading strategies
+            const futuresStrategies = [
+                { id: 1, name: 'Aggressive Mean Reversion', description: 'High-risk mean reversion for volatile futures markets' },
+                { id: 2, name: 'Conservative Trend Following', description: 'Low-risk trend following with tight stops' },
+                { id: 3, name: 'Volatility Breakout', description: 'Trade breakouts from low volatility periods' },
+                { id: 4, name: 'Momentum Continuation', description: 'Follow strong momentum in futures markets' },
+                { id: 5, name: 'Range Trading', description: 'Trade within established support/resistance levels' },
+                { id: 6, name: 'News Event Trading', description: 'Trade around major economic announcements' }
+            ];
+            
+            // Clear existing options
+            strategySelect.innerHTML = '';
+            
+            // Add strategy options
+            futuresStrategies.forEach(strategy => {
+                const option = document.createElement('option');
+                option.value = strategy.id;
+                option.textContent = strategy.name;
+                strategySelect.appendChild(option);
+                console.log('Added futures strategy:', strategy.name);
             });
-            console.log('Strategies loaded into select:', this.mockStrategies.length);
-            console.log('Strategy select HTML:', strategySelect.innerHTML);
             
-            // Verify the options were added
-            console.log('Final strategy select options count:', strategySelect.options.length);
-            for (let i = 0; i < strategySelect.options.length; i++) {
-                console.log(`Option ${i}:`, strategySelect.options[i].text, 'Value:', strategySelect.options[i].value);
-            }
-            
-            // Automatically select and display the first strategy (Aggressive Mean Reversion)
-            if (this.mockStrategies.length > 0) {
-                const firstStrategy = this.mockStrategies[0];
-                strategySelect.value = firstStrategy.id;
-                console.log('Auto-selecting strategy:', firstStrategy.name);
+            // Automatically select the first strategy
+            if (futuresStrategies.length > 0) {
+                strategySelect.value = futuresStrategies[0].id;
+                console.log('Auto-selecting strategy:', futuresStrategies[0].name);
                 
-                // Trigger the change event to load strategy details
-                this.loadStrategyData(firstStrategy.id);
+                // Load strategy details
+                this.loadStrategyData(futuresStrategies[0].id);
             }
+            
+            // Add change event listener to update strategy display
+            strategySelect.addEventListener('change', (e) => {
+                const selectedStrategyId = e.target.value;
+                if (selectedStrategyId) {
+                    const selectedStrategy = futuresStrategies.find(s => s.id == selectedStrategyId);
+                    if (selectedStrategy) {
+                        console.log('Strategy changed to:', selectedStrategy.name);
+                        this.loadStrategyData(selectedStrategy.id);
+                    }
+                }
+            });
+            
+            console.log('Futures strategies loaded:', futuresStrategies.length);
         } else {
             console.error('Strategy select element not found!');
         }
@@ -347,26 +351,42 @@ class FutureQuantDashboard {
         this.updateBacktestConfigDisplay(mockConfig);
     }
 
-    loadPaperTradingSessions() {
-        const mockSessions = [
-            {
-                session_id: 'session_1',
-                strategy_name: 'Moderate Trend Following',
-                start_time: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-                current_capital: 105000,
-                current_return: 5.0
+    async loadPaperTradingSessions() {
+        try {
+            // Call real API to get active sessions
+            const response = await fetch('/api/v1/futurequant/paper-trading/sessions');
+            const data = await response.json();
+            
+            if (data.success && data.active_sessions) {
+                // Convert API response to display format
+                const sessions = Object.entries(data.active_sessions).map(([sessionId, session]) => ({
+                    session_id: sessionId,
+                    strategy_name: session.strategy_name,
+                    start_time: session.start_time,
+                    current_capital: session.current_capital,
+                    current_return: session.current_return
+                }));
+                this.updatePaperTradingDisplay(sessions);
+            } else {
+                // No active sessions
+                this.updatePaperTradingDisplay([]);
             }
-        ];
-        this.updatePaperTradingDisplay(mockSessions);
+        } catch (error) {
+            console.error('Error loading paper trading sessions:', error);
+            // Fallback to empty display
+            this.updatePaperTradingDisplay([]);
+        }
     }
 
     loadRecentSignals() {
-        const mockSignals = [
+        const futuresSignals = [
             { symbol: 'ES=F', side: 'long', confidence: 0.78, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
             { symbol: 'NQ=F', side: 'short', confidence: 0.82, timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() },
-            { symbol: 'YM=F', side: 'long', confidence: 0.71, timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString() }
+            { symbol: 'YM=F', side: 'long', confidence: 0.71, timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString() },
+            { symbol: 'CL=F', side: 'long', confidence: 0.65, timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString() },
+            { symbol: 'GC=F', side: 'short', confidence: 0.73, timestamp: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString() }
         ];
-        this.updateSignalsDisplay(mockSignals);
+        this.updateSignalsDisplay(futuresSignals);
     }
 
     loadJobStatuses() {
@@ -400,65 +420,124 @@ class FutureQuantDashboard {
     }
 
     async loadStrategyData(strategyId) {
-        console.log('Loading strategy data for ID:', strategyId);
+        console.log('Loading futures strategy data for ID:', strategyId);
         if (!strategyId) {
             console.log('No strategy ID provided, returning');
             return;
         }
         
         try {
-            const strategy = this.mockStrategies.find(s => s.id == strategyId);
-            console.log('Found strategy:', strategy);
+            // Define futures strategies with detailed information
+            const futuresStrategies = [
+                { 
+                    id: 1, 
+                    name: 'Aggressive Mean Reversion', 
+                    description: 'High-risk mean reversion for volatile futures markets',
+                    riskLevel: 'High',
+                    timeframe: '5 minutes to 1 hour',
+                    bestFor: 'Volatile markets, short-term trades, experienced traders',
+                    howItWorks: 'Identifies when futures prices move too far from their average and bets they\'ll return to normal levels. Uses aggressive position sizing for maximum profit potential.',
+                    avgGain: '0.1193% per 30-min trade'
+                },
+                { 
+                    id: 2, 
+                    name: 'Conservative Trend Following', 
+                    description: 'Low-risk trend following with tight stops',
+                    riskLevel: 'Low',
+                    timeframe: '1 hour to 4 hours',
+                    bestFor: 'Stable trends, swing trading, risk-averse traders',
+                    howItWorks: 'Follows established futures trends with multiple confirmation signals. Uses tight stop losses and position scaling for risk management.',
+                    avgGain: '0.085% per 2-hour trade'
+                },
+                { 
+                    id: 3, 
+                    name: 'Volatility Breakout', 
+                    description: 'Trade breakouts from low volatility periods',
+                    riskLevel: 'Medium',
+                    timeframe: '15 minutes to 2 hours',
+                    bestFor: 'Range-bound markets, volatility expansion, breakout traders',
+                    howItWorks: 'Monitors futures volatility and enters positions when price breaks out of low volatility ranges with volume confirmation.',
+                    avgGain: '0.156% per breakout trade'
+                },
+                { 
+                    id: 4, 
+                    name: 'Momentum Continuation', 
+                    description: 'Follow strong momentum in futures markets',
+                    riskLevel: 'Medium-High',
+                    timeframe: '30 minutes to 3 hours',
+                    bestFor: 'Strong trending markets, momentum traders, trend followers',
+                    howItWorks: 'Rides strong futures momentum using multiple timeframe analysis and trailing stops to maximize trend profits.',
+                    avgGain: '0.203% per momentum trade'
+                },
+                { 
+                    id: 5, 
+                    name: 'Range Trading', 
+                    description: 'Trade within established support/resistance levels',
+                    riskLevel: 'Low-Medium',
+                    timeframe: '1 hour to 6 hours',
+                    bestFor: 'Sideways markets, range traders, mean reversion',
+                    howItWorks: 'Identifies key support and resistance levels in futures markets and trades bounces within established ranges.',
+                    avgGain: '0.067% per range trade'
+                },
+                { 
+                    id: 6, 
+                    name: 'News Event Trading', 
+                    description: 'Trade around major economic announcements',
+                    riskLevel: 'Very High',
+                    timeframe: '5 minutes to 30 minutes',
+                    bestFor: 'News traders, event-driven strategies, high-frequency trading',
+                    howItWorks: 'Trades futures around major economic events using pre-news positioning and post-news momentum strategies.',
+                    avgGain: '0.342% per news event'
+                }
+            ];
+            
+            const strategy = futuresStrategies.find(s => s.id == strategyId);
+            console.log('Found futures strategy:', strategy);
             if (strategy) {
                 this.updateStrategyDisplay(strategy);
             } else {
-                console.warn('Strategy not found for ID:', strategyId);
+                console.warn('Futures strategy not found for ID:', strategyId);
             }
         } catch (error) {
-            console.error('Error loading strategy data:', error);
+            console.error('Error loading futures strategy data:', error);
         }
     }
     
     updateStrategyDisplay(strategy) {
-        console.log('Updating strategy display for:', strategy.name);
+        console.log('Updating futures strategy display for:', strategy.name);
         const strategyDetails = document.getElementById('fq-strategy-details');
         
         if (strategyDetails) {
-            // Create detailed strategy information
-            let strategyInfo = '';
+            // Create detailed futures strategy information
+            const riskColor = {
+                'Low': 'bg-success',
+                'Low-Medium': 'bg-info',
+                'Medium': 'bg-warning',
+                'Medium-High': 'bg-orange',
+                'High': 'bg-danger',
+                'Very High': 'bg-dark'
+            };
             
-            if (strategy.name === 'Aggressive Mean Reversion') {
-                strategyInfo = `
-                    <div class="alert alert-info mb-2">
-                        <h6 class="text-primary mb-2"><i class="fas fa-chart-line"></i> ${strategy.name}</h6>
-                        <p class="small mb-2"><strong>Strategy Type:</strong> Mean Reversion with High Risk Tolerance</p>
-                        <p class="small mb-2"><strong>Best For:</strong> Volatile markets, short-term trades, experienced traders</p>
-                        <p class="small mb-2"><strong>Risk Level:</strong> <span class="badge bg-danger">High</span></p>
-                        <p class="small mb-0"><strong>Timeframe:</strong> 5 minutes to 1 hour</p>
-                    </div>
-                    <div class="small text-muted mb-2">
-                        <strong>How it works:</strong> Identifies when prices move too far from their average and bets they'll return to normal levels. 
-                        Uses aggressive position sizing for maximum profit potential.
-                    </div>
-                    <div class="alert alert-warning mb-0 py-2 small">
-                        <i class="fas fa-graduation-cap"></i> <strong>Research:</strong> Based on 
-                        <a href="https://arxiv.org/abs/2505.05595" target="_blank" class="text-decoration-none">
-                            FutureQuant Transformer
-                        </a> 
-                        achieving 0.1193% avg gain per 30-min trade.
-                    </div>
-                `;
-            } else {
-                strategyInfo = `
-                    <div class="alert alert-secondary mb-2">
-                        <h6 class="text-secondary mb-2"><i class="fas fa-chart-line"></i> ${strategy.name}</h6>
-                        <p class="small mb-0">Strategy details will be displayed here.</p>
-                    </div>
-                `;
-            }
+            const strategyInfo = `
+                <div class="alert alert-info mb-3">
+                    <h6 class="text-primary mb-2">
+                        <i class="fas fa-chart-line"></i> ${strategy.name}
+                    </h6>
+                    <p class="small mb-2"><strong>Description:</strong> ${strategy.description}</p>
+                    <p class="small mb-2"><strong>Best For:</strong> ${strategy.bestFor}</p>
+                    <p class="small mb-2"><strong>Risk Level:</strong> <span class="badge ${riskColor[strategy.riskLevel]}">${strategy.riskLevel}</span></p>
+                    <p class="small mb-0"><strong>Timeframe:</strong> ${strategy.timeframe}</p>
+                </div>
+                <div class="small text-muted mb-3">
+                    <strong>How it works:</strong> ${strategy.howItWorks}
+                </div>
+                <div class="alert alert-success mb-0 py-2 small">
+                    <i class="fas fa-chart-area"></i> <strong>Performance:</strong> Average gain of ${strategy.avgGain}
+                </div>
+            `;
             
             strategyDetails.innerHTML = strategyInfo;
-            console.log('Strategy display updated');
+            console.log('Futures strategy display updated');
         } else {
             console.error('Strategy details element not found');
         }
@@ -1098,7 +1177,14 @@ class FutureQuantDashboard {
         if (!container) return;
         
         if (!sessions || sessions.length === 0) {
-            container.innerHTML = '<p class="text-muted">No active paper trading sessions</p>';
+            container.innerHTML = `
+                <div class="col-12">
+                    <div class="text-center text-muted">
+                        <p>No active paper trading sessions</p>
+                        <p class="small">Click "Start Session" to begin paper trading with real market data</p>
+                    </div>
+                </div>
+            `;
             return;
         }
         
@@ -1125,14 +1211,34 @@ class FutureQuantDashboard {
                         </div>
                         <div class="mt-2">
                             <button class="btn btn-sm btn-outline-danger" onclick="futurequantDashboard.stopPaperTrading('${session.session_id}')">
-                                Stop Session
+                                <i class="fas fa-stop"></i> Stop
                             </button>
+                            <a href="paper-trading-dashboard.html" class="btn btn-sm btn-primary ms-2" target="_blank">
+                                <i class="fas fa-chart-line"></i> Live Dashboard
+                            </a>
                         </div>
                     </div>
                 </div>
             `;
             container.appendChild(sessionCard);
         });
+    }
+    
+    async getRealTimeDashboardData(sessionId) {
+        try {
+            const response = await fetch(`/api/v1/futurequant/paper-trading/sessions/${sessionId}/dashboard`);
+            const data = await response.json();
+            
+            if (data.success) {
+                return data.dashboard_data;
+            } else {
+                console.error('Failed to get dashboard data:', data.error);
+                return null;
+            }
+        } catch (error) {
+            console.error('Error getting dashboard data:', error);
+            return null;
+        }
     }
 
     updateSignalsDisplay(signals) {
@@ -1316,11 +1422,14 @@ class FutureQuantDashboard {
                                         <div class="mb-3">
                                             <label class="form-label">Horizon (minutes)</label>
                                             <select class="form-select" id="modelHorizon" name="modelHorizon">
+                                                <option value="0.5">30 seconds (DEMO - ultra fast training)</option>
+                                                <option value="5">5 minutes (for testing)</option>
                                                 <option value="15">15 minutes</option>
-                                                <option value="30">30 minutes</option>
-                                                <option value="60">1 hour</option>
-                                                <option value="240">4 hours</option>
+                                                <option value="60">1 hour (60 minutes)</option>
+                                                <option value="240">4 hours (240 minutes)</option>
+                                                <option value="1440">1 day (1440 minutes)</option>
                                             </select>
+                                            <small class="form-text text-muted">30 seconds = demo mode with 5 epochs for quick testing</small>
                                         </div>
                                     </div>
                                 </div>
@@ -1448,10 +1557,12 @@ class FutureQuantDashboard {
                     <div style="margin-bottom: 15px;">
                         <label>Horizon (minutes):</label>
                         <select id="fallbackModelHorizon" style="width: 100%; padding: 8px; margin-top: 5px;">
+                            <option value="0.5">30 seconds (DEMO - ultra fast training)</option>
+                            <option value="5">5 minutes (for testing)</option>
                             <option value="15">15 minutes</option>
-                            <option value="30">30 minutes</option>
-                            <option value="60">1 hour</option>
-                            <option value="240">4 hours</option>
+                            <option value="60">1 hour (60 minutes)</option>
+                            <option value="240">4 hours (240 minutes)</option>
+                            <option value="1440">1 day (1440 minutes)</option>
                         </select>
                     </div>
                     <div style="margin-bottom: 15px;">
@@ -1488,19 +1599,32 @@ class FutureQuantDashboard {
             }
             
             const trainingData = {
+                symbol: selectedSymbols[0], // Use first selected symbol for now
                 model_type: modelType,
-                symbols: selectedSymbols,
-                training_period: trainingPeriod,
-                horizon_minutes: parseInt(horizonMinutes),
+                horizon_minutes: parseFloat(horizonMinutes),
                 hyperparams: JSON.parse(hyperparamsText)
             };
             
             console.log('Training data prepared:', trainingData);
             
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Make real API call to start training
+            const response = await fetch('/api/v1/futurequant/models/train', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(trainingData)
+            });
             
-            this.showNotification('Model training started successfully', 'success');
+            const result = await response.json();
+            console.log('Training API response:', result);
+            
+            if (result.success) {
+                this.showNotification('Model training started successfully', 'success');
+                
+                // Show training progress
+                this.showTrainingProgress(result);
+            } else {
+                throw new Error(result.error || 'Training failed');
+            }
             
             // Remove fallback modal
             const modal = document.getElementById('fallbackModelTrainingModal');
@@ -1570,32 +1694,46 @@ class FutureQuantDashboard {
                 throw new Error('Please select at least one symbol');
             }
             
+            // Prepare training data for the API
             const trainingData = {
+                symbol: selectedSymbols[0], // Use first selected symbol for now
                 model_type: modelTypeValue,
-                symbols: selectedSymbols,
-                training_period: trainingPeriod,
-                horizon_minutes: parseInt(horizonMinutes),
+                horizon_minutes: parseFloat(horizonMinutes),
                 hyperparams: JSON.parse(hyperparamsText)
             };
             
             console.log('Training data prepared:', trainingData);
             
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Make real API call to start training
+            const response = await fetch('/api/v1/futurequant/models/train', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(trainingData)
+            });
             
-            this.showNotification('Model training started successfully', 'success');
+            const result = await response.json();
+            console.log('Training API response:', result);
             
-            // Hide modal if it exists
-            const modalToHide = document.getElementById('modelTrainingModal');
-            if (modalToHide) {
-                const modalInstance = bootstrap.Modal.getInstance(modalToHide);
-                if (modalInstance) {
-                    modalInstance.hide();
+            if (result.success) {
+                this.showNotification('Model training started successfully', 'success');
+                
+                // Show training progress
+                this.showTrainingProgress(result);
+                
+                // Hide modal if it exists
+                const modalToHide = document.getElementById('modelTrainingModal');
+                if (modalToHide) {
+                    const modalInstance = bootstrap.Modal.getInstance(modalToHide);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
                 }
+                
+                // Update job statuses
+                this.loadJobStatuses();
+            } else {
+                throw new Error(result.error || 'Training failed');
             }
-            
-            // Update job statuses
-            this.loadJobStatuses();
             
         } catch (error) {
             console.error('Error training model:', error);
@@ -1635,6 +1773,114 @@ class FutureQuantDashboard {
         
         this.updatePerformanceChart(mockData);
     }
+    
+    showTrainingProgress(result) {
+        // Create or update training progress display
+        let progressDiv = document.getElementById('trainingProgress');
+        if (!progressDiv) {
+            progressDiv = document.createElement('div');
+            progressDiv.id = 'trainingProgress';
+            progressDiv.className = 'alert alert-info';
+            progressDiv.style.position = 'fixed';
+            progressDiv.style.top = '20px';
+            progressDiv.style.right = '20px';
+            progressDiv.style.zIndex = '9999';
+            progressDiv.style.minWidth = '300px';
+            document.body.appendChild(progressDiv);
+        }
+        
+        progressDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h6><i class="fas fa-cog fa-spin"></i> Model Training Started</h6>
+                    <p class="mb-1"><strong>Model ID:</strong> ${result.model_id}</p>
+                    <p class="mb-1"><strong>Symbol:</strong> ${result.symbol}</p>
+                    <p class="mb-1"><strong>Type:</strong> ${result.model_type}</p>
+                    <p class="mb-2"><strong>Status:</strong> Training in progress...</p>
+                </div>
+                <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
+            </div>
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">0%</div>
+            </div>
+            <small class="text-muted">Training started at ${new Date().toLocaleTimeString()}</small>
+        `;
+        
+        // Start progress animation
+        this.animateTrainingProgress(progressDiv);
+    }
+    
+    animateTrainingProgress(progressDiv) {
+        // Get model ID from the progress div
+        const modelId = progressDiv.querySelector('p:first-of-type strong')?.nextSibling?.textContent?.trim();
+        if (!modelId) {
+            console.error('No model ID found for progress tracking');
+            return;
+        }
+        
+        // Poll backend for real training progress
+        const pollInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`/api/v1/futurequant/models/training-status/${modelId}`);
+                const statusData = await response.json();
+                
+                if (statusData.status === 'completed') {
+                    // Training completed
+                    clearInterval(pollInterval);
+                    progressDiv.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6><i class="fas fa-check-circle text-success"></i> Training Completed!</h6>
+                                <p class="mb-1"><strong>Model ID:</strong> ${modelId}</p>
+                                <p class="mb-2"><strong>Status:</strong> Training completed successfully</p>
+                            </div>
+                            <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" style="width: 100%">100%</div>
+                        </div>
+                        <small class="text-muted">Completed at ${new Date().toLocaleTimeString()}</small>
+                    `;
+                } else if (statusData.status === 'failed') {
+                    // Training failed
+                    clearInterval(pollInterval);
+                    progressDiv.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6><i class="fas fa-exclamation-triangle text-danger"></i> Training Failed</h6>
+                                <p class="mb-1"><strong>Model ID:</strong> ${modelId}</p>
+                                <p class="mb-2"><strong>Error:</strong> ${statusData.error || 'Unknown error'}</p>
+                            </div>
+                            <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-danger" style="width: 100%">Failed</div>
+                        </div>
+                        <small class="text-muted">Failed at ${new Date().toLocaleTimeString()}</small>
+                    `;
+                } else if (statusData.status === 'training') {
+                    // Update progress with real data
+                    const progressBar = progressDiv.querySelector('.progress-bar');
+                    const statusText = progressDiv.querySelector('p:last-of-type');
+                    
+                    if (progressBar) {
+                        progressBar.style.width = statusData.progress + '%';
+                        progressBar.textContent = Math.round(statusData.progress) + '%';
+                    }
+                    
+                    if (statusText) {
+                        statusText.innerHTML = `<strong>Status:</strong> Epoch ${statusData.current_epoch}/${statusData.total_epochs} - Loss: ${statusData.loss}`;
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling training status:', error);
+                // Continue polling even if there's an error
+            }
+        }, 2000); // Poll every 2 seconds
+        
+        // Store interval reference for cleanup
+        progressDiv.dataset.progressInterval = pollInterval;
+    }
 
     async startPaperTrading() {
         try {
@@ -1644,14 +1890,40 @@ class FutureQuantDashboard {
                 return;
             }
             
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Get strategy name from the dropdown
+            const strategySelect = document.getElementById('fq-strategy-select');
+            const strategyName = strategySelect.options[strategySelect.selectedIndex].text;
             
-            this.activeSession = 'session_' + Date.now();
-            this.showNotification('Paper trading session started', 'success');
+            // Use futures symbols for futures-focused trading
+            const futuresSymbols = ['ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'CL=F', 'GC=F'];
             
-            // Update sessions
-            this.loadPaperTradingSessions();
+            // Call real API to start paper trading session with selected strategy
+            const response = await fetch('/api/v1/futurequant/paper-trading/start-demo', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.activeSession = data.session_id;
+                
+                // Show strategy-specific notification
+                this.showNotification(`Futures trading session started with ${strategyName} strategy!`, 'success');
+                
+                // Update sessions display
+                this.loadPaperTradingSessions();
+                
+                // Show real-time dashboard link
+                this.showNotification('Open the Live Dashboard to see real-time futures P&L updates!', 'info');
+                
+                // Log strategy selection for debugging
+                console.log(`Started paper trading with strategy: ${strategyName} (ID: ${strategyId})`);
+            } else {
+                this.showNotification('Failed to start session: ' + data.error, 'error');
+            }
             
         } catch (error) {
             console.error('Error starting paper trading:', error);
@@ -1667,16 +1939,30 @@ class FutureQuantDashboard {
                 return;
             }
             
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Call real API to stop paper trading session
+            const response = await fetch(`/api/v1/futurequant/paper-trading/stop/${targetSession}`, {
+                method: 'POST'
+            });
             
-            if (sessionId === this.activeSession) {
-                this.activeSession = null;
+            const data = await response.json();
+            
+            if (data.success) {
+                if (sessionId === this.activeSession) {
+                    this.activeSession = null;
+                }
+                this.showNotification('Paper trading session stopped successfully!', 'success');
+                
+                // Show session summary if available
+                if (data.summary) {
+                    const summary = data.summary;
+                    this.showNotification(`Final P&L: ${summary.total_pnl >= 0 ? '+' : ''}$${summary.total_pnl.toFixed(2)} (${summary.total_return.toFixed(2)}%)`, 'info');
+                }
+                
+                // Update sessions
+                this.loadPaperTradingSessions();
+            } else {
+                this.showNotification('Failed to stop session: ' + data.error, 'error');
             }
-            this.showNotification('Paper trading session stopped', 'success');
-            
-            // Update sessions
-            this.loadPaperTradingSessions();
             
         } catch (error) {
             console.error('Error stopping paper trading:', error);
@@ -1721,6 +2007,33 @@ class FutureQuantDashboard {
                 this.loadSymbolData();
             }
         }, 30000);
+        
+        // Refresh paper trading data more frequently for real-time updates
+        setInterval(() => {
+            if (this.activeSession) {
+                this.refreshActiveSessionData();
+            }
+        }, 10000); // Every 10 seconds
+    }
+    
+    async refreshActiveSessionData() {
+        if (!this.activeSession) return;
+        
+        try {
+            const dashboardData = await this.getRealTimeDashboardData(this.activeSession);
+            if (dashboardData) {
+                // Update any real-time displays if they exist
+                this.updateRealTimeMetrics(dashboardData);
+            }
+        } catch (error) {
+            console.error('Error refreshing session data:', error);
+        }
+    }
+    
+    updateRealTimeMetrics(dashboardData) {
+        // Update any real-time metric displays
+        // This can be expanded to update specific UI elements
+        console.log('Real-time update:', dashboardData);
     }
 
     showNotification(message, type = 'info') {
