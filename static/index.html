@@ -105,6 +105,29 @@
             }
         }
         .col-12.d-flex + .col-12.d-flex { margin-top: -0.2rem; }
+        
+        /* Tech Stack Card Styles */
+        .tech-badge {
+            text-align: center;
+        }
+        
+        .tech-badge .badge {
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            width: 100%;
+            display: block;
+        }
+        
+        .card.border-primary {
+            box-shadow: 0 2px 8px rgba(0,123,255,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .card.border-primary:hover {
+            box-shadow: 0 4px 16px rgba(0,123,255,0.2);
+            transform: translateY(-2px);
+        }
+        
         #main-nav .nav-link {
             color: #183153;
             font-weight: 500;
@@ -328,51 +351,75 @@
                                             
                                                                         <!-- Quick Guide -->
                             <div class="alert alert-info mt-2 mb-0 py-2 small">
-                                <i class="fas fa-info-circle"></i> <strong>How to use:</strong> 
-                                1) Select a <strong>Symbol</strong> (e.g., ES for S&P 500 futures) 
-                                2) Choose a <strong>Strategy</strong> 
-                                3) Click <strong>Train</strong> to build AI models or <strong>Trade</strong> to start paper trading
+                                <i class="fas fa-info-circle"></i> <strong>Quick Start:</strong> 
+                                <strong>Symbol</strong> → <strong>Strategy</strong> → <strong>Train</strong> or <strong>Trade</strong>
                             </div>
                             
                             <!-- Backend Algorithm Info -->
                             <div class="alert alert-secondary mt-2 mb-0 py-2 small">
-                                <i class="fas fa-microchip"></i> <strong>How It Works:</strong> 
-                                <span class="text-muted">Our AI system learns from historical market data to predict future price movements. 
-                                It combines multiple prediction methods and technical analysis tools to make smarter trading decisions.</span>
+                                <i class="fas fa-microchip"></i> <strong>AI Engine:</strong> 
+                                <span class="text-muted">ML models learn from market data to predict price movements using technical analysis</span>
                             </div>
                             
                             <!-- Academic Citation -->
                             <div class="alert alert-info mt-2 mb-0 py-2 small">
-                                <i class="fas fa-graduation-cap"></i> <strong>Research Foundation:</strong> 
+                                <i class="fas fa-graduation-cap"></i> <strong>Performance:</strong> 
                                 <span class="text-muted">Based on </span>
                                 <a href="https://arxiv.org/abs/2505.05595" target="_blank" class="text-decoration-none fw-bold">
                                     FutureQuant Transformer
                                 </a>
-                                <span class="text-muted"> - Distribution-based futures trading strategy achieving 0.1193% average gain per 30-minute trade.</span>
+                                <span class="text-muted">: 0.1193% avg gain per 30-min trade</span>
                             </div>
                             
                             <!-- Data Source Information -->
                             <div class="alert alert-info mt-2 mb-0 py-2 small">
-                                <i class="fas fa-clock"></i> <strong>Market Data Fetching:</strong> 
-                                <span class="text-muted">Click "Fetch Data" to download market data from </span>
-                                <a href="https://finance.yahoo.com/" target="_blank" class="text-decoration-none fw-bold">
-                                    Yahoo Finance
-                                </a>
-                                <span class="text-muted"> via yfinance library. Data is based on US market hours (9:30 AM - 4:00 PM ET) and includes real-time prices, volume, and historical data for futures contracts (ES, NQ, YM).</span>
+                                <i class="fas fa-clock"></i> <strong>Data Source:</strong> 
+                                <span class="text-muted">Yahoo Finance via yfinance - US market hours (9:30-4:00 ET)</span>
                             </div>
                                         </div>
                                         <div class="col-md-4 text-end">
                                             <div class="d-flex gap-2 justify-content-end">
-                                                <button class="btn btn-outline-primary btn-sm" id="fq-ingest-data-btn" 
-                                                        data-bs-toggle="tooltip" data-bs-placement="top" 
-                                                        title="Fetch latest market data from Yahoo Finance. Data is based on US market hours (9:30 AM - 4:00 PM ET). Click to download current day's data.">
-                                                    <i class="fas fa-download"></i> Fetch Data
-                                                </button>
-                                                <button class="btn btn-outline-success btn-sm" id="fq-compute-features-btn"
-                                                        data-bs-toggle="tooltip" data-bs-placement="top" 
-                                                        title="Compute 50+ technical indicators (RSI, MACD, Bollinger Bands, ATR, etc.) from raw market data. This creates the features needed for AI model training and prediction.">
-                                                    <i class="fas fa-cogs"></i> Features
-                                                </button>
+                                                <!-- Technical Stack Card -->
+                                                <div class="card border-primary h-100" style="min-width: 200px;">
+                                                    <div class="card-header bg-primary text-white text-center py-2">
+                                                        <h6 class="mb-0">
+                                                            <i class="fas fa-cogs"></i> FutureQuant Tech Stack
+                                                        </h6>
+                                                    </div>
+                                                                        <div class="card-body py-2">
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="tech-badge mb-1">
+                                    <span class="badge bg-primary">NumPy</span>
+                                </div>
+                                <div class="tech-badge mb-1">
+                                    <span class="badge bg-primary">Pandas</span>
+                                </div>
+                                <div class="tech-badge mb-1">
+                                    <span class="badge bg-info">QuantLib</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="tech-badge mb-1">
+                                    <span class="badge bg-success">PyTorch</span>
+                                </div>
+                                <div class="tech-badge mb-1">
+                                    <span class="badge bg-success">Real-time</span>
+                                </div>
+                                <div class="tech-badge mb-1">
+                                    <span class="badge bg-warning">BRPC</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <div class="tech-badge">
+                                    <span class="badge bg-dark">ML + Risk Mgmt</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

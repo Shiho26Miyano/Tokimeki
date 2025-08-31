@@ -92,6 +92,21 @@ async def start_demo_paper_trading(
             symbols=['ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'CL=F', 'GC=F']  # Futures symbols
         )
         
+        # Store strategy configuration in the session if result is successful
+        if result.get('success') and 'session_id' in result:
+            session_id = result['session_id']
+            if session_id in paper_broker_service.active_sessions:
+                # Store default strategy config for demo
+                paper_broker_service.active_sessions[session_id]['strategy_config'] = {
+                    'name': 'Demo Strategy',
+                    'riskLevel': 'Medium',
+                    'positionSizeMultiplier': 1.0,
+                    'stopLossPercent': 2.0,
+                    'takeProfitPercent': 4.0,
+                    'maxDrawdown': 0.10,
+                    'leverage': 2.0
+                }
+        
         if result["success"]:
             # Track successful request
             await usage_service.track_request(
@@ -203,6 +218,12 @@ async def place_order(
 ):
     """Place an order in paper trading"""
     try:
+        # Get strategy configuration from session if available
+        strategy_config = None
+        if request.session_id in paper_broker_service.active_sessions:
+            session = paper_broker_service.active_sessions[request.session_id]
+            strategy_config = session.get('strategy_config')
+        
         # Place order using shared service
         result = await paper_broker_service.place_order(
             session_id=request.session_id,
@@ -212,7 +233,8 @@ async def place_order(
             order_type=request.order_type,
             price=request.price,
             stop_loss=request.stop_loss,
-            take_profit=request.take_profit
+            take_profit=request.take_profit,
+            strategy_config=strategy_config
         )
         
         if result["success"]:

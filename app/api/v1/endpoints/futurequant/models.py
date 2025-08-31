@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 from app.services.futurequant.model_service import FutureQuantModelService
 from app.services.usage_service import AsyncUsageService
 from app.core.dependencies import get_usage_service
+from app.models.database import get_db
+from app.models.trading_models import Model
 
 logger = logging.getLogger(__name__)
 

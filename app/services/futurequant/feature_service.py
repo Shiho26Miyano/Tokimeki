@@ -254,11 +254,80 @@ class FutureQuantFeatureService:
             features_df = features_df.replace([np.inf, -np.inf], np.nan)
             features_df = features_df.fillna(method=params['fill_method'])
             
+            # Ensure all features are numeric and properly typed
+            features_df = self._ensure_numeric_types(features_df)
+            
+            # Final validation - ensure no object dtypes remain
+            features_df = self._validate_final_features(features_df)
+            
             return features_df
             
         except Exception as e:
             logger.error(f"Error computing feature set: {str(e)}")
             raise
+
+    def _ensure_numeric_types(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Ensure all features are numeric and properly typed"""
+        try:
+            # Convert all columns to numeric, coercing errors to NaN
+            for col in df.columns:
+                if col in ['timestamp', 'date']:  # Skip timestamp columns
+                    continue
+                    
+                # Convert to numeric, coercing errors
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                # Fill any resulting NaN values
+                if df[col].isna().any():
+                    df[col] = df[col].ffill().bfill().fillna(0)
+                
+                # Ensure float64 type for all numeric columns
+                if df[col].dtype in ['object', 'string']:
+                    df[col] = df[col].astype('float64')
+                elif df[col].dtype in ['int64', 'int32', 'int16', 'int8']:
+                    df[col] = df[col].astype('float64')
+                elif df[col].dtype in ['float32', 'float16']:
+                    df[col] = df[col].astype('float64')
+            
+            logger.info(f"Ensured numeric types for {len(df.columns)} columns")
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error ensuring numeric types: {str(e)}")
+            # Return original dataframe if conversion fails
+            return df
+
+    def _validate_final_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Final validation to ensure all features are properly typed"""
+        try:
+            # Check for any remaining object dtypes
+            object_columns = df.select_dtypes(include=['object']).columns.tolist()
+            if object_columns:
+                logger.warning(f"Found object dtype columns: {object_columns}")
+                
+                # Convert remaining object columns to numeric
+                for col in object_columns:
+                    if col not in ['timestamp', 'date']:
+                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                        df[col] = df[col].astype('float64')
+                        logger.info(f"Converted {col} from object to float64")
+            
+            # Final check - ensure all numeric columns are float64
+            numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+            for col in numeric_columns:
+                if df[col].dtype != 'float64':
+                    df[col] = df[col].astype('float64')
+            
+            # Verify no infinite values remain
+            df = df.replace([np.inf, -np.inf], np.nan)
+            df = df.fillna(0)
+            
+            logger.info(f"Final validation complete. DataFrame shape: {df.shape}, dtypes: {df.dtypes.unique()}")
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error in final validation: {str(e)}")
+            return df
     
     async def _compute_returns(self, df: pd.DataFrame, periods: List[int]) -> pd.DataFrame:
         """Compute returns for multiple periods"""
@@ -313,8 +382,16 @@ class FutureQuantFeatureService:
         for period in periods:
             typical_price = (df['high'] + df['low'] + df['close']) / 3
             sma = typical_price.rolling(window=period).mean()
-            mad = typical_price.rolling(window=period).apply(lambda x: np.mean(np.abs(x - x.mean())))
+            
+            # Use pandas operations instead of numpy.apply for better type handling
+            def mad_function(x):
+                return np.mean(np.abs(x - x.mean()))
+            
+            mad = typical_price.rolling(window=period).apply(mad_function, raw=False)
             df[f'cci_{period}'] = (typical_price - sma) / (0.015 * mad)
+            
+            # Ensure the result is numeric
+            df[f'cci_{period}'] = pd.to_numeric(df[f'cci_{period}'], errors='coerce').fillna(0)
         return df
     
     async def _compute_adx(self, df: pd.DataFrame, periods: List[int]) -> pd.DataFrame:
@@ -326,16 +403,21 @@ class FutureQuantFeatureService:
             tr3 = abs(df['low'] - df['close'].shift(1))
             tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
             
-            # Directional Movement
-            dm_plus = np.where((df['high'] - df['high'].shift(1)) > (df['low'].shift(1) - df['low']),
-                              np.maximum(df['high'] - df['high'].shift(1), 0), 0)
-            dm_minus = np.where((df['low'].shift(1) - df['low']) > (df['high'] - df['high'].shift(1)),
-                               np.maximum(df['low'].shift(1) - df['low'], 0), 0)
+            # Directional Movement - ensure proper data types
+            high_diff = df['high'] - df['high'].shift(1)
+            low_diff = df['low'].shift(1) - df['low']
+            
+            # Use pandas operations instead of numpy.where for better type handling
+            dm_plus = pd.Series(0.0, index=df.index)
+            dm_plus.loc[high_diff > low_diff] = high_diff.loc[high_diff > low_diff].clip(lower=0)
+            
+            dm_minus = pd.Series(0.0, index=df.index)
+            dm_minus.loc[low_diff > high_diff] = low_diff.loc[low_diff > high_diff].clip(lower=0)
             
             # Smoothed values
             tr_smooth = tr.rolling(window=period).mean()
-            dm_plus_smooth = pd.Series(dm_plus).rolling(window=period).mean()
-            dm_minus_smooth = pd.Series(dm_minus).rolling(window=period).mean()
+            dm_plus_smooth = dm_plus.rolling(window=period).mean()
+            dm_minus_smooth = dm_minus.rolling(window=period).mean()
             
             # DI values
             di_plus = 100 * dm_plus_smooth / tr_smooth
