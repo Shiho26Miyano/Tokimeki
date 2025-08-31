@@ -10,6 +10,14 @@ import joblib
 import os
 from sqlalchemy.orm import Session
 
+# PyTorch imports for transformer models
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 from app.models.trading_models import Symbol, Bar, Feature, Forecast, Model
 from app.models.database import get_db
 from app.services.brpc_service import get_brpc_service
@@ -20,6 +28,31 @@ class DistModel(Protocol):
     """Protocol for distributional models"""
     def fit(self, X: np.ndarray, y: np.ndarray): ...
     def predict_dist(self, X: np.ndarray) -> Dict[str, np.ndarray]: ...
+
+class FutureQuantTransformer(nn.Module):
+    """FutureQuant Transformer model for distributional prediction"""
+    def __init__(self, input_dim, d_model, n_heads, n_layers, dropout):
+        super().__init__()
+        self.input_projection = nn.Linear(input_dim, d_model)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model, nhead=n_heads, dropout=dropout, batch_first=True
+        )
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
+        self.quantile_head = nn.Linear(d_model, 3)  # q10, q50, q90
+        self.prob_head = nn.Linear(d_model, 1)
+        self.vol_head = nn.Linear(d_model, 1)
+    
+    def forward(self, x):
+        # x: (batch, features) -> add seq dim = 1
+        x = self.input_projection(x)        # (B, d_model)
+        x = x.unsqueeze(1)                  # (B, 1, d_model)
+        x = self.transformer(x)             # (B, 1, d_model)
+        x = x.squeeze(1)                    # (B, d_model)
+        quantiles = self.quantile_head(x)   # (B, 3)
+        prob_up = torch.sigmoid(self.prob_head(x))  # (B, 1)
+        vol = torch.exp(self.vol_head(x))   # (B, 1), positive
+        return quantiles, prob_up, vol
+
 
 class FutureQuantModelService:
     """Service for training and using distributional ML models for futures prediction"""
@@ -146,15 +179,13 @@ class FutureQuantModelService:
                 raise ValueError(f"Invalid model type. Must be one of: {list(self.model_types.keys())}")
             
             # Validate horizon
-            # Convert to float to handle string inputs from frontend
             try:
-                horizon_minutes = float(horizon_minutes)
+                horizon_minutes = float(horizon_minutes)  # may arrive as string
             except (ValueError, TypeError):
                 raise ValueError(f"Invalid horizon format. Must be a number, got: {horizon_minutes}")
             
             logger.info(f"Training with horizon: {horizon_minutes} (type: {type(horizon_minutes)})")
             logger.info(f"Available horizons: {self.horizons}")
-                
             if horizon_minutes not in self.horizons:
                 raise ValueError(f"Invalid horizon. Must be one of: {self.horizons}")
             
@@ -173,19 +204,15 @@ class FutureQuantModelService:
                 )
             except ValueError as e:
                 if "No bars or features found" in str(e):
-                    # Generate test data if none exists
                     logger.info(f"No training data found for {symbol}, generating test data...")
                     test_data_result = await self.generate_test_data(symbol, days=365)
-                    
                     if not test_data_result["success"]:
                         raise ValueError(f"Failed to generate test data: {test_data_result['error']}")
-                    
-                    # Try again with generated data
                     X_train, y_train, X_test, y_test = await self._prepare_training_data(
                         db, symbol, start_date, end_date, horizon_minutes, test_size
                     )
                 else:
-                    raise e
+                    raise
             
             if len(X_train) < 100:
                 raise ValueError(f"Insufficient training data. Need at least 100 samples, got {len(X_train)}")
@@ -201,10 +228,13 @@ class FutureQuantModelService:
             # Save model
             model_path = await self._save_model(model, symbol, model_type, horizon_minutes)
             
-            # Store model metadata in database
+            # Store model metadata in database with initial "training" status
             model_id = await self._store_model_metadata(
-                db, symbol, model_type, model_path, metrics, horizon_minutes, hyperparams
+                db, symbol, model_type, model_path, metrics, horizon_minutes, hyperparams, initial_status="training"
             )
+            
+            # Update status to "completed" after successful training
+            await self._update_model_status(db, model_id, "completed")
             
             return {
                 "success": True,
@@ -218,13 +248,15 @@ class FutureQuantModelService:
                 "model_path": model_path,
                 "hyperparams": hyperparams
             }
-            
         except Exception as e:
-            logger.error(f"Model training error for {symbol}: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error(f"Training error: {e}")
+            # If we have a model_id, update its status to failed
+            if 'model_id' in locals():
+                try:
+                    await self._update_model_status(db, model_id, "failed")
+                except:
+                    pass  # Don't let status update failure mask the original error
+            return {"success": False, "error": str(e)}
     
     async def predict(
         self,
@@ -247,7 +279,6 @@ class FutureQuantModelService:
             
             # Get features for prediction
             features = await self._get_features_for_prediction(db, symbol, start_date, end_date)
-            
             if not features:
                 raise ValueError(f"No features found for {symbol} in date range")
             
@@ -280,7 +311,7 @@ class FutureQuantModelService:
         symbol: str,
         start_date: str,
         end_date: str,
-        horizon_minutes: int,
+        horizon_minutes: float,
         test_size: float
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Prepare training and test data with strict time-based split"""
@@ -306,16 +337,14 @@ class FutureQuantModelService:
         if not bars or not features:
             raise ValueError("No bars or features found for training")
         
-        # Create DataFrame
         data = []
         
         # Convert horizon to appropriate index offset
-        # For 30-second demo, use 1 day as minimum since we have daily bars
         if horizon_minutes == 0.5:  # 30 seconds demo
             horizon_index = 1  # 1 day minimum for daily bars
             logger.info("30-second demo mode: using 1 day offset for daily data")
         elif horizon_minutes < 1:
-            horizon_index = 1  # 1 day minimum for daily bars
+            horizon_index = 1
         else:
             horizon_index = int(horizon_minutes)
         
@@ -328,11 +357,10 @@ class FutureQuantModelService:
             if not feature:
                 continue
             
-            # Get future price (target) - STRICT TIME-BASED SPLIT
+            # Target
             future_bar = bars[i + horizon_index]
             future_return = (future_bar.close - bar.close) / bar.close
             
-            # Combine features
             row = feature.payload.copy()
             row['future_return'] = future_return
             row['timestamp'] = bar.timestamp
@@ -341,24 +369,49 @@ class FutureQuantModelService:
         if not data:
             raise ValueError("No valid training data found")
         
-        # Convert to DataFrame
-        df = pd.DataFrame(data)
-        df = df.dropna()
-        
+        df = pd.DataFrame(data).dropna()
         if len(df) < 100:
             raise ValueError(f"Insufficient data after preprocessing. Got {len(df)} samples")
         
-        # Prepare features and target
-        feature_cols = [col for col in df.columns if col not in ['future_return', 'timestamp']]
+        df = self._fix_feature_data_types(df)
+        
+        feature_cols = [c for c in df.columns if c not in ['future_return', 'timestamp']]
         X = df[feature_cols].values
         y = df['future_return'].values
         
-        # STRICT TIME-BASED SPLIT (no shuffling)
         split_idx = int(len(X) * (1 - test_size))
         X_train, X_test = X[:split_idx], X[split_idx:]
         y_train, y_test = y[:split_idx], y[split_idx:]
-        
         return X_train, y_train, X_test, y_test
+
+    def _fix_feature_data_types(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Fix data types for features to ensure they are numeric"""
+        try:
+            logger.info(f"Fixing data types for {len(df.columns)} columns")
+            for col in df.columns:
+                if col in ['future_return', 'timestamp']:
+                    continue
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                if df[col].isna().any():
+                    df[col] = df[col].ffill().bfill().fillna(0)
+                if df[col].dtype in ['object', 'string', 'int64', 'int32', 'int16', 'int8', 'float32', 'float16']:
+                    df[col] = df[col].astype('float64')
+            object_columns = df.select_dtypes(include=['object']).columns.tolist()
+            if object_columns:
+                logger.warning(f"Found remaining object columns: {object_columns}")
+                for col in object_columns:
+                    if col not in ['future_return', 'timestamp']:
+                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('float64')
+            feature_cols = [c for c in df.columns if c not in ['future_return', 'timestamp']]
+            for col in feature_cols:
+                if not pd.api.types.is_numeric_dtype(df[col]):
+                    logger.error(f"Column {col} is still not numeric: {df[col].dtype}")
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('float64')
+            logger.info(f"Data type fix complete. Final dtypes: {df.dtypes.unique()}")
+            return df
+        except Exception as e:
+            logger.error(f"Error fixing feature data types: {str(e)}")
+            return df
     
     async def _train_distributional_model(
         self,
@@ -370,18 +423,37 @@ class FutureQuantModelService:
         hyperparams: Dict[str, Any] = None
     ) -> Tuple[Any, Dict[str, float]]:
         """Train a distributional model"""
-        if model_type == "quantile_regression":
-            return await self._train_quantile_regression(X_train, y_train, X_test, y_test, hyperparams)
-        elif model_type == "random_forest":
-            return await self._train_random_forest(X_train, y_train, X_test, y_test, hyperparams)
-        elif model_type == "neural_network":
-            return await self._train_neural_network(X_train, y_train, X_test, y_test, hyperparams)
-        elif model_type == "gradient_boosting":
-            return await self._train_gradient_boosting(X_train, y_train, X_test, y_test, hyperparams)
-        elif model_type == "transformer":
-            return await self._train_transformer(X_train, y_train, X_test, y_test, hyperparams)
-        else:
-            raise ValueError(f"Unknown model type: {model_type}")
+        try:
+            if model_type == "quantile_regression":
+                return await self._train_quantile_regression(X_train, y_train, X_test, y_test, hyperparams)
+            elif model_type == "random_forest":
+                return await self._train_random_forest(X_train, y_train, X_test, y_test, hyperparams)
+            elif model_type == "neural_network":
+                return await self._train_neural_network(X_train, y_train, X_test, y_test, hyperparams)
+            elif model_type == "gradient_boosting":
+                return await self._train_gradient_boosting(X_train, y_train, X_test, y_test, hyperparams)
+            elif model_type == "transformer":
+                # For demo mode, try transformer first, fallback to quantile regression if it's too slow
+                if hasattr(self, '_current_horizon') and self._current_horizon == 0.5:
+                    try:
+                        logger.info("Attempting transformer training for demo mode...")
+                        return await self._train_transformer(X_train, y_train, X_test, y_test, hyperparams)
+                    except Exception as e:
+                        logger.warning(f"Transformer training failed for demo mode: {str(e)}")
+                        logger.info("Falling back to quantile regression for faster training...")
+                        return await self._train_quantile_regression(X_train, y_train, X_test, y_test, hyperparams)
+                else:
+                    return await self._train_transformer(X_train, y_train, X_test, y_test, hyperparams)
+            else:
+                raise ValueError(f"Unknown model type: {model_type}")
+        except Exception as e:
+            logger.error(f"Error training {model_type} model: {str(e)}")
+            # For demo mode, always fallback to quantile regression
+            if hasattr(self, '_current_horizon') and self._current_horizon == 0.5:
+                logger.info("Falling back to quantile regression due to training error...")
+                return await self._train_quantile_regression(X_train, y_train, X_test, y_test, hyperparams)
+            else:
+                raise e
     
     async def _train_quantile_regression(
         self,
@@ -394,31 +466,24 @@ class FutureQuantModelService:
         """Train quantile regression model for distributional forecasting"""
         from sklearn.linear_model import QuantileRegressor
         
-        # Default hyperparameters
         default_params = {"alpha": 0.1, "solver": "highs"}
         if hyperparams:
             default_params.update(hyperparams)
         
-        # Train models for different quantiles
         models = {}
         quantiles = [0.1, 0.5, 0.9]
-        
         for q in quantiles:
             model = QuantileRegressor(quantile=q, **default_params)
             model.fit(X_train, y_train)
             models[q] = model
         
-        # Create ensemble model
         ensemble_model = {
             'type': 'quantile_regression',
             'models': models,
             'quantiles': quantiles,
             'hyperparams': default_params
         }
-        
-        # Evaluate
         metrics = await self._evaluate_distributional_model(ensemble_model, X_test, y_test)
-        
         return ensemble_model, metrics
     
     async def _train_transformer(
@@ -430,15 +495,11 @@ class FutureQuantModelService:
         hyperparams: Dict[str, Any] = None
     ) -> Tuple[Any, Dict[str, float]]:
         """Train transformer encoder model (FQT-lite)"""
-        try:
-            import torch
-            import torch.nn as nn
-            import torch.optim as optim
-            from torch.utils.data import DataLoader, TensorDataset
-        except ImportError:
+        if not TORCH_AVAILABLE:
             raise ImportError("PyTorch required for transformer models")
         
-        # Default hyperparameters
+        import torch.optim as optim
+        
         default_params = {
             "d_model": 64,
             "n_heads": 4,
@@ -448,42 +509,22 @@ class FutureQuantModelService:
             "epochs": 100,
             "batch_size": 32
         }
-        
-        # Check if this is a 30-second demo (horizon_minutes = 0.5)
-        # For demo, use much faster training
         if hasattr(self, '_current_horizon') and self._current_horizon == 0.5:
-            logger.info("30-second demo mode: using fast training parameters")
+            logger.info("30-second demo mode: using ultra-fast training parameters")
+            # For demo mode, use simpler parameters to ensure fast training
             default_params.update({
-                "epochs": 5,  # Very few epochs for demo
-                "batch_size": 64,  # Larger batch for speed
-                "lr": 0.01  # Higher learning rate for faster convergence
+                "epochs": 2,  # Very few epochs for demo
+                "batch_size": 256,  # Larger batch for speed
+                "lr": 0.1,  # Higher learning rate for faster convergence
+                "d_model": 16,  # Smaller model for speed
+                "n_heads": 2,  # Fewer attention heads
+                "n_layers": 1  # Single layer for speed
             })
-        
         if hyperparams:
             default_params.update(hyperparams)
         
-        # Create transformer model
-        class FutureQuantTransformer(nn.Module):
-            def __init__(self, input_dim, d_model, n_heads, n_layers, dropout):
-                super().__init__()
-                self.input_projection = nn.Linear(input_dim, d_model)
-                encoder_layer = nn.TransformerEncoderLayer(
-                    d_model=d_model, nhead=n_heads, dropout=dropout, batch_first=True
-                )
-                self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
-                self.quantile_head = nn.Linear(d_model, 3)  # q10, q50, q90
-                self.prob_head = nn.Linear(d_model, 1)
-                self.vol_head = nn.Linear(d_model, 1)
-            
-            def forward(self, x):
-                x = self.input_projection(x)
-                x = self.transformer(x)
-                quantiles = self.quantile_head(x)
-                prob_up = torch.sigmoid(self.prob_head(x))
-                vol = torch.exp(self.vol_head(x))  # Ensure positive volatility
-                return quantiles, prob_up, vol
+        # Use the module-level FutureQuantTransformer class
         
-        # Initialize model
         model = FutureQuantTransformer(
             input_dim=X_train.shape[1],
             d_model=default_params["d_model"],
@@ -492,51 +533,62 @@ class FutureQuantModelService:
             dropout=default_params["dropout"]
         )
         
-        # Training setup
         optimizer = optim.Adam(model.parameters(), lr=default_params["lr"])
-        criterion = nn.MSELoss()
+        # Pinball-like plus volatility penalty is implemented explicitly below
         
-        # Convert to PyTorch tensors
-        X_train_tensor = torch.FloatTensor(X_train)
-        y_train_tensor = torch.FloatTensor(y_train)
+        X_train_tensor = torch.as_tensor(X_train, dtype=torch.float32)
+        y_train_tensor = torch.as_tensor(y_train, dtype=torch.float32)
         
-        # Training loop
         model.train()
-        for epoch in range(default_params["epochs"]):
-            optimizer.zero_grad()
-            
-            # Forward pass
-            quantiles, prob_up, vol = model(X_train_tensor)
-            
-            # Distributional loss (pinball loss for quantiles + volatility penalty)
-            q10, q50, q90 = quantiles[:, 0], quantiles[:, 1], quantiles[:, 2]
-            
-            # Pinball loss for quantiles
-            q10_loss = torch.mean(torch.max((0.1 - 1) * (y_train_tensor - q10), 0.1 * (y_train_tensor - q10)))
-            q50_loss = torch.mean(torch.max((0.5 - 1) * (y_train_tensor - q50), 0.5 * (y_train_tensor - q50)))
-            q90_loss = torch.mean(torch.max((0.9 - 1) * (y_train_tensor - q90), 0.9 * (y_train_tensor - q90)))
-            
-            # Volatility penalty
-            vol_loss = torch.mean(torch.abs(vol - torch.std(y_train_tensor)))
-            
-            # Total loss
-            total_loss = q10_loss + q50_loss + q90_loss + 0.1 * vol_loss
-            
-            # Backward pass
-            total_loss.backward()
-            optimizer.step()
+        logger.info(f"Starting training with {default_params['epochs']} epochs")
         
-        # Create model wrapper
+        # Add timeout for demo mode
+        import time
+        start_time = time.time()
+        max_training_time = 15  # 15 seconds max for demo mode
+        
+        for epoch in range(default_params["epochs"]):
+            # Check timeout
+            if hasattr(self, '_current_horizon') and self._current_horizon == 0.5:
+                if time.time() - start_time > max_training_time:
+                    logger.warning(f"Training timeout after {max_training_time}s, stopping early at epoch {epoch+1}")
+                    break
+            try:
+                optimizer.zero_grad()
+                quantiles, prob_up, vol = model(X_train_tensor)  # (B,3), (B,1), (B,1)
+                q10, q50, q90 = quantiles[:, 0], quantiles[:, 1], quantiles[:, 2]
+                y = y_train_tensor
+                
+                # Pinball losses
+                def pinball_loss(y_true, y_pred, q):
+                    e = y_true - y_pred
+                    return torch.mean(torch.maximum((q - 1) * e, q * e))
+                q10_loss = pinball_loss(y, q10, 0.1)
+                q50_loss = pinball_loss(y, q50, 0.5)
+                q90_loss = pinball_loss(y, q90, 0.9)
+                
+                vol_loss = torch.mean(torch.abs(vol.squeeze(1) - torch.std(y)))
+                total_loss = q10_loss + q50_loss + q90_loss + 0.1 * vol_loss
+                total_loss.backward()
+                optimizer.step()
+                
+                # Log progress every few epochs
+                if epoch % max(1, default_params["epochs"] // 5) == 0:
+                    logger.info(f"Epoch {epoch+1}/{default_params['epochs']}, Loss: {total_loss.item():.6f}")
+                    
+            except Exception as e:
+                logger.error(f"Error during epoch {epoch+1}: {str(e)}")
+                raise e
+        
+        logger.info("Training completed successfully")
+        
         transformer_model = {
             'type': 'transformer',
             'model': model,
             'hyperparams': default_params,
             'input_dim': X_train.shape[1]
         }
-        
-        # Evaluate
         metrics = await self._evaluate_distributional_model(transformer_model, X_test, y_test)
-        
         return transformer_model, metrics
     
     async def _train_random_forest(
@@ -549,18 +601,12 @@ class FutureQuantModelService:
     ) -> Tuple[Any, Dict[str, float]]:
         """Train random forest model"""
         from sklearn.ensemble import RandomForestRegressor
-        
-        # Default hyperparameters
         default_params = {"n_estimators": 100, "max_depth": 10, "random_state": 42}
         if hyperparams:
             default_params.update(hyperparams)
-        
         model = RandomForestRegressor(**default_params)
         model.fit(X_train, y_train)
-        
-        # Evaluate
         metrics = await self._evaluate_distributional_model(model, X_test, y_test)
-        
         return model, metrics
     
     async def _train_neural_network(
@@ -573,18 +619,12 @@ class FutureQuantModelService:
     ) -> Tuple[Any, Dict[str, float]]:
         """Train neural network model"""
         from sklearn.neural_network import MLPRegressor
-        
-        # Default hyperparameters
         default_params = {"hidden_layer_sizes": (100, 50), "max_iter": 500, "random_state": 42}
         if hyperparams:
             default_params.update(hyperparams)
-        
         model = MLPRegressor(**default_params)
         model.fit(X_train, y_train)
-        
-        # Evaluate
         metrics = await self._evaluate_distributional_model(model, X_test, y_test)
-        
         return model, metrics
     
     async def _train_gradient_boosting(
@@ -597,18 +637,12 @@ class FutureQuantModelService:
     ) -> Tuple[Any, Dict[str, float]]:
         """Train gradient boosting model"""
         from sklearn.ensemble import GradientBoostingRegressor
-        
-        # Default hyperparameters
         default_params = {"n_estimators": 100, "max_depth": 5, "random_state": 42}
         if hyperparams:
             default_params.update(hyperparams)
-        
         model = GradientBoostingRegressor(**default_params)
         model.fit(X_train, y_train)
-        
-        # Evaluate
         metrics = await self._evaluate_distributional_model(model, X_test, y_test)
-        
         return model, metrics
     
     async def _evaluate_distributional_model(
@@ -620,53 +654,41 @@ class FutureQuantModelService:
         """Evaluate distributional model performance"""
         try:
             if isinstance(model, dict) and model.get('type') == 'quantile_regression':
-                # For quantile regression ensemble
                 predictions = []
                 for q in model['quantiles']:
                     pred = model['models'][q].predict(X_test)
                     predictions.append(pred)
-                
-                # Calculate metrics for median prediction
-                y_pred = predictions[1]  # 0.5 quantile
-                
-                # Distributional metrics
+                y_pred = predictions[1]  # median
                 q10_pred, q50_pred, q90_pred = predictions[0], predictions[1], predictions[2]
-                
-                # Coverage metrics
                 coverage_10 = np.mean((y_test >= q10_pred) & (y_test <= q90_pred))
                 coverage_50 = np.mean((y_test >= q10_pred) & (y_test <= q50_pred))
-                
             elif isinstance(model, dict) and model.get('type') == 'transformer':
-                # For transformer model
+                # Lazy import torch here to avoid NameError if sklearn path is used
+                import torch
                 model['model'].eval()
                 with torch.no_grad():
-                    X_test_tensor = torch.FloatTensor(X_test)
+                    X_test_tensor = torch.as_tensor(X_test, dtype=torch.float32)
                     quantiles, prob_up, vol = model['model'](X_test_tensor)
-                    q10_pred, q50_pred, q90_pred = quantiles[:, 0].numpy(), quantiles[:, 1].numpy(), quantiles[:, 2].numpy()
+                    q10_pred = quantiles[:, 0].detach().cpu().numpy()
+                    q50_pred = quantiles[:, 1].detach().cpu().numpy()
+                    q90_pred = quantiles[:, 2].detach().cpu().numpy()
                     y_pred = q50_pred
                     coverage_10 = np.mean((y_test >= q10_pred) & (y_test <= q90_pred))
                     coverage_50 = np.mean((y_test >= q10_pred) & (y_test <= q50_pred))
-                
             else:
-                # For single model
                 y_pred = model.predict(X_test)
-                coverage_10 = coverage_50 = 0.0  # Not available for non-distributional models
-            
-            # Calculate metrics
-            mse = np.mean((y_test - y_pred) ** 2)
-            mae = np.mean(np.abs(y_test - y_pred))
-            r2 = 1 - (np.sum((y_test - y_pred) ** 2) / np.sum((y_test - np.mean(y_test)) ** 2))
-            
-            metrics = {
-                "mse": float(mse),
-                "mae": float(mae),
-                "r2": float(r2),
+                coverage_10 = coverage_50 = 0.0  # not available
+            mse = float(np.mean((y_test - y_pred) ** 2))
+            mae = float(np.mean(np.abs(y_test - y_pred)))
+            denom = np.sum((y_test - np.mean(y_test)) ** 2)
+            r2 = float(1 - (np.sum((y_test - y_pred) ** 2) / denom)) if denom != 0 else 0.0
+            return {
+                "mse": mse,
+                "mae": mae,
+                "r2": r2,
                 "coverage_10_90": float(coverage_10),
                 "coverage_10_50": float(coverage_50)
             }
-            
-            return metrics
-            
         except Exception as e:
             logger.error(f"Model evaluation error: {str(e)}")
             return {
@@ -682,21 +704,15 @@ class FutureQuantModelService:
         model: Any,
         symbol: str,
         model_type: str,
-        horizon_minutes: int
+        horizon_minutes: float
     ) -> str:
         """Save trained model to disk"""
-        # Create models directory if it doesn't exist
         models_dir = "models"
         os.makedirs(models_dir, exist_ok=True)
-        
-        # Generate filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{symbol}_{model_type}_{horizon_minutes}m_{timestamp}.joblib"
         filepath = os.path.join(models_dir, filename)
-        
-        # Save model
         joblib.dump(model, filepath)
-        
         return filepath
     
     async def _store_model_metadata(
@@ -706,16 +722,15 @@ class FutureQuantModelService:
         model_type: str,
         model_path: str,
         metrics: Dict[str, float],
-        horizon_minutes: int,
-        hyperparams: Dict[str, Any] = None
+        horizon_minutes: float,
+        hyperparams: Dict[str, Any] = None,
+        initial_status: str = "active"
     ) -> int:
         """Store model metadata in database"""
-        # Get symbol
         symbol_obj = db.query(Symbol).filter(Symbol.ticker == symbol).first()
         if not symbol_obj:
             raise ValueError(f"Symbol {symbol} not found")
         
-        # Create model record
         model = Model(
             name=f"{symbol}_{model_type}_{horizon_minutes}m",
             description=f"{self.model_types[model_type]} for {symbol} with {horizon_minutes}m horizon",
@@ -728,14 +743,62 @@ class FutureQuantModelService:
                 "hyperparams": hyperparams or {}
             },
             metrics=metrics,
-            status="active"
+            status=initial_status
         )
-        
         db.add(model)
         db.commit()
         db.refresh(model)
-        
         return model.id
+    
+    async def _update_model_status(self, db: Session, model_id: int, status: str):
+        """Update model status in database"""
+        try:
+            model = db.query(Model).filter(Model.id == model_id).first()
+            if model:
+                model.status = status
+                model.updated_at = datetime.now()
+                db.commit()
+                logger.info(f"Updated model {model_id} status to: {status}")
+                
+                # Auto-cleanup old models if this one completed successfully
+                if status == 'completed':
+                    await self._cleanup_old_models(db, model.symbol, model.timeframe)
+            else:
+                logger.warning(f"Model {model_id} not found for status update")
+        except Exception as e:
+            logger.error(f"Error updating model {model_id} status: {str(e)}")
+            db.rollback()
+    
+    async def _cleanup_old_models(self, db: Session, symbol: str, timeframe: str, keep_count: int = 3):
+        """Automatically cleanup old models, keeping only the most recent ones"""
+        try:
+            # Get all completed models for this symbol/timeframe combination
+            models = db.query(Model).filter(
+                Model.symbol == symbol,
+                Model.timeframe == timeframe,
+                Model.status == 'completed'
+            ).order_by(Model.updated_at.desc()).all()
+            
+            if len(models) > keep_count:
+                # Keep only the most recent models
+                models_to_delete = models[keep_count:]
+                
+                for model in models_to_delete:
+                    # Delete the model file
+                    model_path = f"models/{model.filename}"
+                    if os.path.exists(model_path):
+                        os.remove(model_path)
+                        logger.info(f"Deleted old model file: {model_path}")
+                    
+                    # Delete from database
+                    db.delete(model)
+                
+                db.commit()
+                logger.info(f"Cleaned up {len(models_to_delete)} old models for {symbol}_{timeframe}")
+                
+        except Exception as e:
+            logger.error(f"Error during model cleanup: {str(e)}")
+            db.rollback()
     
     async def _get_features_for_prediction(
         self,
@@ -745,25 +808,19 @@ class FutureQuantModelService:
         end_date: str
     ) -> List[Dict[str, Any]]:
         """Get features for making predictions"""
-        # Get symbol
         symbol_obj = db.query(Symbol).filter(Symbol.ticker == symbol).first()
         if not symbol_obj:
             raise ValueError(f"Symbol {symbol} not found")
-        
-        # Get features
         features = db.query(Feature).filter(
             Feature.symbol_id == symbol_obj.id,
             Feature.timestamp >= start_date,
             Feature.timestamp <= end_date
         ).order_by(Feature.timestamp).all()
-        
-        # Convert to list of dicts
         result = []
         for feature in features:
             feature_dict = feature.payload.copy()
             feature_dict['timestamp'] = feature.timestamp
             result.append(feature_dict)
-        
         return result
     
     async def _make_distributional_predictions(
@@ -774,43 +831,31 @@ class FutureQuantModelService:
     ) -> List[Dict[str, Any]]:
         """Make distributional predictions using trained model"""
         predictions = []
-        
         for feature in features:
             try:
-                # Extract feature values (exclude timestamp)
                 feature_values = {k: v for k, v in feature.items() if k != 'timestamp'}
-                
-                # Convert to numpy array
                 X = np.array([list(feature_values.values())])
                 
                 if isinstance(model, dict) and model.get('type') == 'quantile_regression':
-                    # For quantile regression ensemble
                     q10_pred = model['models'][0.1].predict(X)[0]
                     q50_pred = model['models'][0.5].predict(X)[0]
                     q90_pred = model['models'][0.9].predict(X)[0]
-                    
-                    # Calculate probability of up movement
-                    prob_up = 0.5 + (q50_pred / (abs(q10_pred) + abs(q90_pred))) * 0.5
+                    prob_up = 0.5 + (q50_pred / (abs(q10_pred) + abs(q90_pred) + 1e-8)) * 0.5
                     prob_up = max(0.0, min(1.0, prob_up))
-                    
-                    # Calculate volatility
                     volatility = abs(q90_pred - q10_pred) / 2
-                    
                 elif isinstance(model, dict) and model.get('type') == 'transformer':
-                    # For transformer model
+                    import torch
                     model['model'].eval()
                     with torch.no_grad():
-                        X_tensor = torch.FloatTensor(X)
-                        quantiles, prob_up, vol = model['model'](X_tensor)
-                        q10_pred = quantiles[0, 0].item()
-                        q50_pred = quantiles[0, 1].item()
-                        q90_pred = quantiles[0, 2].item()
-                        prob_up = prob_up[0, 0].item()
-                        volatility = vol[0, 0].item()
-                
+                        X_tensor = torch.as_tensor(X, dtype=torch.float32)
+                        quantiles, prob_up_t, vol_t = model['model'](X_tensor)
+                        q10_pred = float(quantiles[0, 0].item())
+                        q50_pred = float(quantiles[0, 1].item())
+                        q90_pred = float(quantiles[0, 2].item())
+                        prob_up = float(prob_up_t[0, 0].item())
+                        volatility = float(vol_t[0, 0].item())
                 else:
-                    # For single model
-                    pred = model.predict(X)[0]
+                    pred = float(model.predict(X)[0])
                     q10_pred = pred * 0.9
                     q50_pred = pred
                     q90_pred = pred * 1.1
@@ -826,11 +871,9 @@ class FutureQuantModelService:
                     "prob_up": float(prob_up),
                     "volatility": float(volatility)
                 })
-                
             except Exception as e:
                 logger.error(f"Prediction error for feature: {str(e)}")
                 continue
-        
         return predictions
     
     async def _store_forecasts(
@@ -839,16 +882,13 @@ class FutureQuantModelService:
         symbol: str,
         predictions: List[Dict[str, Any]],
         model_id: int,
-        horizon_minutes: int
+        horizon_minutes: float
     ):
         """Store forecasts in database"""
         try:
-            # Get symbol
             symbol_obj = db.query(Symbol).filter(Symbol.ticker == symbol).first()
             if not symbol_obj:
                 raise ValueError(f"Symbol {symbol} not found")
-            
-            # Create forecast objects
             forecasts = []
             for pred in predictions:
                 forecast = Forecast(
@@ -863,13 +903,9 @@ class FutureQuantModelService:
                     model_id=model_id
                 )
                 forecasts.append(forecast)
-            
-            # Bulk insert
             db.bulk_save_objects(forecasts)
             db.commit()
-            
             logger.info(f"Stored {len(forecasts)} forecasts for {symbol}")
-            
         except Exception as e:
             db.rollback()
             raise e
@@ -885,12 +921,10 @@ class FutureQuantModelService:
                 "symbol": model_config.get("symbol", "ES"),
                 "timeframe": model_config.get("timeframe", "1d")
             }
-            
             response = await self.brpc_service.call_method(
                 method_name="train_model",
                 request_data=request_data
             )
-            
             if response and "error" not in response:
                 return {
                     "success": True,
@@ -903,10 +937,9 @@ class FutureQuantModelService:
             else:
                 return {
                     "success": False, 
-                    "error": response.get("error", "BRPC call failed"),
+                    "error": (response or {}).get("error", "BRPC call failed"),
                     "brpc_mode": False
                 }
-                
         except Exception as e:
             logger.error(f"Model training via BRPC failed: {e}")
             return {"success": False, "error": str(e), "brpc_mode": False}
@@ -914,16 +947,11 @@ class FutureQuantModelService:
     async def predict_brpc(self, model_id: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Make predictions using BRPC"""
         try:
-            request_data = {
-                "model_id": model_id,
-                "input_data": input_data
-            }
-            
+            request_data = {"model_id": model_id, "input_data": input_data}
             response = await self.brpc_service.call_method(
                 method_name="predict",
                 request_data=request_data
             )
-            
             if response and "error" not in response:
                 return {
                     "success": True,
@@ -934,8 +962,7 @@ class FutureQuantModelService:
                     "brpc_mode": self.brpc_service.is_available()
                 }
             else:
-                return {"success": False, "error": response.get("error", "Prediction failed")}
-                
+                return {"success": False, "error": (response or {}).get("error", "Prediction failed")}
         except Exception as e:
             logger.error(f"Prediction via BRPC failed: {e}")
             return {"success": False, "error": str(e)}

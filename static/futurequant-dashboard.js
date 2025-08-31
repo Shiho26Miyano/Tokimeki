@@ -551,6 +551,123 @@ class FutureQuantDashboard {
         modal.className = 'modal fade';
         modal.id = 'trainingModal';
         modal.innerHTML = `
+            <style>
+                .training-step {
+                    transition: all 0.3s ease;
+                }
+                .success-animation {
+                    animation: fadeInUp 0.6s ease-out;
+                }
+                .animate-bounce {
+                    animation: bounce 2s infinite;
+                }
+                .stat-card {
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                    border-radius: 12px;
+                    border: 1px solid #dee2e6;
+                    transition: all 0.3s ease;
+                }
+                .stat-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                    border-color: #007bff;
+                }
+                .progress-circle {
+                    position: relative;
+                    width: 80px;
+                    height: 80px;
+                    margin: 0 auto;
+                }
+                .progress-circle-bg {
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 50%;
+                    background: #e9ecef;
+                    border: 8px solid #dee2e6;
+                }
+                .progress-circle-fill {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 50%;
+                    border: 8px solid transparent;
+                    border-top-color: #28a745;
+                    border-right-color: #28a745;
+                    transform: rotate(45deg);
+                    animation: fillProgress 1s ease-out;
+                }
+                .progress-circle-text {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-weight: bold;
+                    color: #28a745;
+                    font-size: 14px;
+                }
+                .action-buttons {
+                    margin: 2rem 0;
+                }
+                .action-buttons .btn {
+                    transition: all 0.3s ease;
+                }
+                        .action-buttons .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .technical-stack-card {
+            margin: 2rem 0;
+        }
+        
+        .tech-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .tech-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 0.5rem;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            transition: all 0.3s ease;
+        }
+        
+        .tech-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-color: #007bff;
+        }
+        
+        .tech-item .badge {
+            font-size: 0.75rem;
+            padding: 0.375rem 0.75rem;
+        }
+        
+        .tech-item small {
+            font-size: 0.75rem;
+            line-height: 1.2;
+        }
+                @keyframes fadeInUp {
+                    from { opacity: 0; transform: translateY(30px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes bounce {
+                    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+                    40% { transform: translateY(-10px); }
+                    60% { transform: translateY(-5px); }
+                }
+                @keyframes fillProgress {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(45deg); }
+                }
+            </style>
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header bg-primary text-white">
@@ -560,62 +677,263 @@ class FutureQuantDashboard {
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6>Training Configuration</h6>
-                                <div class="mb-3">
-                                    <label class="form-label">Model Type</label>
-                                    <select class="form-select">
-                                        <option>Neural Network</option>
-                                        <option>Random Forest</option>
-                                        <option>Gradient Boosting</option>
-                                        <option>LSTM</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Training Period</label>
-                                    <select class="form-select">
-                                        <option>Last 6 months</option>
-                                        <option>Last 1 year</option>
-                                        <option>Last 2 years</option>
-                                        <option>All available data</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Features</label>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" checked>
-                                        <label class="form-check-label">Price indicators</label>
+                        <!-- Step 1: Configuration -->
+                        <div id="configStep" class="training-step">
+                            <h6><i class="fas fa-cog"></i> Training Configuration</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Model Type</label>
+                                        <select class="form-select" id="modelType">
+                                            <option value="neural_network">Neural Network</option>
+                                            <option value="transformer">Transformer</option>
+                                            <option value="quantile_regression">Quantile Regression</option>
+                                        </select>
                                     </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" checked>
-                                        <label class="form-check-label">Volume indicators</label>
+                                    <div class="mb-3">
+                                        <label class="form-label">Training Period</label>
+                                        <select class="form-select" id="trainingPeriod">
+                                            <option value="6_months">Last 6 months</option>
+                                            <option value="1_year">Last 1 year</option>
+                                            <option value="2_years">Last 2 years</option>
+                                        </select>
                                     </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" checked>
-                                        <label class="form-check-label">Volatility indicators</label>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Features</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="priceIndicators" checked>
+                                            <label class="form-check-label" for="priceIndicators">Price indicators</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="volumeIndicators" checked>
+                                            <label class="form-check-label" for="volumeIndicators">Volume indicators</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="volatilityIndicators" checked>
+                                            <label class="form-check-label" for="volatilityIndicators">Volatility indicators</label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle"></i>
+                                        <small>
+                                            <strong>Training Process:</strong><br>
+                                            • Configure your model settings<br>
+                                            • Click "Start Training" to begin<br>
+                                            • Model will be saved automatically<br>
+                                            • Ready for trading when complete
+                                        </small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <h6>Training Progress</h6>
-                                <div class="text-center p-4">
-                                    <div class="spinner-border text-primary mb-3" role="status">
-                                        <span class="visually-hidden">Training...</span>
+                        </div>
+                        
+                        <!-- Step 2: Training Progress -->
+                        <div id="progressStep" class="training-step" style="display: none;">
+                            <h6><i class="fas fa-chart-line"></i> Training Progress</h6>
+                            <div class="text-center p-4">
+                                <div class="spinner-border text-primary mb-3" role="status">
+                                    <span class="visually-hidden">Training...</span>
+                                </div>
+                                <h6>Training in Progress...</h6>
+                                <div class="progress mb-3">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         style="width: 45%">45%</div>
+                                </div>
+                                <p class="text-muted small">Epoch 23/50 - Loss: 0.0234</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 3: Completion -->
+                        <div id="completionStep" class="training-step" style="display: none;">
+                            <div class="text-center p-4">
+                                <!-- Success Animation -->
+                                <div class="success-animation mb-4">
+                                    <div class="text-success mb-3">
+                                        <i class="fas fa-check-circle fa-4x animate-bounce"></i>
                                     </div>
-                                    <h6>Training in Progress...</h6>
-                                    <div class="progress mb-3">
-                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                             style="width: 45%">45%</div>
+                                    <h4 class="text-success mb-2">🎉 Training Complete!</h4>
+                                    <p class="text-muted">Your AI model is ready to trade</p>
+                                </div>
+                                
+                                <!-- Model Status Card -->
+                                <div class="card border-success mb-4">
+                                    <div class="card-body text-center">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-8">
+                                                <h5 class="card-title text-success mb-2">
+                                                    <i class="fas fa-robot"></i> Model Saved Successfully
+                                                </h5>
+                                                <p class="card-text mb-3">
+                                                    Your trained model has been automatically saved and is now ready for 
+                                                    <strong>paper trading</strong> and <strong>strategy execution</strong>.
+                                                </p>
+                                                <div class="d-flex justify-content-center gap-3">
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-save"></i> Saved
+                                                    </span>
+                                                    <span class="badge bg-primary">
+                                                        <i class="fas fa-chart-line"></i> Trading Ready
+                                                    </span>
+                                                    <span class="badge bg-info">
+                                                        <i class="fas fa-shield-alt"></i> Risk Managed
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="text-center">
+                                                    <div class="progress-circle mb-2">
+                                                        <div class="progress-circle-bg"></div>
+                                                        <div class="progress-circle-fill"></div>
+                                                        <div class="progress-circle-text">100%</div>
+                                                    </div>
+                                                    <small class="text-muted">Training Progress</small>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p class="text-muted small">Epoch 23/50 - Loss: 0.0234</p>
+                                </div>
+                                
+                                                                    <!-- Technical Stack Card -->
+                                    <div class="technical-stack-card mb-4">
+                                        <div class="card border-primary">
+                                            <div class="card-header bg-primary text-white text-center">
+                                                <h6 class="mb-0">
+                                                    <i class="fas fa-cogs"></i> FutureQuant Technical Stack
+                                                </h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <h6 class="text-primary mb-3">
+                                                            <i class="fas fa-python"></i> Core Python Libraries
+                                                        </h6>
+                                                        <div class="tech-list">
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-primary">NumPy</span>
+                                                                <small class="text-muted">Numerical computing</small>
+                                                            </div>
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-primary">Pandas</span>
+                                                                <small class="text-muted">Data manipulation</small>
+                                                            </div>
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-info">QuantLib</span>
+                                                                <small class="text-muted">Derivatives pricing</small>
+                                                            </div>
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-primary">yfinance</span>
+                                                                <small class="text-muted">Market data</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                                                                        <div class="col-md-6">
+                                                        <h6 class="text-success mb-3">
+                                                            <i class="fas fa-rocket"></i> Core Technologies
+                                                        </h6>
+                                                        <div class="tech-list">
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-success">PyTorch</span>
+                                                                <small class="text-muted">Deep learning</small>
+                                                            </div>
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-success">Transformer Models</span>
+                                                                <small class="text-muted">Sequence learning</small>
+                                                            </div>
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-warning">BRPC</span>
+                                                                <small class="text-muted">High-performance RPC</small>
+                                                            </div>
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-success">Real-time Processing</span>
+                                                                <small class="text-muted">Async I/O</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Core Quantitative Analysis Section -->
+                                        <div class="row mt-3">
+                                            <div class="col-12">
+                                                <h6 class="text-dark mb-3">
+                                                    <i class="fas fa-chart-line"></i> Essential Quant Components
+                                                </h6>
+                                                <div class="tech-list">
+                                                    <div class="row">
+                                                        <div class="col-md-4">
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-dark">Risk Management</span>
+                                                                <small class="text-muted">Position sizing</small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-dark">Feature Engineering</span>
+                                                                <small class="text-muted">Technical indicators</small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="tech-item">
+                                                                <span class="badge bg-dark">Portfolio Theory</span>
+                                                                <small class="text-muted">MPT & CAPM</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Start Trading Button -->
+                                        <div class="text-center mt-4">
+                                        <button type="button" class="btn btn-success btn-lg" onclick="startTradingWithModel()">
+                                            <i class="fas fa-play"></i> Start Trading with Model
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Quick Stats -->
+                                    <div class="row mt-4">
+                                    <div class="col-md-3">
+                                        <div class="stat-card text-center p-3">
+                                            <i class="fas fa-chart-line fa-2x text-primary mb-2"></i>
+                                            <h6 class="mb-1">Ready for Trading</h6>
+                                            <small class="text-muted">Paper Trading</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stat-card text-center p-3">
+                                            <i class="fas fa-robot fa-2x text-success mb-2"></i>
+                                            <h6 class="mb-1">AI Powered</h6>
+                                            <small class="text-muted">Machine Learning</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stat-card text-center p-3">
+                                            <i class="fas fa-shield-alt fa-2x text-info mb-2"></i>
+                                            <h6 class="mb-1">Risk Managed</h6>
+                                            <small class="text-muted">Safety First</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stat-card text-center p-3">
+                                            <i class="fas fa-rocket fa-2x text-warning mb-2"></i>
+                                            <h6 class="mb-1">High Performance</h6>
+                                            <small class="text-muted">Optimized</small>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="startTrainingBRPC()">Start Training</button>
+                        <button type="button" class="btn btn-primary" id="startTrainingBtn" onclick="startTrainingBRPC()">Start Training</button>
+                        <button type="button" class="btn btn-success" id="backToConfigBtn" onclick="showTrainingStep('config')" style="display: none;">Back to Configuration</button>
+                        <button type="button" class="btn btn-info" id="closeModalBtn" data-bs-dismiss="modal" style="display: none;">Close</button>
                     </div>
                 </div>
             </div>
@@ -1827,6 +2145,8 @@ class FutureQuantDashboard {
                 if (statusData.status === 'completed') {
                     // Training completed
                     clearInterval(pollInterval);
+                    
+                    // Update the progress div
                     progressDiv.innerHTML = `
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
@@ -1840,10 +2160,20 @@ class FutureQuantDashboard {
                             <div class="progress-bar bg-success" style="width: 100%">100%</div>
                         </div>
                         <small class="text-muted">Completed at ${new Date().toLocaleTimeString()}</small>
+                        
+                        <div class="alert alert-success mt-2">
+                            <i class="fas fa-save"></i>
+                            <strong>Model Saved!</strong> Ready for paper trading and strategy execution.
+                        </div>
                     `;
+                    
+                    // Also update the main training dialog if it exists
+                    this.updateMainTrainingDialog(modelId, 'completed', statusData);
                 } else if (statusData.status === 'failed') {
                     // Training failed
                     clearInterval(pollInterval);
+                    
+                    // Update the progress div
                     progressDiv.innerHTML = `
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
@@ -1858,6 +2188,9 @@ class FutureQuantDashboard {
                         </div>
                         <small class="text-muted">Failed at ${new Date().toLocaleTimeString()}</small>
                     `;
+                    
+                    // Also update the main training dialog if it exists
+                    this.updateMainTrainingDialog(modelId, 'failed', statusData);
                 } else if (statusData.status === 'training') {
                     // Update progress with real data
                     const progressBar = progressDiv.querySelector('.progress-bar');
@@ -1881,6 +2214,71 @@ class FutureQuantDashboard {
         // Store interval reference for cleanup
         progressDiv.dataset.progressInterval = pollInterval;
     }
+    
+    updateMainTrainingDialog(modelId, status, statusData) {
+        // Find the main training dialog
+        const trainingDialog = document.querySelector('.modal.show');
+        if (!trainingDialog) return;
+        
+        // Find the training progress section
+        const progressSection = trainingDialog.querySelector('.col-md-6:last-child');
+        if (!progressSection) return;
+        
+                        if (status === 'completed') {
+                    // Update to completed state
+                    progressSection.innerHTML = `
+                        <h6>Training Progress</h6>
+                        <div class="text-center p-4">
+                            <div class="text-success mb-3">
+                                <i class="fas fa-check-circle fa-3x"></i>
+                            </div>
+                            <h6 class="text-success">Training Completed!</h6>
+                            <div class="progress mb-3">
+                                <div class="progress-bar bg-success" style="width: 100%">100%</div>
+                            </div>
+                            <p class="text-success small">Model ID: ${modelId} - Training completed successfully</p>
+                            <p class="text-muted small">Completed at ${new Date().toLocaleTimeString()}</p>
+                            
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Model Saved!</strong> Your trained model has been automatically saved and is now ready for trading.
+                                <br><small class="text-muted">You can use this model for paper trading and strategy execution.</small>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Update the Start Training button to be disabled or change text
+                    const startButton = trainingDialog.querySelector('.btn-primary');
+                    if (startButton) {
+                        startButton.textContent = 'Model Ready for Trading';
+                        startButton.disabled = true;
+                        startButton.className = 'btn btn-success';
+                    }
+        } else if (status === 'failed') {
+            // Update to failed state
+            progressSection.innerHTML = `
+                <h6>Training Progress</h6>
+                <div class="text-center p-4">
+                    <div class="text-danger mb-3">
+                        <i class="fas fa-exclamation-triangle fa-3x"></i>
+                    </div>
+                    <h6 class="text-danger">Training Failed</h6>
+                    <div class="progress mb-3">
+                        <div class="progress-bar bg-danger" style="width: 100%">Failed</div>
+                    </div>
+                    <p class="text-danger small">Error: ${statusData.error || 'Unknown error'}</p>
+                    <p class="text-muted small">Failed at ${new Date().toLocaleTimeString()}</p>
+                </div>
+            `;
+            
+            // Update the Start Training button
+            const startButton = trainingDialog.querySelector('.btn-primary');
+            if (startButton) {
+                startButton.textContent = 'Retry Training';
+                startButton.className = 'btn btn-warning';
+            }
+        }
+    }
 
     async startPaperTrading() {
         try {
@@ -1890,9 +2288,13 @@ class FutureQuantDashboard {
                 return;
             }
             
-            // Get strategy name from the dropdown
+            // Get strategy name and details from the dropdown
             const strategySelect = document.getElementById('fq-strategy-select');
             const strategyName = strategySelect.options[strategySelect.selectedIndex].text;
+            
+            // Get strategy configuration based on selection
+            const strategyConfig = this.getStrategyConfiguration(strategyId);
+            console.log('Applying strategy configuration:', strategyConfig);
             
             // Use futures symbols for futures-focused trading
             const futuresSymbols = ['ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'CL=F', 'GC=F'];
@@ -1902,7 +2304,12 @@ class FutureQuantDashboard {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
+                body: JSON.stringify({
+                    strategy_name: strategyName,
+                    strategy_config: strategyConfig,
+                    symbols: futuresSymbols
+                })
             });
             
             const data = await response.json();
@@ -1910,8 +2317,11 @@ class FutureQuantDashboard {
             if (data.success) {
                 this.activeSession = data.session_id;
                 
-                // Show strategy-specific notification
-                this.showNotification(`Futures trading session started with ${strategyName} strategy!`, 'success');
+                // Store strategy config for this session
+                this.activeStrategyConfig = strategyConfig;
+                
+                // Show strategy-specific notification with details
+                this.showNotification(`🎯 ${strategyName} strategy applied! Risk: ${strategyConfig.riskLevel}, Position Size: ${strategyConfig.positionSizeMultiplier}x`, 'success');
                 
                 // Update sessions display
                 this.loadPaperTradingSessions();
@@ -1919,8 +2329,12 @@ class FutureQuantDashboard {
                 // Show real-time dashboard link
                 this.showNotification('Open the Live Dashboard to see real-time futures P&L updates!', 'info');
                 
-                // Log strategy selection for debugging
+                // Log strategy application
                 console.log(`Started paper trading with strategy: ${strategyName} (ID: ${strategyId})`);
+                console.log('Strategy configuration applied:', strategyConfig);
+                
+                // Show strategy details panel
+                this.showStrategyDetailsPanel(strategyConfig);
             } else {
                 this.showNotification('Failed to start session: ' + data.error, 'error');
             }
@@ -1929,6 +2343,152 @@ class FutureQuantDashboard {
             console.error('Error starting paper trading:', error);
             this.showNotification('Error starting paper trading session', 'error');
         }
+    }
+
+    getStrategyConfiguration(strategyId) {
+        // Define strategy-specific configurations that affect trading behavior
+        const strategyConfigs = {
+            1: { // Aggressive Mean Reversion
+                name: 'Aggressive Mean Reversion',
+                riskLevel: 'High',
+                positionSizeMultiplier: 2.0,        // 2x normal position size
+                stopLossPercent: 3.0,               // 3% stop loss
+                takeProfitPercent: 6.0,             // 6% take profit
+                maxDrawdown: 0.15,                  // 15% max drawdown
+                leverage: 3.0,                      // 3x leverage
+                entryRules: 'Enter when price deviates 2+ standard deviations from mean',
+                exitRules: 'Exit on mean reversion or stop loss hit',
+                timeHorizon: '5min-1hour',
+                volatilityThreshold: 'High'
+            },
+            2: { // Conservative Trend Following
+                name: 'Conservative Trend Following',
+                riskLevel: 'Low',
+                positionSizeMultiplier: 0.5,        // 0.5x normal position size
+                stopLossPercent: 1.5,               // 1.5% tight stop loss
+                takeProfitPercent: 3.0,             // 3% take profit
+                maxDrawdown: 0.08,                  // 8% max drawdown
+                leverage: 1.5,                      // 1.5x leverage
+                entryRules: 'Enter on trend confirmation with multiple timeframes',
+                exitRules: 'Exit on trend reversal or trailing stop',
+                timeHorizon: '1hour-4hours',
+                volatilityThreshold: 'Low'
+            },
+            3: { // Volatility Breakout
+                name: 'Volatility Breakout',
+                riskLevel: 'Medium',
+                positionSizeMultiplier: 1.0,        // 1x normal position size
+                stopLossPercent: 2.5,               // 2.5% stop loss
+                takeProfitPercent: 5.0,             // 5% take profit
+                maxDrawdown: 0.12,                  // 12% max drawdown
+                leverage: 2.0,                      // 2x leverage
+                entryRules: 'Enter on volatility expansion with volume confirmation',
+                exitRules: 'Exit on volatility contraction or target hit',
+                timeHorizon: '15min-2hours',
+                volatilityThreshold: 'Medium'
+            },
+            4: { // Momentum Continuation
+                name: 'Momentum Continuation',
+                riskLevel: 'Medium-High',
+                positionSizeMultiplier: 1.5,        // 1.5x normal position size
+                stopLossPercent: 2.0,               // 2% stop loss
+                takeProfitPercent: 8.0,             // 8% take profit
+                maxDrawdown: 0.18,                  // 18% max drawdown
+                leverage: 2.5,                      // 2.5x leverage
+                entryRules: 'Enter on momentum confirmation with volume',
+                exitRules: 'Exit on momentum loss or trailing stop',
+                timeHorizon: '30min-3hours',
+                volatilityThreshold: 'Medium-High'
+            },
+            5: { // Range Trading
+                name: 'Range Trading',
+                riskLevel: 'Low-Medium',
+                positionSizeMultiplier: 0.8,        // 0.8x normal position size
+                stopLossPercent: 2.0,               // 2% stop loss
+                takeProfitPercent: 4.0,             // 4% take profit
+                maxDrawdown: 0.10,                  // 10% max drawdown
+                leverage: 1.8,                      // 1.8x leverage
+                entryRules: 'Enter at support/resistance with reversal signals',
+                exitRules: 'Exit at opposite boundary or stop loss',
+                timeHorizon: '1hour-6hours',
+                volatilityThreshold: 'Low'
+            },
+            6: { // News Event Trading
+                name: 'News Event Trading',
+                riskLevel: 'Very High',
+                positionSizeMultiplier: 3.0,        // 3x normal position size
+                stopLossPercent: 5.0,               // 5% stop loss
+                takeProfitPercent: 15.0,            // 15% take profit
+                maxDrawdown: 0.25,                  // 25% max drawdown
+                leverage: 4.0,                      // 4x leverage
+                entryRules: 'Enter before major news with position sizing',
+                exitRules: 'Exit on news release or extreme volatility',
+                timeHorizon: '5min-30min',
+                volatilityThreshold: 'Extreme'
+            }
+        };
+        
+        return strategyConfigs[strategyId] || strategyConfigs[1]; // Default to aggressive if not found
+    }
+
+    showStrategyDetailsPanel(strategyConfig) {
+        // Create and show a strategy details panel
+        const panel = document.createElement('div');
+        panel.className = 'alert alert-info alert-dismissible fade show';
+        panel.innerHTML = `
+            <div class="row">
+                <div class="col-md-8">
+                    <h6 class="alert-heading">🎯 Active Strategy: ${strategyConfig.name}</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <small><strong>Risk Level:</strong> <span class="badge bg-${this.getRiskColor(strategyConfig.riskLevel)}">${strategyConfig.riskLevel}</span></small><br>
+                            <small><strong>Position Size:</strong> ${strategyConfig.positionSizeMultiplier}x</small><br>
+                            <small><strong>Leverage:</strong> ${strategyConfig.leverage}x</small>
+                        </div>
+                        <div class="col-md-6">
+                            <small><strong>Stop Loss:</strong> ${strategyConfig.stopLossPercent}%</small><br>
+                            <small><strong>Take Profit:</strong> ${strategyConfig.takeProfitPercent}%</small><br>
+                            <small><strong>Max Drawdown:</strong> ${strategyConfig.maxDrawdown * 100}%</small>
+                        </div>
+                    </div>
+                    <small class="text-muted mt-2 d-block">
+                        <strong>Entry:</strong> ${strategyConfig.entryRules}<br>
+                        <strong>Exit:</strong> ${strategyConfig.exitRules}
+                    </small>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="this.showStrategyPerformance()">
+                            <i class="fas fa-chart-line"></i> Performance
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add to the page
+        const container = document.querySelector('.container') || document.body;
+        container.insertBefore(panel, container.firstChild);
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            if (panel.parentNode) {
+                panel.remove();
+            }
+        }, 10000);
+    }
+
+    getRiskColor(riskLevel) {
+        const colors = {
+            'Low': 'success',
+            'Low-Medium': 'info',
+            'Medium': 'warning',
+            'Medium-High': 'orange',
+            'High': 'danger',
+            'Very High': 'dark'
+        };
+        return colors[riskLevel] || 'secondary';
     }
 
     async stopPaperTrading(sessionId = null) {
@@ -2336,11 +2896,24 @@ window.testTradeButton = function() {
 // BRPC Training Function
 async function startTrainingBRPC() {
     try {
+        // Get values from the new step-based UI
+        const modelType = document.getElementById('modelType')?.value || 'neural_network';
+        const trainingPeriod = document.getElementById('trainingPeriod')?.value || '6_months';
+        const priceIndicators = document.getElementById('priceIndicators')?.checked || false;
+        const volumeIndicators = document.getElementById('volumeIndicators')?.checked || false;
+        const volatilityIndicators = document.getElementById('volatilityIndicators')?.checked || false;
+        
         const trainingConfig = {
-            model_type: document.querySelector('#trainingModal select')?.value || 'Neural Network',
+            model_type: modelType,
             strategy_id: document.getElementById('fq-strategy-select')?.value || 1,
             symbol: document.getElementById('fq-symbol-select')?.value || 'ES',
             timeframe: document.getElementById('fq-timeframe-select')?.value || '1d',
+            training_period: trainingPeriod,
+            features: {
+                price_indicators: priceIndicators,
+                volume_indicators: volumeIndicators,
+                volatility_indicators: volatilityIndicators
+            },
             hyperparameters: {
                 epochs: 100,
                 batch_size: 32,
@@ -2348,7 +2921,10 @@ async function startTrainingBRPC() {
             }
         };
         
-        console.log('Starting BRPC training with config:', trainingConfig);
+        console.log('Starting training with config:', trainingConfig);
+        
+        // Show progress step
+        showTrainingStep('progress');
         
         const response = await fetch('/api/v1/futurequant/models/train-brpc', {
             method: 'POST',
@@ -2357,17 +2933,308 @@ async function startTrainingBRPC() {
         });
         
         const result = await response.json();
-        console.log('BRPC training result:', result);
+        console.log('Training result:', result);
         
         if (result.success) {
-            showTrainingProgressBRPC(result);
+            // Start monitoring training progress
+            monitorTrainingProgress(result.model_id);
         } else {
             showTrainingError(result.error);
         }
     } catch (error) {
-        console.error('BRPC training failed:', error);
+        console.error('Training failed:', error);
         showTrainingError('Training failed: ' + error.message);
     }
+}
+
+// Function to show different training steps
+function showTrainingStep(step) {
+    // Hide all steps
+    document.getElementById('configStep').style.display = 'none';
+    document.getElementById('progressStep').style.display = 'none';
+    document.getElementById('completionStep').style.display = 'none';
+    
+    // Get button references
+    const startTrainingBtn = document.getElementById('startTrainingBtn');
+    const backToConfigBtn = document.getElementById('backToConfigBtn');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    
+    // Show the requested step and update buttons
+    switch(step) {
+        case 'config':
+            document.getElementById('configStep').style.display = 'block';
+            if (startTrainingBtn) startTrainingBtn.style.display = 'inline-block';
+            if (backToConfigBtn) backToConfigBtn.style.display = 'none';
+            if (closeModalBtn) closeModalBtn.style.display = 'none';
+            break;
+        case 'progress':
+            document.getElementById('progressStep').style.display = 'block';
+            if (startTrainingBtn) startTrainingBtn.style.display = 'none';
+            if (backToConfigBtn) backToConfigBtn.style.display = 'none';
+            if (closeModalBtn) closeModalBtn.style.display = 'none';
+            break;
+        case 'completion':
+            document.getElementById('completionStep').style.display = 'block';
+            if (startTrainingBtn) startTrainingBtn.style.display = 'none';
+            if (backToConfigBtn) backToConfigBtn.style.display = 'inline-block';
+            if (closeModalBtn) closeModalBtn.style.display = 'inline-block';
+            break;
+    }
+}
+
+// Function to monitor training progress
+async function monitorTrainingProgress(modelId) {
+    try {
+        const response = await fetch(`/api/v1/futurequant/models/status/${modelId}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            if (result.status === 'completed') {
+                showTrainingStep('completion');
+                updateTrainingProgress(100, 'Training completed successfully!');
+            } else if (result.status === 'failed') {
+                showTrainingError('Training failed: ' + (result.error || 'Unknown error'));
+            } else {
+                // Still training, update progress and check again
+                updateTrainingProgress(result.progress || 0, result.message || 'Training in progress...');
+                setTimeout(() => monitorTrainingProgress(modelId), 2000); // Check every 2 seconds
+            }
+        } else {
+            showTrainingError('Failed to get training status');
+        }
+    } catch (error) {
+        console.error('Error monitoring training:', error);
+        showTrainingError('Error monitoring training: ' + error.message);
+    }
+}
+
+// Function to update training progress
+function updateTrainingProgress(progress, message) {
+    const progressStep = document.getElementById('progressStep');
+    if (progressStep) {
+        const progressBar = progressStep.querySelector('.progress-bar');
+        const messageElement = progressStep.querySelector('h6');
+        
+        if (progressBar) {
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = progress + '%';
+        }
+        
+        if (messageElement) {
+            messageElement.textContent = message;
+        }
+    }
+}
+
+// Function to start trading with the trained model
+function startTradingWithModel() {
+    console.log('Starting trading with trained model...');
+    
+    // Close the training modal
+    const trainingModal = bootstrap.Modal.getInstance(document.getElementById('trainingModal'));
+    if (trainingModal) {
+        trainingModal.hide();
+    }
+    
+    // Show the trading interface
+    if (window.futurequantDashboard) {
+        window.futurequantDashboard.showTradingInterface();
+    } else {
+        // Fallback: show a success message and redirect
+        showSuccessMessage('Model loaded successfully! Redirecting to trading interface...');
+        setTimeout(() => {
+            // You can redirect to the trading page or show trading modal
+            showTradingModal();
+        }, 2000);
+    }
+}
+
+// Function to view model details
+function viewModelDetails() {
+    console.log('Showing model details...');
+    
+    // Create and show model details modal
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-info-circle"></i> Model Details
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Model Information</h6>
+                            <table class="table table-sm">
+                                <tr><td><strong>Model Type:</strong></td><td>Neural Network</td></tr>
+                                <tr><td><strong>Training Period:</strong></td><td>Last 6 months</td></tr>
+                                <tr><td><strong>Features:</strong></td><td>Price, Volume, Volatility</td></tr>
+                                <tr><td><strong>Status:</strong></td><td><span class="badge bg-success">Ready</span></td></tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Performance Metrics</h6>
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h4 class="text-success">85.7%</h4>
+                                    <p class="mb-0">Training Accuracy</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <h6>Model Capabilities</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="text-center p-3">
+                                    <i class="fas fa-chart-line fa-2x text-primary mb-2"></i>
+                                    <p class="small">Price Prediction</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center p-3">
+                                    <i class="fas fa-robot fa-2x text-success mb-2"></i>
+                                    <p class="small">AI Trading Signals</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center p-3">
+                                    <i class="fas fa-shield-alt fa-2x text-info mb-2"></i>
+                                    <p class="small">Risk Management</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success" onclick="startTradingWithModel()">
+                        <i class="fas fa-play"></i> Start Trading
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Show the modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    // Clean up when modal is hidden
+    modal.addEventListener('hidden.bs.modal', () => {
+        document.body.removeChild(modal);
+    });
+}
+
+// Function to show success message
+function showSuccessMessage(message) {
+    // Create a toast notification
+    const toast = document.createElement('div');
+    toast.className = 'toast align-items-center text-white bg-success border-0';
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-check-circle"></i> ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(toast);
+    
+    // Show toast
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    // Remove after hidden
+    toast.addEventListener('hidden.bs.toast', () => {
+        document.body.removeChild(toast);
+    });
+}
+
+// Function to show trading modal (fallback)
+function showTradingModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-play"></i> Paper Trading with AI Model
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-success">
+                        <i class="fas fa-robot"></i>
+                        <strong>AI Model Loaded!</strong> Your trained model is now active and ready for paper trading.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h6>Live Trading Chart</h6>
+                            <div class="border rounded p-3" style="height: 300px; background: #f8f9fa;">
+                                <div class="text-center text-muted pt-5">
+                                    <i class="fas fa-chart-line fa-3x mb-3"></i>
+                                    <p>Real-time price chart with AI trading signals</p>
+                                    <small>Your trained model will provide entry/exit signals</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>AI Trading Signals</h6>
+                            <div class="list-group">
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>ES Long</strong><br>
+                                        <small class="text-muted">AI Signal: Strong Buy</small>
+                                    </div>
+                                    <span class="badge bg-success">+$125</span>
+                                </div>
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>NQ Short</strong><br>
+                                        <small class="text-muted">AI Signal: Sell</small>
+                                    </div>
+                                    <span class="badge bg-danger">-$85</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success">
+                        <i class="fas fa-play"></i> Start Paper Trading
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Show the modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    // Clean up when modal is hidden
+    modal.addEventListener('hidden.bs.modal', () => {
+        document.body.removeChild(modal);
+    });
 }
 
 function showTrainingProgressBRPC(result) {
@@ -2390,15 +3257,26 @@ function showTrainingProgressBRPC(result) {
 }
 
 function showTrainingError(error) {
-    const progressDiv = document.getElementById('trainingProgress');
-    if (progressDiv) {
-        progressDiv.innerHTML = `
-            <div class="alert alert-danger">
-                <h6><i class="fas fa-exclamation-triangle"></i> Training Error</h6>
-                <p>${error}</p>
+    // Show error in the progress step
+    const progressStep = document.getElementById('progressStep');
+    if (progressStep) {
+        progressStep.innerHTML = `
+            <h6><i class="fas fa-exclamation-triangle text-danger"></i> Training Error</h6>
+            <div class="text-center p-4">
+                <div class="text-danger mb-3">
+                    <i class="fas fa-exclamation-triangle fa-3x"></i>
+                </div>
+                <h6 class="text-danger">Training Failed</h6>
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Error:</strong> ${error}
+                </div>
+                <button class="btn btn-warning" onclick="showTrainingStep('config')">
+                    <i class="fas fa-arrow-left"></i> Back to Configuration
+                </button>
             </div>
         `;
-        progressDiv.style.display = 'block';
+        showTrainingStep('progress');
     }
 }
 

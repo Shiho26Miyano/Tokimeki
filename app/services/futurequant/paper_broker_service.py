@@ -229,7 +229,8 @@ class FutureQuantPaperBrokerService:
         price: float = None,
         stop_loss: float = None,
         take_profit: float = None,
-        strategy_signal: Dict[str, Any] = None
+        strategy_signal: Dict[str, Any] = None,
+        strategy_config: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Place an order in paper trading"""
         try:
@@ -252,6 +253,13 @@ class FutureQuantPaperBrokerService:
             current_price = await self._get_current_price(symbol)
             if not current_price:
                 raise ValueError(f"Unable to get current price for {symbol}")
+            
+            # Apply strategy configuration if provided
+            if strategy_config:
+                quantity, stop_loss, take_profit = self._apply_strategy_config(
+                    session, symbol, side, quantity, current_price, strategy_config
+                )
+                logger.info(f"Applied strategy config: {strategy_config['name']} - Position: {strategy_config['positionSizeMultiplier']}x, Stop: {stop_loss}, Take Profit: {take_profit}")
             
             # Calculate position size if not provided
             if quantity is None:
@@ -316,6 +324,56 @@ class FutureQuantPaperBrokerService:
                 'success': False,
                 'error': str(e)
             }
+
+    def _apply_strategy_config(
+        self,
+        session: Dict[str, Any],
+        symbol: str,
+        side: str,
+        quantity: float,
+        current_price: float,
+        strategy_config: Dict[str, Any]
+    ) -> Tuple[float, float, float]:
+        """Apply strategy-specific configuration to order parameters"""
+        try:
+            # Apply position size multiplier
+            if strategy_config.get('positionSizeMultiplier'):
+                base_quantity = quantity or 1.0
+                quantity = base_quantity * strategy_config['positionSizeMultiplier']
+                logger.info(f"Strategy {strategy_config['name']}: Position size adjusted from {base_quantity} to {quantity}")
+            
+            # Calculate stop loss based on strategy
+            if strategy_config.get('stopLossPercent'):
+                if side == 'buy':
+                    stop_loss = current_price * (1 - strategy_config['stopLossPercent'] / 100)
+                else:  # sell
+                    stop_loss = current_price * (1 + strategy_config['stopLossPercent'] / 100)
+                logger.info(f"Strategy {strategy_config['name']}: Stop loss set at {stop_loss:.2f} ({strategy_config['stopLossPercent']}%)")
+            
+            # Calculate take profit based on strategy
+            if strategy_config.get('takeProfitPercent'):
+                if side == 'buy':
+                    take_profit = current_price * (1 + strategy_config['takeProfitPercent'] / 100)
+                else:  # sell
+                    take_profit = current_price * (1 - strategy_config['takeProfitPercent'] / 100)
+                logger.info(f"Strategy {strategy_config['name']}: Take profit set at {take_profit:.2f} ({strategy_config['takeProfitPercent']}%)")
+            
+            # Apply leverage constraints
+            if strategy_config.get('leverage'):
+                max_leverage = strategy_config['leverage']
+                session['max_leverage'] = min(session.get('max_leverage', 2.0), max_leverage)
+                logger.info(f"Strategy {strategy_config['name']}: Max leverage set to {max_leverage}x")
+            
+            # Apply drawdown limits
+            if strategy_config.get('maxDrawdown'):
+                session['max_drawdown'] = strategy_config['maxDrawdown']
+                logger.info(f"Strategy {strategy_config['name']}: Max drawdown set to {strategy_config['maxDrawdown'] * 100}%")
+            
+            return quantity, stop_loss, take_profit
+            
+        except Exception as e:
+            logger.error(f"Error applying strategy config: {str(e)}")
+            return quantity, None, None
     
     async def _calculate_distribution_position_size(
         self,
