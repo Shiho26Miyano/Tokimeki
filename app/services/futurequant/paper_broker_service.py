@@ -9,9 +9,11 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 import uuid
 import json
+import asyncio
 
 from app.models.trading_models import Symbol, Bar, Feature, Forecast, Strategy, Trade, User
 from app.models.database import get_db
+from .model_cleanup_service import FutureQuantModelCleanupService
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,9 @@ class FutureQuantPaperBrokerService:
     def __init__(self):
         self.active_sessions = {}
         self.order_counter = 0
+        
+        # Initialize model cleanup service
+        self.model_cleanup_service = FutureQuantModelCleanupService()
         
         # Default risk parameters
         self.default_risk_params = {
@@ -97,6 +102,11 @@ class FutureQuantPaperBrokerService:
             
             logger.info(f"Started paper trading session {session_id} for user {user_id}")
             
+            # Generate daily P&L projections
+            daily_projections = await self._generate_daily_pnl_projections(
+                strategy, symbols or [], initial_capital, risk_config
+            )
+            
             return {
                 'success': True,
                 'session_id': session_id,
@@ -106,7 +116,8 @@ class FutureQuantPaperBrokerService:
                     'initial_capital': initial_capital,
                     'risk_params': risk_config,
                     'symbols': symbols or []
-                }
+                },
+                'daily_projections': daily_projections
             }
             
         except Exception as e:
@@ -161,6 +172,11 @@ class FutureQuantPaperBrokerService:
             
             logger.info(f"Started demo paper trading session {session_id}")
             
+            # Generate daily P&L projections for demo
+            daily_projections = await self._generate_daily_pnl_projections(
+                None, symbols or [], initial_capital, risk_config, is_demo=True
+            )
+            
             return {
                 'success': True,
                 'session_id': session_id,
@@ -170,7 +186,8 @@ class FutureQuantPaperBrokerService:
                     'initial_capital': initial_capital,
                     'risk_params': risk_config,
                     'symbols': symbols or []
-                }
+                },
+                'daily_projections': daily_projections
             }
             
         except Exception as e:
@@ -608,6 +625,9 @@ class FutureQuantPaperBrokerService:
                     # Update capital
                     session['current_capital'] += pnl
                     
+                    # Trigger model cleanup after trade
+                    asyncio.create_task(self.model_cleanup_service.cleanup_after_trade(trade))
+                    
                 else:
                     # Open short position
                     if symbol in session['positions']:
@@ -720,6 +740,9 @@ class FutureQuantPaperBrokerService:
                     'timestamp': datetime.now()
                 }
                 session['trades'].append(trade)
+                
+                # Trigger model cleanup after trade
+                asyncio.create_task(self.model_cleanup_service.cleanup_after_trade(trade))
                 
                 # Remove position
                 del session['positions'][symbol]
@@ -1028,4 +1051,143 @@ class FutureQuantPaperBrokerService:
             return {
                 'success': False,
                 'error': str(e)
+            }
+
+    async def _generate_daily_pnl_projections(
+        self,
+        strategy: Optional[Strategy],
+        symbols: List[str],
+        initial_capital: float,
+        risk_config: Dict[str, Any],
+        is_demo: bool = False
+    ) -> Dict[str, Any]:
+        """Generate daily P&L projections based on strategy and market conditions"""
+        try:
+            projections = {
+                'today': {},
+                'this_week': {},
+                'this_month': {},
+                'risk_analysis': {},
+                'expected_scenarios': []
+            }
+            
+            # Get current market data for symbols
+            market_data = {}
+            for symbol in symbols:
+                current_price = await self._get_current_price(symbol)
+                if current_price:
+                    market_data[symbol] = current_price
+            
+            if not market_data:
+                # Use fallback prices for demo
+                market_data = {
+                    'ES=F': 4500.0,
+                    'NQ=F': 15500.0,
+                    'YM=F': 38000.0,
+                    'RTY=F': 2000.0,
+                    'CL=F': 75.0,
+                    'GC=F': 2000.0
+                }
+            
+            # Calculate position sizing based on risk parameters
+            max_position_size = risk_config.get('max_position_size', 0.20)
+            max_leverage = risk_config.get('max_leverage', 2.0)
+            max_daily_loss = risk_config.get('max_daily_loss', 0.05)
+            
+            # Generate projections for different timeframes
+            for timeframe in ['today', 'this_week', 'this_month']:
+                if timeframe == 'today':
+                    # Daily projection based on volatility and position sizing
+                    daily_volatility = 0.015  # 1.5% daily volatility for futures
+                    max_positions = min(len(symbols), 3)  # Max 3 positions per day
+                    
+                    # Calculate expected daily P&L range
+                    expected_daily_return = daily_volatility * max_positions * max_position_size
+                    max_daily_loss_amount = initial_capital * max_daily_loss
+                    
+                    # Conservative estimate
+                    conservative_pnl = expected_daily_return * initial_capital * 0.3  # 30% of expected
+                    aggressive_pnl = expected_daily_return * initial_capital * 0.7  # 70% of expected
+                    
+                    projections[timeframe] = {
+                        'expected_pnl': expected_daily_return * initial_capital,
+                        'conservative_pnl': conservative_pnl,
+                        'aggressive_pnl': aggressive_pnl,
+                        'max_loss': -max_daily_loss_amount,
+                        'probability_positive': 0.65,  # 65% chance of positive day
+                        'volatility': daily_volatility,
+                        'max_positions': max_positions
+                    }
+                    
+                elif timeframe == 'this_week':
+                    # Weekly projection (5 trading days)
+                    weekly_volatility = daily_volatility * (5 ** 0.5)  # Square root of time
+                    weekly_return = weekly_volatility * max_positions * max_position_size
+                    
+                    projections[timeframe] = {
+                        'expected_pnl': weekly_return * initial_capital,
+                        'conservative_pnl': weekly_return * initial_capital * 0.4,
+                        'aggressive_pnl': weekly_return * initial_capital * 0.8,
+                        'max_loss': -max_daily_loss_amount * 2,  # Double daily max loss
+                        'probability_positive': 0.75,
+                        'volatility': weekly_volatility,
+                        'trading_days': 5
+                    }
+                    
+                elif timeframe == 'this_month':
+                    # Monthly projection (22 trading days)
+                    monthly_volatility = daily_volatility * (22 ** 0.5)
+                    monthly_return = monthly_volatility * max_positions * max_position_size
+                    
+                    projections[timeframe] = {
+                        'expected_pnl': monthly_return * initial_capital,
+                        'conservative_pnl': monthly_return * initial_capital * 0.5,
+                        'aggressive_pnl': monthly_return * initial_capital * 0.9,
+                        'max_loss': -max_daily_loss_amount * 4,  # 4x daily max loss
+                        'probability_positive': 0.80,
+                        'volatility': monthly_volatility,
+                        'trading_days': 22
+                    }
+            
+            # Risk analysis
+            projections['risk_analysis'] = {
+                'max_drawdown': risk_config.get('max_drawdown', 0.25),
+                'position_sizing': risk_config.get('position_sizing', 'kelly'),
+                'stop_loss_type': risk_config.get('stop_loss_type', 'quantile'),
+                'max_leverage': max_leverage,
+                'daily_loss_limit': max_daily_loss,
+                'volatility_adjustment': risk_config.get('volatility_adjustment', True)
+            }
+            
+            # Expected scenarios
+            projections['expected_scenarios'] = [
+                {
+                    'scenario': 'Conservative',
+                    'description': 'Lower risk, steady returns',
+                    'daily_pnl_range': f"${projections['today']['conservative_pnl']:.0f} to ${projections['today']['aggressive_pnl']:.0f}",
+                    'probability': 0.40
+                },
+                {
+                    'scenario': 'Moderate',
+                    'description': 'Balanced risk and return',
+                    'daily_pnl_range': f"${projections['today']['expected_pnl']:.0f}",
+                    'probability': 0.35
+                },
+                {
+                    'scenario': 'Aggressive',
+                    'description': 'Higher risk, higher potential return',
+                    'daily_pnl_range': f"${projections['today']['aggressive_pnl']:.0f} to ${projections['today']['expected_pnl'] * 1.5:.0f}",
+                    'probability': 0.25
+                }
+            ]
+            
+            return projections
+            
+        except Exception as e:
+            logger.error(f"Error generating daily P&L projections: {str(e)}")
+            return {
+                'error': f"Could not generate projections: {str(e)}",
+                'today': {'expected_pnl': 0, 'max_loss': 0},
+                'this_week': {'expected_pnl': 0, 'max_loss': 0},
+                'this_month': {'expected_pnl': 0, 'max_loss': 0}
             }

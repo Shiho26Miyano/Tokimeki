@@ -1,4 +1,5 @@
 # Essential requirements for Railway deployment - Python 3.11 compatible
+
 # Core web framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
@@ -36,7 +37,6 @@ joblib==1.3.2
 
 # PyTorch for transformer models (optional, but used)
 torch==2.3.1
-transformers==4.38.2
 
 # VectorBT for quantitative analysis
 vectorbt==0.28.1
@@ -56,11 +56,6 @@ langchain-text-splitters==0.2.2
 pdfminer.six==20231228
 pypdf==4.0.1
 beautifulsoup4==4.12.3
-
-# Additional ML libraries
-pytorch-lightning==2.1.3
-pandas-ta==0.3.14b0
-polars==0.20.3
 
 # Task scheduling
 celery==5.3.4

@@ -304,7 +304,7 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="futurequant-dashboard-tab" data-bs-toggle="pill" data-bs-target="#futurequant-dashboard-content" role="tab" aria-controls="futurequant-dashboard-content" aria-selected="true">📊 FutureQuant Trader</a>
+                        <a class="nav-link active" id="futurequant-dashboard-tab" data-bs-toggle="pill" data-bs-target="#futurequant-dashboard-content" role="tab" aria-controls="futurequant-dashboard-content" aria-selected="true">📊 FutureQuant Simulator</a>
                     </li>
 
                     <li class="nav-item" role="presentation">
@@ -328,6 +328,7 @@
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="mnq-dashboard-tab" data-bs-toggle="pill" data-bs-target="#mnq-dashboard-content" role="tab" aria-controls="mnq-dashboard-content" aria-selected="false">🧪 Experimental Trading Hub</a>
                     </li>
+
                 </ul>
 
 
@@ -345,9 +346,9 @@
                                         <div class="col-md-8">
                                             <h3 class="mb-1">
                                                 <i class="fas fa-chart-line text-primary"></i> 
-                                                FutureQuant Trader
+                                                FutureQuant Simulator
                                             </h3>
-                                            <p class="text-muted mb-0 small">Futures Trading Platform</p>
+
                                             
                                                                         <!-- Quick Guide -->
                             <div class="alert alert-info mt-2 mb-0 py-2 small">
@@ -390,13 +391,10 @@
                         <div class="row">
                             <div class="col-6">
                                 <div class="tech-badge mb-1">
-                                    <span class="badge bg-primary">NumPy</span>
+                                    <span class="badge bg-primary">qf-lib</span>
                                 </div>
                                 <div class="tech-badge mb-1">
-                                    <span class="badge bg-primary">Pandas</span>
-                                </div>
-                                <div class="tech-badge mb-1">
-                                    <span class="badge bg-info">QuantLib</span>
+                                    <span class="badge bg-info">MLflow</span>
                                 </div>
                             </div>
                             <div class="col-6">
@@ -404,10 +402,7 @@
                                     <span class="badge bg-success">PyTorch</span>
                                 </div>
                                 <div class="tech-badge mb-1">
-                                    <span class="badge bg-success">Real-time</span>
-                                </div>
-                                <div class="tech-badge mb-1">
-                                    <span class="badge bg-warning">BRPC</span>
+                                    <span class="badge bg-warning">scikit-learn</span>
                                 </div>
                             </div>
                         </div>
@@ -435,7 +430,6 @@
                                             title="Futures contract symbols (ES=S&P500, NQ=Nasdaq, YM=Dow)">
                                         <option value="">Select</option>
                                     </select>
-                                    <small class="text-muted d-block mt-1">ES, NQ, YM</small>
                                 </div>
                                 <div class="col-md-2">
                                     <label class="form-label small mb-1">Strategy</label>
@@ -468,21 +462,18 @@
                                     <div class="d-grid gap-1 w-100">
                                         <button class="btn btn-primary btn-sm" id="fq-train-model-btn"
                                                 data-bs-toggle="tooltip" data-bs-placement="top" 
-                                                title="Train AI models using historical data to predict market movements">
+                                                title="Train AI models for futures trading - Required first step">
                                             <i class="fas fa-brain"></i> Train
                                         </button>
-                                        <button class="btn btn-success btn-sm" id="fq-start-paper-trading-btn"
+                                        <button class="btn btn-secondary btn-sm" id="fq-start-paper-trading-btn"
                                                 data-bs-toggle="tooltip" data-bs-placement="top" 
-                                                title="Start paper trading session to test strategies with virtual money">
+                                                title="Start paper trading with trained models - Requires training first"
+                                                disabled>
                                             <i class="fas fa-play"></i> Trade
                                         </button>
                                         <div class="text-center mt-1">
-                                            <small class="text-info">
-                                                <i class="fas fa-download"></i> Data: Click to Fetch
-                                            </small>
-                                            <br>
-                                            <small class="text-warning">
-                                                <i class="fas fa-cogs"></i> Features: Click to Compute
+                                            <small class="text-muted" id="train-trade-status">
+                                                <i class="fas fa-info-circle"></i> Train first, then Trade
                                             </small>
                                         </div>
                                     </div>
@@ -513,37 +504,21 @@
                                 </div>
                             </div>
 
-                            <!-- What Happens When You Click Section -->
+                            <!-- FutureQuant Strategy Concept Section -->
                             <div class="row mb-3">
                                 <div class="col-12">
                                     <div class="card">
                                         <div class="card-header py-2">
-                                            <h6 class="mb-0"><i class="fas fa-question-circle text-info"></i> What Happens When You Click...</h6>
+                                            <h6 class="mb-0"><i class="fas fa-lightbulb text-warning"></i> FutureQuant Strategy Concept</h6>
                                         </div>
                                         <div class="card-body py-2">
                                             <div class="row">
-                                                <div class="col-md-6">
-                                                    <div class="border-end pe-3">
-                                                        <h6 class="text-primary"><i class="fas fa-brain"></i> Train Button</h6>
-                                                        <ul class="small text-muted mb-0">
-                                                            <li>Opens model training interface</li>
-                                                            <li>Uses historical data to build AI models</li>
-                                                            <li>Creates predictive algorithms for trading</li>
-                                                            <li>Shows training progress and results</li>
-                                                            <li>Models can be used for backtesting</li>
-                                                        </ul>
-                                                    </div>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <div class="ps-3">
-                                                        <h6 class="text-success"><i class="fas fa-play"></i> Trade Button</h6>
-                                                        <ul class="small text-muted mb-0">
-                                                            <li>Starts paper trading session</li>
-                                                            <li>Uses virtual money (no real risk)</li>
-                                                            <li>Applies selected strategy automatically</li>
-                                                            <li>Shows real-time position updates</li>
-                                                            <li>Track performance and P&L</li>
-                                                        </ul>
+                                                <div class="col-md-12">
+                                                    <div class="text-center">
+                                                        <h6 class="text-primary"><i class="fas fa-chart-line"></i> Distribution-Based Futures Trading Strategy</h6>
+                                                        <p class="small text-muted mb-0">
+                                                            Instead of predicting exact prices, the FutureQuant strategy forecasts the probability distribution of future price movements, enabling traders to make informed decisions under market uncertainty by understanding both potential gains and risks across different scenarios.
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -597,87 +572,7 @@
                                 </div>
                             </div>
                             
-                            <!-- Academic Research Citation -->
-                            <div class="row mb-3">
-                                <div class="col-12">
-                                    <div class="card border-warning">
-                                        <div class="card-header py-2 bg-warning text-dark">
-                                            <h6 class="mb-0"><i class="fas fa-graduation-cap"></i> Academic Foundation</h6>
-                                        </div>
-                                        <div class="card-body py-2">
-                                            <div class="row">
-                                                <div class="col-md-8">
-                                                    <h6 class="text-warning mb-2">FutureQuant Transformer Research</h6>
-                                                    <p class="small text-muted mb-2">
-                                                        This trading system implements the distribution-based strategy from the research paper 
-                                                        <strong>"Trading Under Uncertainty: A Distribution-Based Strategy for Futures Markets Using FutureQuant Transformer"</strong>
 
-                                                    </p>
-                                                    <div class="d-flex align-items-center gap-3">
-                                                        <a href="https://arxiv.org/abs/2505.05595" target="_blank" class="btn btn-outline-warning btn-sm">
-                                                            <i class="fas fa-external-link-alt"></i> View Paper
-                                                        </a>
-                                                        <span class="badge bg-primary">arXiv:2505.05595</span>
-                                                        <span class="badge bg-success">Published: May 8, 2025</span>
-                                                        <span class="badge bg-info">q-fin.TR</span>
-                                                    </div>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <h6 class="text-success mb-2">Key Results</h6>
-                                                    <ul class="small text-muted mb-0">
-                                                        <li><strong>Performance:</strong> 0.1193% avg gain per 30-min trade</li>
-                                                        <li><strong>Innovation:</strong> Distribution-based forecasting</li>
-                                                        <li><strong>Technology:</strong> Attention mechanism transformer</li>
-                                                        <li><strong>Markets:</strong> Futures with LOB data</li>
-                                                    </ul>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Data & Features Pipeline -->
-                            <div class="row mb-3">
-                                <div class="col-12">
-                                    <div class="card border-primary">
-                                        <div class="card-header py-2 bg-primary text-white">
-                                            <h6 class="mb-0"><i class="fas fa-database"></i> Data & Features Pipeline</h6>
-                                        </div>
-                                        <div class="card-body py-2">
-                                            <div class="row">
-                                                <div class="col-md-4">
-                                                    <h6 class="text-primary mb-2">Data Sources</h6>
-                                                    <ul class="small text-muted mb-0">
-                                                        <li><strong>Primary:</strong> Yahoo Finance (yfinance library)</li>
-                                                        <li><strong>Futures:</strong> ES (S&P 500), NQ (Nasdaq), YM (Dow)</li>
-                                                        <li><strong>Timeframes:</strong> 1D, 1H, 15M, 5M intervals</li>
-                                                        <li><strong>Data Types:</strong> OHLCV, volume, market cap</li>
-                                                    </ul>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <h6 class="text-success mb-2">Manual Data Flow</h6>
-                                                    <ul class="small text-muted mb-0">
-                                                        <li><strong>Click Fetch:</strong> Download from Yahoo Finance</li>
-                                                        <li><strong>Market Hours:</strong> 9:30 AM - 4:00 PM ET</li>
-                                                        <li><strong>Store:</strong> Local SQLite database</li>
-                                                        <li><strong>Ready:</strong> Data available for features</li>
-                                                    </ul>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <h6 class="text-warning mb-2">Features Computation</h6>
-                                                    <ul class="small text-muted mb-0">
-                                                        <li><strong>Click Features:</strong> Computes 50+ technical indicators</li>
-                                                        <li><strong>Indicators:</strong> RSI, MACD, Bollinger Bands, ATR</li>
-                                                        <li><strong>Purpose:</strong> Creates AI training features</li>
-                                                        <li><strong>Output:</strong> Ready for model training</li>
-                                                    </ul>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                             
                             <!-- Technical Algorithm Details -->
                             <div class="row mb-3">
@@ -1594,7 +1489,7 @@
                                         <div class="card-body">
                                             <div class="d-grid gap-2">
                                                 <button class="btn btn-primary" id="fq-train-model-btn">
-                                                    <i class="fas fa-brain"></i> Train New Model
+                                                    <i class="fas fa-rocket"></i> Train & Trade
                                                 </button>
                                                 <button class="btn btn-outline-primary" id="fq-backtest-btn">
                                                     <i class="fas fa-chart-bar"></i> Run Backtest
@@ -1623,7 +1518,7 @@
                                         <div class="card-body">
                                             <div class="d-grid gap-2">
                                                 <button class="btn btn-success" id="fq-start-paper-trading-btn">
-                                                    <i class="fas fa-play"></i> Start Session
+                                                    <i class="fas fa-rocket"></i> Train & Trade
                                                 </button>
                                                 <button class="btn btn-danger" id="fq-stop-paper-trading-btn">
                                                     <i class="fas fa-stop"></i> Stop Session
@@ -1949,6 +1844,45 @@
                 localStorage.removeItem('activeTab');
             }
         });
+        
+        // Functions to enable Trade button after training
+        function enableTradeButton() {
+            const tradeBtn = document.getElementById('fq-start-paper-trading-btn');
+            const statusText = document.getElementById('train-trade-status');
+            
+            if (tradeBtn) {
+                tradeBtn.disabled = false;
+                tradeBtn.classList.remove('btn-secondary');
+                tradeBtn.classList.add('btn-success');
+                tradeBtn.title = 'Start paper trading with trained models';
+            }
+            
+            if (statusText) {
+                statusText.innerHTML = '<i class="fas fa-check-circle text-success"></i> Training complete! Ready to Trade';
+                statusText.className = 'text-success';
+            }
+        }
+        
+        function resetTradeButton() {
+            const tradeBtn = document.getElementById('fq-start-paper-trading-btn');
+            const statusText = document.getElementById('train-trade-status');
+            
+            if (tradeBtn) {
+                tradeBtn.disabled = true;
+                tradeBtn.classList.remove('btn-success');
+                tradeBtn.classList.add('btn-secondary');
+                tradeBtn.title = 'Start paper trading with trained models - Requires training first';
+            }
+            
+            if (statusText) {
+                statusText.innerHTML = '<i class="fas fa-info-circle"></i> Train first, then Trade';
+                statusText.className = 'text-muted';
+            }
+        }
+        
+        // Make functions globally available
+        window.enableTradeButton = enableTradeButton;
+        window.resetTradeButton = resetTradeButton;
     </script>
 </body>
 </html> 

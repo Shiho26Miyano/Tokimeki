@@ -142,21 +142,20 @@ class FutureQuantDashboard {
             console.error('Strategy select element not found during event listener setup');
         }
         
-        // Train button
+        // Train and Trade buttons - now unified
         const trainBtn = document.getElementById('fq-train-model-btn');
         if (trainBtn) {
             trainBtn.addEventListener('click', () => {
-                this.showTrainingInterface();
+                this.showUnifiedTrainAndTradeInterface();
             });
         }
         
-        // Trade button
         const tradeBtn = document.getElementById('fq-start-paper-trading-btn');
         if (tradeBtn) {
             console.log('Trade button found, adding event listener');
             tradeBtn.addEventListener('click', () => {
                 console.log('Trade button clicked!');
-                this.showTradingInterface();
+                this.showUnifiedTrainAndTradeInterface();
             });
         } else {
             console.error('Trade button not found!');
@@ -752,6 +751,12 @@ class FutureQuantDashboard {
                                     </div>
                                     <h4 class="text-success mb-2">🎉 Training Complete!</h4>
                                     <p class="text-muted">Your AI model is ready to trade</p>
+                                    <script>
+                                        // Enable the Trade button when training completes
+                                        if (typeof window.enableTradeButton === 'function') {
+                                            window.enableTradeButton();
+                                        }
+                                    </script>
                                 </div>
                                 
                                 <!-- Model Status Card -->
@@ -2165,6 +2170,11 @@ class FutureQuantDashboard {
                     
                     // Also update the main training dialog if it exists
                     this.updateMainTrainingDialog(modelId, 'completed', statusData);
+                    
+                    // Enable the Trade button after training completion
+                    if (typeof window.enableTradeButton === 'function') {
+                        window.enableTradeButton();
+                    }
                 } else if (statusData.status === 'failed') {
                     // Training failed
                     clearInterval(pollInterval);
@@ -2626,6 +2636,22 @@ class FutureQuantDashboard {
     initializePaperTrading() {
         console.log('Initializing paper trading interface...');
         
+        // Add event listener for the Start Session button
+        const startButton = document.getElementById('fq-start-paper-trading-btn');
+        if (startButton) {
+            startButton.addEventListener('click', () => {
+                this.showPaperTradingModal();
+            });
+        }
+        
+        // Add event listener for the Stop Session button
+        const stopButton = document.getElementById('fq-stop-paper-trading-btn');
+        if (stopButton) {
+            stopButton.addEventListener('click', () => {
+                this.stopPaperTrading();
+            });
+        }
+        
         // Show paper trading section
         const paperTradingSection = document.getElementById('paper-trading-section');
         if (paperTradingSection) {
@@ -2654,6 +2680,1202 @@ class FutureQuantDashboard {
         this.showNotification('Paper trading interface ready! Your model is loaded and ready for strategy execution.', 'success');
         
         console.log('Paper trading interface initialized successfully');
+    }
+
+    // Show paper trading modal
+    showPaperTradingModal() {
+        // Create and show paper trading modal
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'paperTradingModal';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-play"></i> Paper Trading Session
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Trading Controls -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="form-label">Symbol</label>
+                                                <select class="form-select" id="tradingSymbol">
+                                                    <option value="ES=F">ES=F (E-mini S&P 500)</option>
+                                                    <option value="NQ=F">NQ=F (E-mini NASDAQ)</option>
+                                                    <option value="YM=F">YM=F (E-mini Dow)</option>
+                                                    <option value="RTY=F">RTY=F (E-mini Russell)</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label">Position Size</label>
+                                                <input type="number" class="form-control" id="positionSize" value="1" min="1" max="10">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label">Stop Loss</label>
+                                                <input type="number" class="form-control" id="stopLoss" step="0.25" placeholder="0.00">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label">Take Profit</label>
+                                                <input type="number" class="form-control" id="takeProfit" step="0.25" placeholder="0.00">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">&nbsp;</label>
+                                                <div class="d-grid gap-2">
+                                                    <button type="button" class="btn btn-success" id="buyButton">
+                                                        <i class="fas fa-arrow-up"></i> BUY
+                                                    </button>
+                                                    <button type="button" class="btn btn-danger" id="sellButton">
+                                                        <i class="fas fa-arrow-down"></i> SELL
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Account Summary -->
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">Account Balance</h6>
+                                        <h4 class="text-success" id="accountBalance">$100,000</h4>
+                                        <small class="text-muted">Virtual Money</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">Current P&L</h6>
+                                        <h4 class="text-primary" id="currentPnL">+$0</h4>
+                                        <small class="text-muted">Today's Gain</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">Open Positions</h6>
+                                        <h4 class="text-info" id="openPositions">0</h4>
+                                        <small class="text-muted">Active Trades</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h6 class="text-muted">Win Rate</h6>
+                                        <h4 class="text-warning" id="winRate">0%</h4>
+                                        <small class="text-muted">Successful Trades</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6>Live Trading Chart</h6>
+                                <div class="border rounded p-3" style="height: 400px; background: #f8f9fa;">
+                                    <canvas id="tradingChart" width="400" height="400"></canvas>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Recent Trades</h6>
+                                <div id="recentTradesList" class="list-group">
+                                    <div class="text-center text-muted pt-3">
+                                        <i class="fas fa-info-circle"></i>
+                                        <p>No trades yet</p>
+                                        <small>Start trading to see your history</small>
+                                    </div>
+                                </div>
+                                
+                                <h6 class="mt-3">Open Positions</h6>
+                                <div id="openPositionsList" class="list-group">
+                                    <div class="text-center text-muted pt-3">
+                                        <i class="fas fa-info-circle"></i>
+                                        <p>No open positions</p>
+                                        <small>Open a position to see it here</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-warning" id="closeAllPositions">
+                            <i class="fas fa-times"></i> Close All Positions
+                        </button>
+                        <button type="button" class="btn btn-danger" id="stopTrading">
+                            <i class="fas fa-stop"></i> Stop Trading
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Show the modal
+        const paperTradingModal = new bootstrap.Modal(modal);
+        paperTradingModal.show();
+        
+        // Initialize paper trading functionality
+        this.initializePaperTradingModal();
+    }
+
+    // Create and show paper trading modal
+    initializePaperTradingModal() {
+        // Initialize trading state
+        this.tradingState = {
+            accountBalance: 100000,
+            openPositions: [],
+            tradeHistory: [],
+            currentSymbol: 'ES=F',
+            isTrading: false,
+            chart: null,
+            priceData: [],
+            lastPrice: null
+        };
+
+        // Initialize chart
+        this.initializeTradingChart();
+        
+        // Set up event listeners
+        this.setupTradingEventListeners();
+        
+        // Start real-time price updates
+        this.startRealTimeUpdates();
+        
+        // Load initial data
+        this.loadTradingData();
+    }
+
+    initializeTradingChart() {
+        const ctx = document.getElementById('tradingChart');
+        if (!ctx) return;
+
+        this.tradingState.chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Price',
+                    data: [],
+                    borderColor: '#00d4aa',
+                    backgroundColor: 'rgba(0, 212, 170, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#666'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#666'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#666'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    setupTradingEventListeners() {
+        // Buy button
+        document.getElementById('buyButton')?.addEventListener('click', () => {
+            this.executeTrade('BUY');
+        });
+
+        // Sell button
+        document.getElementById('sellButton')?.addEventListener('click', () => {
+            this.executeTrade('SELL');
+        });
+
+        // Symbol change
+        document.getElementById('tradingSymbol')?.addEventListener('change', (e) => {
+            this.tradingState.currentSymbol = e.target.value;
+            this.loadTradingData();
+        });
+
+        // Stop trading
+        document.getElementById('stopTrading')?.addEventListener('click', () => {
+            this.stopTrading();
+        });
+
+        // Close all positions
+        document.getElementById('closeAllPositions')?.addEventListener('click', () => {
+            this.closeAllPositions();
+        });
+    }
+
+    executeTrade(direction) {
+        const symbol = document.getElementById('tradingSymbol')?.value || 'ES=F';
+        const size = parseInt(document.getElementById('positionSize')?.value || 1);
+        const stopLoss = parseFloat(document.getElementById('stopLoss')?.value || 0);
+        const takeProfit = parseFloat(document.getElementById('takeProfit')?.value || 0);
+
+        if (!this.tradingState.lastPrice) {
+            this.showNotification('No price data available', 'error');
+            return;
+        }
+
+        const trade = {
+            id: Date.now(),
+            symbol: symbol,
+            direction: direction,
+            size: size,
+            entryPrice: this.tradingState.lastPrice,
+            stopLoss: stopLoss,
+            takeProfit: takeProfit,
+            timestamp: new Date(),
+            status: 'OPEN'
+        };
+
+        // Add to open positions
+        this.tradingState.openPositions.push(trade);
+        
+        // Update UI
+        this.updateTradingUI();
+        
+        // Show confirmation
+        this.showNotification(`${direction} ${size} ${symbol} at $${this.tradingState.lastPrice}`, 'success');
+        
+        // Log trade
+        console.log('Trade executed:', trade);
+    }
+
+    startRealTimeUpdates() {
+        this.tradingState.isTrading = true;
+        
+        // Simulate real-time price updates (replace with actual API calls)
+        this.priceUpdateInterval = setInterval(() => {
+            if (this.tradingState.isTrading) {
+                this.updatePrice();
+                this.checkStopLossTakeProfit();
+            }
+        }, 2000); // Update every 2 seconds
+    }
+
+    updatePrice() {
+        // Simulate price movement (replace with real market data)
+        const basePrice = this.getBasePrice(this.tradingState.currentSymbol);
+        const volatility = 0.002; // 0.2% volatility
+        const change = (Math.random() - 0.5) * 2 * volatility * basePrice;
+        const newPrice = basePrice + change;
+        
+        this.tradingState.lastPrice = newPrice;
+        this.tradingState.priceData.push({
+            timestamp: new Date(),
+            price: newPrice
+        });
+
+        // Keep only last 100 data points
+        if (this.tradingState.priceData.length > 100) {
+            this.tradingState.priceData.shift();
+        }
+
+        // Update chart
+        this.updateChart();
+        
+        // Update P&L for open positions
+        this.updatePositionsPnL();
+    }
+
+    getBasePrice(symbol) {
+        const basePrices = {
+            'ES=F': 4500,
+            'NQ=F': 15800,
+            'YM=F': 33450,
+            'RTY=F': 2000
+        };
+        return basePrices[symbol] || 4500;
+    }
+
+    updateChart() {
+        if (!this.tradingState.chart) return;
+
+        const labels = this.tradingState.priceData.map((_, index) => 
+            new Date(this.tradingState.priceData[index].timestamp).toLocaleTimeString()
+        );
+        const prices = this.tradingState.priceData.map(d => d.price);
+
+        this.tradingState.chart.data.labels = labels;
+        this.tradingState.chart.data.datasets[0].data = prices;
+        this.tradingState.chart.update('none');
+    }
+
+    updatePositionsPnL() {
+        if (!this.tradingState.lastPrice) return;
+
+        this.tradingState.openPositions.forEach(position => {
+            const priceDiff = this.tradingState.lastPrice - position.entryPrice;
+            const multiplier = position.direction === 'BUY' ? 1 : -1;
+            position.currentPnL = priceDiff * multiplier * position.size * 50; // ES=F multiplier
+        });
+
+        this.updateTradingUI();
+    }
+
+    checkStopLossTakeProfit() {
+        this.tradingState.openPositions.forEach((position, index) => {
+            if (position.status !== 'OPEN') return;
+
+            const currentPrice = this.tradingState.lastPrice;
+            let shouldClose = false;
+            let closeReason = '';
+
+            // Check stop loss
+            if (position.stopLoss > 0) {
+                if (position.direction === 'BUY' && currentPrice <= position.stopLoss) {
+                    shouldClose = true;
+                    closeReason = 'Stop Loss';
+                } else if (position.direction === 'SELL' && currentPrice >= position.stopLoss) {
+                    shouldClose = true;
+                    closeReason = 'Stop Loss';
+                }
+            }
+
+            // Check take profit
+            if (position.takeProfit > 0) {
+                if (position.direction === 'BUY' && currentPrice >= position.takeProfit) {
+                    shouldClose = true;
+                    closeReason = 'Take Profit';
+                } else if (position.direction === 'SELL' && currentPrice <= position.takeProfit) {
+                    shouldClose = true;
+                    closeReason = 'Take Profit';
+                }
+            }
+
+            if (shouldClose) {
+                this.closePosition(index, closeReason);
+            }
+        });
+    }
+
+    closePosition(index, reason = 'Manual') {
+        const position = this.tradingState.openPositions[index];
+        if (!position) return;
+
+        // Calculate final P&L
+        const priceDiff = this.tradingState.lastPrice - position.entryPrice;
+        const multiplier = position.direction === 'BUY' ? 1 : -1;
+        const finalPnL = priceDiff * multiplier * position.size * 50;
+
+        // Update position
+        position.exitPrice = this.tradingState.lastPrice;
+        position.exitTime = new Date();
+        position.status = 'CLOSED';
+        position.finalPnL = finalPnL;
+        position.closeReason = reason;
+
+        // Move to trade history
+        this.tradingState.tradeHistory.push({...position});
+        this.tradingState.openPositions.splice(index, 1);
+
+        // Update account balance
+        this.tradingState.accountBalance += finalPnL;
+
+        // Update UI
+        this.updateTradingUI();
+        
+        // Show notification
+        const pnlText = finalPnL >= 0 ? `+$${finalPnL.toFixed(2)}` : `-$${Math.abs(finalPnL).toFixed(2)}`;
+        this.showNotification(`Position closed: ${pnlText} (${reason})`, finalPnL >= 0 ? 'success' : 'error');
+    }
+
+    closeAllPositions() {
+        if (this.tradingState.openPositions.length === 0) {
+            this.showNotification('No open positions to close', 'info');
+            return;
+        }
+
+        this.tradingState.openPositions.forEach((_, index) => {
+            this.closePosition(index, 'Close All');
+        });
+    }
+
+    stopTrading() {
+        this.tradingState.isTrading = false;
+        if (this.priceUpdateInterval) {
+            clearInterval(this.priceUpdateInterval);
+        }
+        this.showNotification('Trading stopped', 'warning');
+    }
+
+    stopPaperTrading() {
+        if (this.tradingState && this.tradingState.isTrading) {
+            this.stopTrading();
+        }
+        this.showNotification('Paper trading session stopped', 'warning');
+    }
+
+    updateTradingUI() {
+        // Update account summary
+        const totalPnL = this.tradingState.openPositions.reduce((sum, pos) => sum + (pos.currentPnL || 0), 0);
+        const totalPnLText = totalPnL >= 0 ? `+$${totalPnL.toFixed(2)}` : `-$${Math.abs(totalPnL).toFixed(2)}`;
+        
+        document.getElementById('accountBalance').textContent = `$${this.tradingState.accountBalance.toFixed(2)}`;
+        document.getElementById('currentPnL').textContent = totalPnLText;
+        document.getElementById('currentPnL').className = totalPnL >= 0 ? 'text-success' : 'text-danger';
+        document.getElementById('openPositions').textContent = this.tradingState.openPositions.length;
+        
+        // Calculate win rate
+        const closedTrades = this.tradingState.tradeHistory.filter(t => t.status === 'CLOSED');
+        const winningTrades = closedTrades.filter(t => t.finalPnL > 0);
+        const winRate = closedTrades.length > 0 ? (winningTrades.length / closedTrades.length * 100).toFixed(1) : 0;
+        document.getElementById('winRate').textContent = `${winRate}%`;
+
+        // Update open positions list
+        this.updateOpenPositionsList();
+        
+        // Update recent trades list
+        this.updateRecentTradesList();
+    }
+
+    updateOpenPositionsList() {
+        const container = document.getElementById('openPositionsList');
+        if (!container) return;
+
+        if (this.tradingState.openPositions.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted pt-3">
+                    <i class="fas fa-info-circle"></i>
+                    <p>No open positions</p>
+                    <small>Open a position to see it here</small>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = this.tradingState.openPositions.map(position => `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${position.symbol} ${position.direction}</strong><br>
+                    <small class="text-muted">Entry: $${position.entryPrice.toFixed(2)} | Size: ${position.size}</small>
+                </div>
+                <div class="text-end">
+                    <span class="badge ${(position.currentPnL || 0) >= 0 ? 'bg-success' : 'bg-danger'}">
+                        ${(position.currentPnL || 0) >= 0 ? '+' : ''}$${(position.currentPnL || 0).toFixed(2)}
+                    </span>
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="window.futurequantDashboard.closePositionById(${position.id})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    updateRecentTradesList() {
+        const container = document.getElementById('recentTradesList');
+        if (!container) return;
+
+        const recentTrades = this.tradingState.tradeHistory.slice(-5).reverse();
+        
+        if (recentTrades.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted pt-3">
+                    <i class="fas fa-info-circle"></i>
+                    <p>No trades yet</p>
+                    <small>Start trading to see your history</small>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = recentTrades.map(trade => `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${trade.symbol} ${trade.direction}</strong><br>
+                    <small class="text-muted">Entry: $${trade.entryPrice.toFixed(2)} | Exit: $${trade.exitPrice.toFixed(2)}</small>
+                </div>
+                <span class="badge ${trade.finalPnL >= 0 ? 'bg-success' : 'bg-danger'}">
+                    ${trade.finalPnL >= 0 ? '+' : ''}$${trade.finalPnL.toFixed(2)}
+                </span>
+            </div>
+        `).join('');
+    }
+
+    closePositionById(id) {
+        const index = this.tradingState.openPositions.findIndex(p => p.id === id);
+        if (index !== -1) {
+            this.closePosition(index, 'Manual');
+        }
+    }
+
+    loadTradingData() {
+        // Load historical data for the selected symbol
+        // This would typically call your backend API
+        console.log('Loading trading data for:', this.tradingState.currentSymbol);
+        
+        // For now, initialize with some sample data
+        this.tradingState.priceData = [];
+        for (let i = 0; i < 50; i++) {
+            const time = new Date(Date.now() - (50 - i) * 2000);
+            const basePrice = this.getBasePrice(this.tradingState.currentSymbol);
+            const price = basePrice + (Math.random() - 0.5) * 100;
+            this.tradingState.priceData.push({ timestamp: time, price });
+        }
+        
+        this.tradingState.lastPrice = this.tradingState.priceData[this.tradingState.priceData.length - 1].price;
+        this.updateChart();
+    }
+
+    showUnifiedTrainAndTradeInterface() {
+        console.log('Showing unified train and trade interface...');
+        
+        // Create and show unified modal
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'unifiedTrainTradeModal';
+        modal.innerHTML = `
+            <style>
+                .unified-step {
+                    transition: all 0.3s ease;
+                }
+                .step-indicator {
+                    display: flex;
+                    justify-content: center;
+                    margin-bottom: 2rem;
+                }
+                .step-indicator .step {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    background: #6c757d;
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 0 10px;
+                    font-weight: bold;
+                    transition: all 0.3s ease;
+                }
+                .step-indicator .step.active {
+                    background: #007bff;
+                    transform: scale(1.1);
+                }
+                .step-indicator .step.completed {
+                    background: #28a745;
+                }
+                .step-indicator .step-line {
+                    width: 60px;
+                    height: 2px;
+                    background: #6c757d;
+                    margin: auto 0;
+                }
+                .step-indicator .step-line.completed {
+                    background: #28a745;
+                }
+                .unified-content {
+                    min-height: 500px;
+                }
+                .training-section, .trading-section {
+                    display: none;
+                }
+                .training-section.active, .trading-section.active {
+                    display: block;
+                }
+                .action-buttons {
+                    margin: 2rem 0;
+                }
+                .action-buttons .btn {
+                    transition: all 0.3s ease;
+                }
+                .action-buttons .btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                }
+                .progress-section {
+                    text-align: center;
+                    padding: 2rem;
+                }
+                .completion-section {
+                    text-align: center;
+                    padding: 2rem;
+                }
+                .success-animation {
+                    animation: fadeInUp 0.6s ease-out;
+                }
+                @keyframes fadeInUp {
+                    from { opacity: 0; transform: translateY(30px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            </style>
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-rocket"></i> AI-Powered Trading Workflow
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Step Indicator -->
+                        <div class="step-indicator">
+                            <div class="step active" data-step="1">1</div>
+                            <div class="step-line" data-step="1"></div>
+                            <div class="step" data-step="2">2</div>
+                            <div class="step-line" data-step="2"></div>
+                            <div class="step" data-step="3">3</div>
+                        </div>
+                        
+                        <!-- Step 1: Configuration -->
+                        <div id="step1" class="unified-step unified-content">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-cog"></i> Model Configuration</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label">Model Type</label>
+                                        <select class="form-select" id="unifiedModelType">
+                                            <option value="transformer">Transformer Encoder (FQT-lite)</option>
+                                            <option value="quantile_regression">Quantile Regression</option>
+                                            <option value="random_forest">Random Forest Quantiles</option>
+                                            <option value="neural_network">Neural Network</option>
+                                            <option value="gradient_boosting">Gradient Boosting</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Training Period</label>
+                                        <select class="form-select" id="unifiedTrainingPeriod">
+                                            <option value="6_months">Last 6 months</option>
+                                            <option value="1_year">Last 1 year</option>
+                                            <option value="2_years">Last 2 years</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Horizon (minutes)</label>
+                                        <select class="form-select" id="unifiedHorizon">
+                                            <option value="0.5">30 seconds (DEMO - ultra fast)</option>
+                                            <option value="5">5 minutes</option>
+                                            <option value="15">15 minutes</option>
+                                            <option value="60">1 hour</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-chart-line"></i> Trading Strategy</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label">Strategy</label>
+                                        <select class="form-select" id="unifiedStrategy">
+                                            <option value="1">Aggressive Mean Reversion</option>
+                                            <option value="2">Conservative Trend Following</option>
+                                            <option value="3">Volatility Breakout</option>
+                                            <option value="4">Momentum Continuation</option>
+                                            <option value="5">Range Trading</option>
+                                            <option value="6">News Event Trading</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Initial Capital</label>
+                                        <input type="number" class="form-control" id="unifiedCapital" value="100000" min="10000" step="10000">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Risk Tolerance</label>
+                                        <select class="form-select" id="unifiedRisk">
+                                            <option value="low">Low (Conservative)</option>
+                                            <option value="medium">Medium (Balanced)</option>
+                                            <option value="high">High (Aggressive)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Workflow:</strong> This will train your AI model and then automatically start paper trading with the selected strategy.
+                            </div>
+                        </div>
+                        
+                        <!-- Step 2: Training Progress -->
+                        <div id="step2" class="unified-step unified-content" style="display: none;">
+                            <div class="progress-section">
+                                <h6><i class="fas fa-cog fa-spin"></i> Training AI Model</h6>
+                                <div class="spinner-border text-primary mb-3" role="status">
+                                    <span class="visually-hidden">Training...</span>
+                                </div>
+                                <h6>Training in Progress...</h6>
+                                <div class="progress mb-3">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         style="width: 0%">0%</div>
+                                </div>
+                                <p class="text-muted small">Epoch 0/50 - Loss: 0.0000</p>
+                                <div class="alert alert-info mt-3">
+                                    <i class="fas fa-clock"></i>
+                                    <strong>Estimated time:</strong> 2-5 minutes for demo mode
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 3: Trading Interface -->
+                        <div id="step3" class="unified-step unified-content" style="display: none;">
+                            <div class="completion-section">
+                                <div class="success-animation mb-4">
+                                    <div class="text-success mb-3">
+                                        <i class="fas fa-check-circle fa-4x"></i>
+                                    </div>
+                                    <h4 class="text-success mb-2">Model Ready!</h4>
+                                    <p class="text-muted">Your AI model is now trading automatically</p>
+                                </div>
+                                
+                                <!-- Live Trading Dashboard -->
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <h6>Live Trading Chart</h6>
+                                        <div class="border rounded p-3" style="height: 300px; background: #f8f9fa;">
+                                            <canvas id="unifiedTradingChart" width="400" height="300"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h6>Account Summary</h6>
+                                        <div class="card mb-3">
+                                            <div class="card-body text-center">
+                                                <h6 class="text-muted">Balance</h6>
+                                                <h4 class="text-success" id="unifiedBalance">$100,000</h4>
+                                            </div>
+                                        </div>
+                                        <div class="card mb-3">
+                                            <div class="card-body text-center">
+                                                <h6 class="text-muted">P&L</h6>
+                                                <h4 class="text-primary" id="unifiedPnL">+$0</h4>
+                                            </div>
+                                        </div>
+                                        <div class="card">
+                                            <div class="card-body text-center">
+                                                <h6 class="text-muted">Positions</h6>
+                                                <h4 class="text-info" id="unifiedPositions">0</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Recent Trades -->
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <h6>Recent Trades</h6>
+                                        <div id="unifiedRecentTrades" class="list-group">
+                                            <div class="text-center text-muted pt-3">
+                                                <i class="fas fa-info-circle"></i>
+                                                <p>No trades yet</p>
+                                                <small>AI model will start trading automatically</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="startWorkflowBtn" onclick="futurequantDashboard.startUnifiedWorkflow()">
+                            <i class="fas fa-rocket"></i> Start Workflow
+                        </button>
+                        <button type="button" class="btn btn-success" id="nextStepBtn" onclick="futurequantDashboard.nextStep()" style="display: none;">
+                            <i class="fas fa-arrow-right"></i> Next
+                        </button>
+                        <button type="button" class="btn btn-info" id="closeModalBtn" data-bs-dismiss="modal" style="display: none;">
+                            <i class="fas fa-check"></i> Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Show the modal
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+        
+        // Clean up when modal is hidden
+        modal.addEventListener('hidden.bs.modal', () => {
+            // Clean up intervals
+            if (this.unifiedTradingInterval) {
+                clearInterval(this.unifiedTradingInterval);
+                this.unifiedTradingInterval = null;
+            }
+            
+            // Clean up training interval if exists
+            if (modal.dataset.trainingInterval) {
+                clearInterval(parseInt(modal.dataset.trainingInterval));
+            }
+            
+            // Remove modal from DOM
+            document.body.removeChild(modal);
+        });
+        
+        // Store modal reference
+        this.unifiedModal = modal;
+        this.currentStep = 1;
+    }
+
+    async startUnifiedWorkflow() {
+        try {
+            console.log('Starting unified workflow...');
+            
+            // Get configuration values
+            const modelType = document.getElementById('unifiedModelType').value;
+            const trainingPeriod = document.getElementById('unifiedTrainingPeriod').value;
+            const horizon = document.getElementById('unifiedHorizon').value;
+            const strategy = document.getElementById('unifiedStrategy').value;
+            const capital = document.getElementById('unifiedCapital').value;
+            const risk = document.getElementById('unifiedRisk').value;
+            
+            // Validate inputs
+            if (!modelType || !strategy) {
+                this.showNotification('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            // Move to step 2 (training)
+            this.goToStep(2);
+            
+            // Start model training
+            const trainingData = {
+                symbol: 'ES=F', // Default symbol for demo
+                model_type: modelType,
+                horizon_minutes: parseFloat(horizon),
+                hyperparams: { learning_rate: 0.001, batch_size: 32 }
+            };
+            
+            console.log('Starting model training with:', trainingData);
+            
+            // Make API call to start training
+            const response = await fetch('/api/v1/futurequant/models/train', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(trainingData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification('Model training started successfully', 'success');
+                this.startUnifiedTrainingProgress(result.model_id);
+            } else {
+                throw new Error(result.error || 'Training failed');
+            }
+            
+        } catch (error) {
+            console.error('Error starting unified workflow:', error);
+            this.showNotification(`Error starting workflow: ${error.message}`, 'error');
+            this.goToStep(1); // Go back to configuration
+        }
+    }
+
+    startUnifiedTrainingProgress(modelId) {
+        console.log('Starting unified training progress for model:', modelId);
+        
+        // Simulate training progress (replace with real API polling)
+        let progress = 0;
+        const progressBar = this.unifiedModal.querySelector('.progress-bar');
+        const statusText = this.unifiedModal.querySelector('.text-muted.small');
+        
+        const trainingInterval = setInterval(() => {
+            progress += Math.random() * 15; // Random progress increment
+            if (progress > 100) progress = 100;
+            
+            if (progressBar) {
+                progressBar.style.width = progress + '%';
+                progressBar.textContent = Math.round(progress) + '%';
+            }
+            
+            if (statusText) {
+                const epoch = Math.floor(progress / 2);
+                statusText.textContent = `Epoch ${epoch}/50 - Loss: ${(0.1 - progress * 0.001).toFixed(4)}`;
+            }
+            
+            if (progress >= 100) {
+                clearInterval(trainingInterval);
+                
+                // Show success message
+                this.showTrainingCompletionMessage();
+                
+                // Enable the Trade button after training completion
+                if (typeof window.enableTradeButton === 'function') {
+                    window.enableTradeButton();
+                }
+                
+                // Training complete, move to step 3
+                setTimeout(() => {
+                    this.goToStep(3);
+                    this.initializeUnifiedTrading();
+                }, 2000);
+            }
+        }, 1000);
+        
+        // Store interval for cleanup
+        this.unifiedModal.dataset.trainingInterval = trainingInterval;
+    }
+
+    initializeUnifiedTrading() {
+        console.log('Initializing unified trading interface...');
+        
+        // Initialize trading chart
+        this.initializeUnifiedTradingChart();
+        
+        // Start simulated trading
+        this.startUnifiedTrading();
+        
+        // Update UI elements
+        this.updateUnifiedTradingUI();
+    }
+
+    initializeUnifiedTradingChart() {
+        const ctx = document.getElementById('unifiedTradingChart');
+        if (!ctx) return;
+        
+        // Create simple line chart
+        this.unifiedTradingChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Portfolio Value',
+                    data: [],
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    }
+
+    startUnifiedTrading() {
+        // Simulate trading activity
+        this.unifiedTradingState = {
+            balance: 100000,
+            positions: 0,
+            pnl: 0,
+            trades: [],
+            chartData: []
+        };
+        
+        // Start updating trading data
+        this.unifiedTradingInterval = setInterval(() => {
+            this.updateUnifiedTradingData();
+        }, 3000);
+    }
+
+    updateUnifiedTradingData() {
+        // Simulate price movements and trades
+        const priceChange = (Math.random() - 0.5) * 0.02; // ±1% change
+        this.unifiedTradingState.balance *= (1 + priceChange);
+        this.unifiedTradingState.pnl = this.unifiedTradingState.balance - 100000;
+        
+        // Randomly generate trades
+        if (Math.random() < 0.3) { // 30% chance of trade
+            this.generateUnifiedTrade();
+        }
+        
+        // Update chart
+        this.updateUnifiedTradingChart();
+        
+        // Update UI
+        this.updateUnifiedTradingUI();
+    }
+
+    generateUnifiedTrade() {
+        const trade = {
+            id: Date.now(),
+            symbol: 'ES=F',
+            side: Math.random() > 0.5 ? 'BUY' : 'SELL',
+            price: 4850 + (Math.random() - 0.5) * 100,
+            size: Math.floor(Math.random() * 5) + 1,
+            timestamp: new Date()
+        };
+        
+        this.unifiedTradingState.trades.unshift(trade);
+        this.unifiedTradingState.positions = this.unifiedTradingState.trades.length;
+        
+        // Keep only last 10 trades
+        if (this.unifiedTradingState.trades.length > 10) {
+            this.unifiedTradingState.trades.pop();
+        }
+    }
+
+    updateUnifiedTradingChart() {
+        if (!this.unifiedTradingChart) return;
+        
+        const now = new Date();
+        this.unifiedTradingState.chartData.push({
+            time: now.toLocaleTimeString(),
+            value: this.unifiedTradingState.balance
+        });
+        
+        // Keep only last 20 data points
+        if (this.unifiedTradingState.chartData.length > 20) {
+            this.unifiedTradingState.chartData.shift();
+        }
+        
+        // Update chart
+        this.unifiedTradingChart.data.labels = this.unifiedTradingState.chartData.map(d => d.time);
+        this.unifiedTradingChart.data.datasets[0].data = this.unifiedTradingState.chartData.map(d => d.value);
+        this.unifiedTradingChart.update();
+    }
+
+    updateUnifiedTradingUI() {
+        // Update balance
+        const balanceElement = document.getElementById('unifiedBalance');
+        if (balanceElement) {
+            balanceElement.textContent = `$${this.unifiedTradingState.balance.toLocaleString()}`;
+        }
+        
+        // Update P&L
+        const pnlElement = document.getElementById('unifiedPnL');
+        if (pnlElement) {
+            const pnlText = this.unifiedTradingState.pnl >= 0 ? 
+                `+$${this.unifiedTradingState.pnl.toFixed(2)}` : 
+                `-$${Math.abs(this.unifiedTradingState.pnl).toFixed(2)}`;
+            pnlElement.textContent = pnlText;
+            pnlElement.className = this.unifiedTradingState.pnl >= 0 ? 'text-success' : 'text-danger';
+        }
+        
+        // Update positions
+        const positionsElement = document.getElementById('unifiedPositions');
+        if (positionsElement) {
+            positionsElement.textContent = this.unifiedTradingState.positions;
+        }
+        
+        // Update recent trades
+        this.updateUnifiedRecentTrades();
+    }
+
+    updateUnifiedRecentTrades() {
+        const tradesContainer = document.getElementById('unifiedRecentTrades');
+        if (!tradesContainer || this.unifiedTradingState.trades.length === 0) return;
+        
+        tradesContainer.innerHTML = '';
+        this.unifiedTradingState.trades.slice(0, 5).forEach(trade => {
+            const tradeElement = document.createElement('div');
+            tradeElement.className = 'list-group-item d-flex justify-content-between align-items-center';
+            tradeElement.innerHTML = `
+                <div>
+                    <strong>${trade.side} ${trade.symbol}</strong><br>
+                    <small class="text-muted">$${trade.price.toFixed(2)} × ${trade.size}</small>
+                </div>
+                <small class="text-muted">${trade.timestamp.toLocaleTimeString()}</small>
+            `;
+            tradesContainer.appendChild(tradeElement);
+        });
+    }
+
+    goToStep(step) {
+        console.log('Moving to step:', step);
+        
+        // Hide all steps
+        for (let i = 1; i <= 3; i++) {
+            const stepElement = document.getElementById(`step${i}`);
+            if (stepElement) {
+                stepElement.style.display = 'none';
+            }
+        }
+        
+        // Show current step
+        const currentStepElement = document.getElementById(`step${step}`);
+        if (currentStepElement) {
+            currentStepElement.style.display = 'block';
+        }
+        
+        // Update step indicator
+        this.updateStepIndicator(step);
+        
+        // Update buttons
+        this.updateUnifiedButtons(step);
+        
+        this.currentStep = step;
+    }
+
+    updateStepIndicator(activeStep) {
+        const steps = this.unifiedModal.querySelectorAll('.step');
+        const lines = this.unifiedModal.querySelectorAll('.step-line');
+        
+        steps.forEach((step, index) => {
+            const stepNumber = index + 1;
+            if (stepNumber < activeStep) {
+                step.classList.remove('active');
+                step.classList.add('completed');
+            } else if (stepNumber === activeStep) {
+                step.classList.remove('completed');
+                step.classList.add('active');
+            } else {
+                step.classList.remove('active', 'completed');
+            }
+        });
+        
+        lines.forEach((line, index) => {
+            const lineNumber = index + 1;
+            if (lineNumber < activeStep) {
+                line.classList.add('completed');
+            } else {
+                line.classList.remove('completed');
+            }
+        });
+    }
+
+    updateUnifiedButtons(step) {
+        const startBtn = document.getElementById('startWorkflowBtn');
+        const nextBtn = document.getElementById('nextStepBtn');
+        const closeBtn = document.getElementById('closeModalBtn');
+        
+        if (step === 1) {
+            startBtn.style.display = 'inline-block';
+            nextBtn.style.display = 'none';
+            closeBtn.style.display = 'none';
+        } else if (step === 2) {
+            startBtn.style.display = 'none';
+            nextBtn.style.display = 'none';
+            closeBtn.style.display = 'none';
+        } else if (step === 3) {
+            startBtn.style.display = 'none';
+            nextBtn.style.display = 'none';
+            closeBtn.style.display = 'inline-block';
+        }
+    }
+
+    nextStep() {
+        if (this.currentStep < 3) {
+            this.goToStep(this.currentStep + 1);
+        }
     }
 }
 
@@ -3060,6 +4282,11 @@ function updateTrainingProgress(progress, message) {
 function startTradingWithModel() {
     console.log('Starting trading with trained model...');
     
+    // Enable the Trade button after training completion
+    if (typeof window.enableTradeButton === 'function') {
+        window.enableTradeButton();
+    }
+    
     // Close the training modal
     const trainingModal = bootstrap.Modal.getInstance(document.getElementById('trainingModal'));
     if (trainingModal) {
@@ -3247,7 +4474,7 @@ function showTradingModal() {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-success">
+                    <button type="button" class="btn btn-success" onclick="window.futurequantDashboard.showPaperTradingModal()">
                         <i class="fas fa-play"></i> Start Paper Trading
                     </button>
                 </div>
