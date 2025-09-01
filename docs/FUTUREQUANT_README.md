@@ -71,7 +71,7 @@ pip install -r requirements.txt
 
 ### 2. Set Environment Variables
 ```bash
-export FUTUREQUANT_DATABASE_URL="sqlite:///./futurequant_trader.db"
+export FUTUREQUANT_DATABASE_URL="sqlite:///./data/databases/futurequant_trader.db"
 export MLFLOW_TRACKING_URI="http://localhost:5000"
 ```
 
@@ -121,7 +121,7 @@ uvicorn app.main:app --reload
 ## 🔧 Configuration
 
 ### Database
-- **SQLite** (default): `sqlite:///./futurequant_trader.db`
+- **SQLite** (default): `sqlite:///./data/databases/futurequant_trader.db`
 - **PostgreSQL**: `postgresql://user:pass@localhost/futurequant`
 
 ### MLflow

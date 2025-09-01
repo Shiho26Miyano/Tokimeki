@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 # FutureQuant Trader Database URL from environment or default to SQLite for development
 FUTUREQUANT_DATABASE_URL = os.getenv(
     "FUTUREQUANT_DATABASE_URL", 
-    "sqlite:///./futurequant_trader.db"
+    "sqlite:///./data/databases/futurequant_trader.db"
 )
 
 # Create FutureQuant Trader engine

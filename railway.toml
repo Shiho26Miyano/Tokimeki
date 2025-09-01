@@ -9,3 +9,7 @@ restartPolicyType = "on_failure"
 
 [deploy.envs]
 PYTHON_VERSION = "3.11"
+
+[build]
+builder = "nixpacks"
+buildCommand = "pip install -r requirements.txt"

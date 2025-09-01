@@ -186,11 +186,7 @@ class FutureQuantDashboard {
             console.error('Train model button not found');
         }
 
-        // Backtest button
-        const backtestBtn = document.getElementById('fq-backtest-btn');
-        if (backtestBtn) {
-            backtestBtn.addEventListener('click', () => this.runBacktest());
-        }
+
 
         // Paper trading - using the showTradingInterface method instead
         // const startPaperTradingBtn = document.getElementById('fq-start-paper-trading-btn');
@@ -2154,7 +2150,7 @@ class FutureQuantDashboard {
                                 <p class="mb-1"><strong>Model ID:</strong> ${modelId}</p>
                                 <p class="mb-2"><strong>Status:</strong> Training completed successfully</p>
                             </div>
-                            <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
+                            <button type="button" class="btn-close" onclick="closeTrainingPopupAndTransitionToPaperTrading(this)"></button>
                         </div>
                         <div class="progress">
                             <div class="progress-bar bg-success" style="width: 100%">100%</div>
@@ -2181,7 +2177,7 @@ class FutureQuantDashboard {
                                 <p class="mb-1"><strong>Model ID:</strong> ${modelId}</p>
                                 <p class="mb-2"><strong>Error:</strong> ${statusData.error || 'Unknown error'}</p>
                             </div>
-                            <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
+                            <button type="button" class="btn-close" onclick="closeTrainingPopupAndTransitionToPaperTrading(this)"></button>
                         </div>
                         <div class="progress">
                             <div class="progress-bar bg-danger" style="width: 100%">Failed</div>
@@ -2624,6 +2620,40 @@ class FutureQuantDashboard {
     forceChartInitialization() {
         console.log('Force initializing charts...');
         this.initializeCharts();
+    }
+    
+    // Initialize paper trading interface
+    initializePaperTrading() {
+        console.log('Initializing paper trading interface...');
+        
+        // Show paper trading section
+        const paperTradingSection = document.getElementById('paper-trading-section');
+        if (paperTradingSection) {
+            paperTradingSection.style.display = 'block';
+        }
+        
+        // Hide training sections
+        const trainingSections = document.querySelectorAll('.training-section, .model-training-section');
+        trainingSections.forEach(section => {
+            section.style.display = 'none';
+        });
+        
+        // Update navigation
+        const navItems = document.querySelectorAll('.nav-link');
+        navItems.forEach(item => {
+            item.classList.remove('active');
+            if (item.textContent.includes('Paper Trading') || item.getAttribute('data-section') === 'paper-trading') {
+                item.classList.add('active');
+            }
+        });
+        
+        // Load paper trading data
+        this.loadPaperTradingSessions();
+        
+        // Show success message
+        this.showNotification('Paper trading interface ready! Your model is loaded and ready for strategy execution.', 'success');
+        
+        console.log('Paper trading interface initialized successfully');
     }
 }
 
@@ -3338,3 +3368,98 @@ window.completeFeaturesComputation = function() {
     // Show success message
     alert('Features computation completed! You can now click "Train" to build AI models.');
 };
+
+// Global function to close training popup and transition to paper trading
+window.closeTrainingPopupAndTransitionToPaperTrading = function(closeButton) {
+    console.log('Closing training popup and transitioning to paper trading...');
+    
+    // Remove the training popup
+    const popup = closeButton.closest('.alert, .progress-div, .training-popup');
+    if (popup) {
+        popup.remove();
+    }
+    
+    // Close any open modals
+    const openModals = document.querySelectorAll('.modal.show');
+    openModals.forEach(modal => {
+        const modalInstance = bootstrap.Modal.getInstance(modal);
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+    });
+    
+    // Transition to paper trading interface
+    transitionToPaperTrading();
+};
+
+// Function to transition to paper trading interface
+function transitionToPaperTrading() {
+    console.log('Transitioning to paper trading interface...');
+    
+    // Hide training-related sections
+    const trainingSections = document.querySelectorAll('.training-section, .model-training-section');
+    trainingSections.forEach(section => {
+        section.style.display = 'none';
+    });
+    
+    // Show paper trading interface
+    const paperTradingSection = document.getElementById('paper-trading-section');
+    if (paperTradingSection) {
+        paperTradingSection.style.display = 'block';
+    }
+    
+    // Update navigation to highlight paper trading
+    const navItems = document.querySelectorAll('.nav-link');
+    navItems.forEach(item => {
+        item.classList.remove('active');
+        if (item.textContent.includes('Paper Trading') || item.getAttribute('data-section') === 'paper-trading') {
+            item.classList.add('active');
+        }
+    });
+    
+    // Show success message
+    showPaperTradingReadyMessage();
+    
+    // Initialize paper trading components
+    if (window.futurequantDashboard && window.futurequantDashboard.initializePaperTrading) {
+        window.futurequantDashboard.initializePaperTrading();
+    }
+}
+
+// Function to show paper trading ready message
+function showPaperTradingReadyMessage() {
+    // Create and show a success toast
+    const toastContainer = document.getElementById('toastContainer') || createToastContainer();
+    
+    const toast = document.createElement('div');
+    toast.className = 'toast show bg-success text-white';
+    toast.innerHTML = `
+        <div class="toast-header bg-success text-white">
+            <i class="fas fa-rocket me-2"></i>
+            <strong class="me-auto">Paper Trading Ready!</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            <p class="mb-0">Your model is ready for paper trading! Start executing strategies with real-time market data.</p>
+        </div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.remove();
+        }
+    }, 5000);
+}
+
+// Function to create toast container if it doesn't exist
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toastContainer';
+    container.className = 'toast-container position-fixed top-0 end-0 p-3';
+    container.style.zIndex = '9999';
+    document.body.appendChild(container);
+    return container;
+}
