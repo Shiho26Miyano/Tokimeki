@@ -26,7 +26,7 @@ class FutureQuantLeanService:
             "brokerage_model": "InteractiveBrokersBrokerageModel",
             "data_feed": "InteractiveBrokers",
             "resolution": "Minute",
-            "warmup_period": 30
+            "warmup_period": 10
         }
     
     async def run_lean_backtest(
@@ -134,6 +134,17 @@ class FutureQuantLeanService:
             close_prices = price_data.xs('close', level=1, axis=1)
             timestamps = close_prices.index
             
+            # Validate data structure
+            if close_prices.empty:
+                raise ValueError("Close prices data is empty")
+            
+            if len(timestamps) == 0:
+                raise ValueError("No timestamps available in price data")
+            
+            # Log data availability for debugging
+            logger.info(f"Lean backtest data: {len(timestamps)} timestamps, {len(close_prices.columns)} symbols")
+            logger.info(f"Data range: {timestamps[0]} to {timestamps[-1]}")
+            
             # Initialize tracking variables
             portfolio_values = []
             trades = []
@@ -141,6 +152,19 @@ class FutureQuantLeanService:
             
             # Warmup period
             warmup_start = config["warmup_period"]
+            logger.info(f"Configured warmup period: {warmup_start}")
+            
+            # Validate warmup period doesn't exceed available data
+            if warmup_start >= len(timestamps):
+                logger.warning(f"Warmup period ({warmup_start}) exceeds available data length ({len(timestamps)}). Adjusting warmup period.")
+                warmup_start = max(0, len(timestamps) - 1)
+            
+            # Ensure there's at least one data point to process
+            if warmup_start >= len(timestamps):
+                logger.error(f"Insufficient data for backtest. Need at least {warmup_start + 1} data points, but only have {len(timestamps)}.")
+                raise ValueError(f"Insufficient data for backtest. Need at least {warmup_start + 1} data points, but only have {len(timestamps)}.")
+            
+            logger.info(f"Final warmup start index: {warmup_start}, will process {len(timestamps) - warmup_start} data points")
             
             for i in range(warmup_start, len(timestamps)):
                 current_time = timestamps[i]

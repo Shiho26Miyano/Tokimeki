@@ -42,9 +42,16 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup"""
-    logger.info("Starting Tokimeki FastAPI application...")
-    logger.info(f"Debug mode: {settings.debug}")
-    logger.info(f"API key configured: {bool(settings.openrouter_api_key)}")
+    try:
+        logger.info("Starting Tokimeki FastAPI application...")
+        logger.info(f"Debug mode: {settings.debug}")
+        logger.info(f"API key configured: {bool(settings.openrouter_api_key)}")
+        logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+        logger.info(f"Port: {os.getenv('PORT', '8000')}")
+        logger.info("Application startup completed successfully")
+    except Exception as e:
+        logger.error(f"Startup error: {str(e)}")
+        raise e
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -71,6 +78,11 @@ async def add_cache_headers(request: Request, call_next):
 async def favicon():
     return FileResponse("static/favicon.ico")
 
+# Health check endpoint for Docker
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": time.time()}
+
 # Error handlers
 @app.exception_handler(500)
 async def internal_error_handler(request: Request, exc: Exception):
@@ -89,6 +101,17 @@ async def not_found_handler(request: Request, exc: Exception):
 
 # Include API router
 app.include_router(api_router, prefix="/api/v1")
+
+# Root endpoint for debugging
+@app.get("/")
+async def root():
+    return {
+        "message": "Tokimeki FastAPI is running",
+        "status": "healthy",
+        "timestamp": time.time(),
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "version": "1.0.0"
+    }
 
 # Core app endpoints (not part of API v1)
 
