@@ -14,7 +14,7 @@ redis==5.0.1
 psutil==5.9.8
 
 # HTTP client (used by AI service)
-httpx==0.25.2
+httpx[http2]==0.25.2
 
 # Essential data processing
 numpy==1.26.4

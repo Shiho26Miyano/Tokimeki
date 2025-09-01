@@ -6,12 +6,76 @@ console.log('MNQ Dashboard JavaScript loaded');
 // Global variables for MNQ dashboard
 let mnqData = null;
 
+// Display current date range information
+function updateDateRangeInfo() {
+    const startDateInput = document.getElementById('mnq-start-date');
+    const endDateInput = document.getElementById('mnq-end-date');
+    
+    if (startDateInput && endDateInput && startDateInput.value && endDateInput.value) {
+        const start = new Date(startDateInput.value);
+        const end = new Date(endDateInput.value);
+        const diffTime = Math.abs(end - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const diffYears = (diffDays / 365.25).toFixed(1);
+        
+        // Find or create the date range info element
+        let dateRangeInfo = document.getElementById('mnq-date-range-info');
+        if (!dateRangeInfo) {
+            dateRangeInfo = document.createElement('div');
+            dateRangeInfo.id = 'mnq-date-range-info';
+            dateRangeInfo.className = 'mt-2';
+            dateRangeInfo.style.fontSize = '0.875rem';
+            
+            // Insert after the date inputs
+            const dateInputsRow = startDateInput.closest('.row');
+            if (dateInputsRow) {
+                dateInputsRow.parentNode.insertBefore(dateRangeInfo, dateInputsRow.nextSibling);
+            }
+        }
+        
+        // Update the info text
+        const remainingDays = (365 * 5) - diffDays;
+        dateRangeInfo.innerHTML = `
+            <small class="text-info">
+                <i class="fas fa-calendar-alt"></i> 
+                Current range: ${diffDays} days (${diffYears} years). 
+                ${remainingDays > 0 ? `You can extend by up to ${remainingDays} more days.` : 'Maximum 5-year range reached.'}
+            </small>
+        `;
+    }
+}
+
+// Validate date range (max 5 years)
+function validateDateRange(startDate, endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const maxDays = 365 * 5; // 5 years maximum
+    
+    if (diffDays > maxDays) {
+        return {
+            valid: false,
+            message: `Date range cannot exceed 5 years (${maxDays} days). Current selection: ${diffDays} days.`
+        };
+    }
+    
+    if (start >= end) {
+        return {
+            valid: false,
+            message: 'Start date must be before end date.'
+        };
+    }
+    
+    return { valid: true };
+}
+
 // Initialize MNQ dashboard
 function initializeMNQDashboard() {
     console.log('Initializing MNQ dashboard...');
     
     try {
-        // Set default dates
+        // Set default dates - 1 year ago to today
         const today = new Date();
         const oneYearAgo = new Date();
         oneYearAgo.setFullYear(today.getFullYear() - 1);
@@ -21,56 +85,77 @@ function initializeMNQDashboard() {
         const calculateBtn = document.getElementById('mnq-calculate-btn');
         const resetBtn = document.getElementById('mnq-reset-btn');
         
-                            if (startDateInput && endDateInput) {
-                        // First set default dates (1 year back to today)
-                        startDateInput.value = oneYearAgo.toISOString().split('T')[0];
-                        endDateInput.value = today.toISOString().split('T')[0];
-                        console.log('Default dates set');
-                        
-                        // Then fetch the maximum available date range from backend
-                        fetchMaxAvailableDateRange();
-                        
-                        // Add event listeners for date changes
-                        startDateInput.addEventListener('change', function() {
-                            console.log('Start date changed to:', this.value);
-                            // Auto-calculate if both dates are set
-                            if (endDateInput.value) {
-                                showAutoCalculationIndicator();
-                                setTimeout(() => calculateMNQInvestment(), 100);
-                            }
-                        });
-                        
-                        endDateInput.addEventListener('change', function() {
-                            console.log('End date changed to:', this.value);
-                            // Auto-calculate if both dates are set
-                            if (startDateInput.value) {
-                                showAutoCalculationIndicator();
-                                setTimeout(() => calculateMNQInvestment(), 100);
-                            }
-                        });
-                        
-                        // Add event listener for weekly amount changes
-                        const weeklyAmountInput = document.getElementById('mnq-weekly-amount');
-                        if (weeklyAmountInput) {
-                            let calculationTimeout;
-                            weeklyAmountInput.addEventListener('input', function() {
-                                console.log('Weekly amount changed to:', this.value);
-                                // Clear previous timeout to prevent rapid calculations
-                                clearTimeout(calculationTimeout);
-                                // Auto-calculate if both dates are set (with 500ms delay)
-                                if (startDateInput.value && endDateInput.value) {
-                                    calculationTimeout = setTimeout(() => {
-                                        showAutoCalculationIndicator();
-                                        calculateMNQInvestment();
-                                    }, 500);
-                                }
-                            });
-                        }
-                        
-                        console.log('All parameter change listeners added');
-                    } else {
-                        console.warn('Date inputs not found');
+        if (startDateInput && endDateInput) {
+            // Set default dates (1 year back to today)
+            startDateInput.value = oneYearAgo.toISOString().split('T')[0];
+            endDateInput.value = today.toISOString().split('T')[0];
+            console.log('Default dates set to 1 year ago');
+            
+            // Update date range info display
+            updateDateRangeInfo();
+            
+            // Fetch the maximum available date range from backend to set constraints
+            fetchMaxAvailableDateRange();
+            
+            // Add event listeners for date changes
+            startDateInput.addEventListener('change', function() {
+                console.log('Start date changed to:', this.value);
+                const endDate = endDateInput.value;
+                
+                if (endDate) {
+                    const validation = validateDateRange(this.value, endDate);
+                    if (!validation.valid) {
+                        showMNQError(validation.message);
+                        return;
                     }
+                    hideMNQError();
+                    updateDateRangeInfo();
+                    // Auto-calculate if both dates are set
+                    showAutoCalculationIndicator();
+                    setTimeout(() => calculateMNQInvestment(), 100);
+                }
+            });
+            
+            endDateInput.addEventListener('change', function() {
+                console.log('End date changed to:', this.value);
+                const startDate = startDateInput.value;
+                
+                if (startDate) {
+                    const validation = validateDateRange(startDate, this.value);
+                    if (!validation.valid) {
+                        showMNQError(validation.message);
+                        return;
+                    }
+                    hideMNQError();
+                    updateDateRangeInfo();
+                    // Auto-calculate if both dates are set
+                    showAutoCalculationIndicator();
+                    setTimeout(() => calculateMNQInvestment(), 100);
+                }
+            });
+            
+            // Add event listeners for weekly amount changes
+            const weeklyAmountInput = document.getElementById('mnq-weekly-amount');
+            if (weeklyAmountInput) {
+                let calculationTimeout;
+                weeklyAmountInput.addEventListener('input', function() {
+                    console.log('Weekly amount changed to:', this.value);
+                    // Clear previous timeout to prevent rapid calculations
+                    clearTimeout(calculationTimeout);
+                    // Auto-calculate if both dates are set (with 500ms delay)
+                    if (startDateInput.value && endDateInput.value) {
+                        calculationTimeout = setTimeout(() => {
+                            showAutoCalculationIndicator();
+                            calculateMNQInvestment();
+                        }, 500);
+                    }
+                });
+            }
+            
+            console.log('All parameter change listeners added');
+        } else {
+            console.warn('Date inputs not found');
+        }
         
         if (calculateBtn && resetBtn) {
             // Remove existing event listeners to prevent duplicates
@@ -117,8 +202,11 @@ async function calculateMNQInvestment() {
         if (!startDate || !endDate) {
             throw new Error('Please select both start and end dates');
         }
-        if (new Date(startDate) >= new Date(endDate)) {
-            throw new Error('Start date must be before end date');
+        
+        // Validate date range (max 5 years)
+        const validation = validateDateRange(startDate, endDate);
+        if (!validation.valid) {
+            throw new Error(validation.message);
         }
         
         // Start MNQ calculation and AI preparation in parallel
@@ -385,13 +473,27 @@ function updateMNQWeeklyTable(data) {
 function resetMNQDefaults() {
     document.getElementById('mnq-weekly-amount').value = 1000;
     
-    // Reset to maximum available date range
-    fetchMaxAvailableDateRange();
+    // Reset to default dates (1 year ago to today)
+    const today = new Date();
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(today.getFullYear() - 1);
+    
+    const startDateInput = document.getElementById('mnq-start-date');
+    const endDateInput = document.getElementById('mnq-end-date');
+    
+    if (startDateInput && endDateInput) {
+        startDateInput.value = oneYearAgo.toISOString().split('T')[0];
+        endDateInput.value = today.toISOString().split('T')[0];
+        console.log('MNQ defaults reset to 1 year ago');
+        
+        // Update date range info display
+        updateDateRangeInfo();
+    }
     
     // Hide results
     showMNQResults(false);
     
-    console.log('MNQ defaults reset to maximum available range');
+    console.log('MNQ defaults reset to 1 year ago');
 }
 
 // Show/hide loading state
@@ -432,24 +534,21 @@ async function fetchMaxAvailableDateRange() {
             const dateRange = data.data;
             console.log('Available date range:', dateRange);
             
-            // Update date inputs with maximum available range
+            // Update min/max attributes for date inputs to set constraints
             const startDateInput = document.getElementById('mnq-start-date');
             const endDateInput = document.getElementById('mnq-end-date');
             
             if (startDateInput && endDateInput) {
-                startDateInput.value = dateRange.earliest_available;
-                endDateInput.value = dateRange.latest_available;
-                
-                // Update min/max attributes for date inputs
+                // Set constraints without overwriting current values
                 startDateInput.min = dateRange.earliest_available;
                 startDateInput.max = dateRange.latest_available;
                 endDateInput.min = dateRange.earliest_available;
                 endDateInput.max = dateRange.latest_available;
                 
-                console.log(`Date range updated: ${dateRange.earliest_available} to ${dateRange.latest_available}`);
+                console.log(`Date constraints set: ${dateRange.earliest_available} to ${dateRange.latest_available}`);
                 console.log(`Maximum range: ${dateRange.max_range_weeks} weeks (${dateRange.max_range_days} days)`);
                 
-                // Auto-calculate with the new date range
+                // Auto-calculate with the current date range (preserving user's default choice)
                 setTimeout(() => {
                     if (startDateInput.value && endDateInput.value) {
                         showAutoCalculationIndicator();
@@ -462,7 +561,7 @@ async function fetchMaxAvailableDateRange() {
         }
     } catch (error) {
         console.error('Error fetching date range:', error);
-        // Fall back to default dates (1 year back to today)
+        // Keep default dates (1 year back to today) if backend fails
         console.log('Using default date range (1 year back to today)');
     }
 }

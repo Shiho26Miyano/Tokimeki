@@ -4,7 +4,15 @@ import logging
 import re
 import os
 from typing import Dict, Any, List, Optional
-from ..core.config import settings, FREE_MODELS
+from ..core.config import settings
+
+# Define FREE_MODELS locally to avoid circular import issues
+FREE_MODELS = {
+    "mistral-small": "mistralai/mistral-small-3.2-24b-instruct:free",
+    "deepseek-r1": "deepseek/deepseek-r1-0528:free",
+    "deepseek-chat": "deepseek/deepseek-chat-v3-0324:free",
+    "llama-3.1-405b": "meta-llama/llama-3.1-405b-instruct:free"
+}
 from .cache_service import AsyncCacheService
 from .stock_service import AsyncStockService
 
@@ -15,9 +23,15 @@ class AsyncAIService:
         self.http_client = http_client
         self.cache_service = cache_service
         self.stock_service = stock_service
+        
         # Try to get API key from settings first, then environment variable
-        self.api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
-        self.api_url = settings.openrouter_api_url
+        try:
+            self.api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
+            self.api_url = settings.openrouter_api_url
+        except Exception as e:
+            logger.warning(f"Error getting API settings: {e}")
+            self.api_key = os.getenv("OPENROUTER_API_KEY")
+            self.api_url = "https://openrouter.ai/api/v1/chat/completions"
         
         logger.info(f"AI Service initialized with API key: {self.api_key[:20] + '...' if self.api_key else 'None'}")
         
@@ -106,14 +120,21 @@ class AsyncAIService:
     ) -> List[Dict[str, Any]]:
         """Compare multiple models concurrently with optimizations"""
         
-        if models is None:
-            # Use fewer models for faster comparison
-            models = ["mistral-small", "deepseek-chat"]
-        
-        # Validate models
-        for model in models:
-            if model not in FREE_MODELS:
-                raise ValueError(f"Invalid model: {model}")
+        try:
+            if models is None:
+                # Use fewer models for faster comparison
+                models = ["mistral-small", "deepseek-chat"]
+            
+            # Validate models
+            for model in models:
+                if model not in FREE_MODELS:
+                    logger.warning(f"Invalid model requested: {model}, using default")
+                    models = ["mistral-small", "deepseek-chat"]
+                    break
+        except Exception as e:
+            logger.error(f"Error in compare_models setup: {e}")
+            # Fallback to safe defaults
+            models = ["mistral-small"]
         
         # Generate cache key for the entire comparison
         comparison_cache_key = f"model_comparison:{hash(prompt + str(models) + str(temperature) + str(max_tokens))}"
