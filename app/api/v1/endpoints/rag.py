@@ -7,7 +7,12 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel, Field
 from bs4 import BeautifulSoup
 import io
-from pdfminer.high_level import extract_text as pdf_extract_text
+try:
+    from pdfminer.high_level import extract_text as pdf_extract_text
+    PDFMINER_AVAILABLE = True
+except ImportError:
+    PDFMINER_AVAILABLE = False
+    pdf_extract_text = None
 try:
     from pypdf import PdfReader  # optional fallback
     PYPDF_AVAILABLE = True
@@ -84,11 +89,16 @@ async def ingest_corpus(
                             logger.warning(f"Skipping non-HTML URL due to only_html=True: {url}")
                             continue
                         # Extract text from PDF bytes
-                        try:
-                            text = pdf_extract_text(io.BytesIO(resp.content))
-                        except Exception as pdf_exc:
-                            logger.warning(f"PDF extract failed for {url} using pdfminer: {pdf_exc}")
-                            if PYPDF_AVAILABLE:
+                        if PDFMINER_AVAILABLE:
+                            try:
+                                text = pdf_extract_text(io.BytesIO(resp.content))
+                            except Exception as pdf_exc:
+                                logger.warning(f"PDF extract failed for {url} using pdfminer: {pdf_exc}")
+                                text = ""
+                        else:
+                            text = ""
+                        
+                        if not text and PYPDF_AVAILABLE:
                                 try:
                                     reader = PdfReader(io.BytesIO(resp.content))
                                     pages = []

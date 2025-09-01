@@ -1,19 +1,12 @@
-# Comprehensive requirements for Railway deployment - Python 3.11 compatible
-# Python version constraint
-python-version>=3.11,<3.12
-
-# PyTorch CPU wheels index
---extra-index-url https://download.pytorch.org/whl/cpu
+# Essential requirements for Railway deployment - Python 3.11 compatible
 
 # Core web framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 gunicorn==21.2.0
-httpx[http2]==0.25.2
-h2==4.2.0
 python-multipart==0.0.6
-slowapi==0.1.9
 pydantic-settings==2.1.0
+slowapi==0.1.9
 
 # Core dependencies
 python-dotenv==1.0.0
@@ -21,33 +14,60 @@ requests==2.31.0
 redis==5.0.1
 psutil==5.9.8
 
-# Data processing
+# HTTP client (used by AI service)
+httpx==0.25.2
+
+# Essential data processing
 numpy==1.26.4
 pandas==2.2.1
-scipy==1.15.3
-yfinance==0.2.63
-
-# AI/ML
-scikit-learn==1.4.2
-torch==2.3.1
-transformers==4.38.2
-datasets==2.18.0
-beautifulsoup4==4.12.3
-transformers-interpret==0.10.0
-vaderSentiment==3.3.2
 
 # Database
 sqlalchemy==2.0.23
 sqlmodel==0.0.14
-alembic==1.13.1
 psycopg2-binary==2.9.9
-asyncpg==0.29.0
 
-# ML/Analytics
+# Stock data (used by stock service)
+yfinance==0.2.63
+
+# Basic ML (used by model service)
+scikit-learn==1.4.2
+
+# Joblib for model persistence
+joblib==1.3.2
+
+# PyTorch for transformer models (optional, but used)
+torch==2.3.1
+transformers==4.38.2
+
+# VectorBT for quantitative analysis
+vectorbt==0.28.1
+
+# QF-Lib for quantitative analysis
+qf-lib==4.0.3
+
+# MLflow for model tracking
 mlflow==2.8.1
+
+# LangChain for RAG features
+langchain==0.2.11
+langchain-community==0.2.10
+faiss-cpu==1.8.0.post1
+sentence-transformers==2.7.0
+langchain-text-splitters==0.2.2
+pdfminer.six==20231228
+pypdf==4.0.1
+beautifulsoup4==4.12.3
+
+# Additional ML libraries
 pytorch-lightning==2.1.3
 pandas-ta==0.3.14b0
 polars==0.20.3
+
+# Quantitative finance
+empyrical==0.5.5
+alphalens==0.4.0
+arch==6.2.0
+statsmodels==0.14.1
 
 # Task scheduling
 celery==5.3.4
@@ -57,22 +77,6 @@ apscheduler==3.10.4
 minio==7.2.0
 boto3==1.34.34
 
-# Quantitative Finance (compatible versions)
-vectorbt==0.28.1
-qf-lib==4.0.3
-empyrical==0.5.5
-alphalens==0.4.0
-arch==6.2.0
-statsmodels==0.14.1
-
-# RAG/LangChain
-langchain==0.2.11
-langchain-community==0.2.10
-faiss-cpu==1.8.0.post1
-sentence-transformers==2.7.0
-langchain-text-splitters==0.2.2
-pdfminer.six==20231228
-
-# Testing
+# Testing (for development)
 pytest==7.4.3
 pytest-asyncio==0.21.1
