@@ -90,7 +90,6 @@ class FutureQuantModelService:
             
             # Generate synthetic bars data
             import random
-            from datetime import datetime, timedelta
             
             base_price = 100.0
             bars_data = []

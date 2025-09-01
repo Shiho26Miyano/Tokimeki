@@ -328,6 +328,7 @@
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="mnq-dashboard-tab" data-bs-toggle="pill" data-bs-target="#mnq-dashboard-content" role="tab" aria-controls="mnq-dashboard-content" aria-selected="false">🧪 Experimental Trading Hub</a>
                     </li>
+
                 </ul>
 
 
@@ -435,7 +436,6 @@
                                             title="Futures contract symbols (ES=S&P500, NQ=Nasdaq, YM=Dow)">
                                         <option value="">Select</option>
                                     </select>
-                                    <small class="text-muted d-block mt-1">ES, NQ, YM</small>
                                 </div>
                                 <div class="col-md-2">
                                     <label class="form-label small mb-1">Strategy</label>
@@ -468,13 +468,13 @@
                                     <div class="d-grid gap-1 w-100">
                                         <button class="btn btn-primary btn-sm" id="fq-train-model-btn"
                                                 data-bs-toggle="tooltip" data-bs-placement="top" 
-                                                title="Train AI models using historical data to predict market movements">
-                                            <i class="fas fa-brain"></i> Train
+                                                title="Train AI models and start paper trading in one unified workflow">
+                                            <i class="fas fa-rocket"></i> Train & Trade
                                         </button>
                                         <button class="btn btn-success btn-sm" id="fq-start-paper-trading-btn"
                                                 data-bs-toggle="tooltip" data-bs-placement="top" 
-                                                title="Start paper trading session to test strategies with virtual money">
-                                            <i class="fas fa-play"></i> Trade
+                                                title="Train AI models and start paper trading in one unified workflow">
+                                            <i class="fas fa-rocket"></i> Train & Trade
                                         </button>
                                         <div class="text-center mt-1">
                                             <small class="text-info">
@@ -522,27 +522,16 @@
                                         </div>
                                         <div class="card-body py-2">
                                             <div class="row">
-                                                <div class="col-md-6">
-                                                    <div class="border-end pe-3">
-                                                        <h6 class="text-primary"><i class="fas fa-brain"></i> Train Button</h6>
+                                                <div class="col-md-12">
+                                                    <div class="text-center">
+                                                        <h6 class="text-primary"><i class="fas fa-rocket"></i> Train & Trade Button</h6>
                                                         <ul class="small text-muted mb-0">
-                                                            <li>Opens model training interface</li>
-                                                            <li>Uses historical data to build AI models</li>
-                                                            <li>Creates predictive algorithms for trading</li>
-                                                            <li>Shows training progress and results</li>
-                                                            <li>Models can be used for backtesting</li>
-                                                        </ul>
-                                                    </div>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <div class="ps-3">
-                                                        <h6 class="text-success"><i class="fas fa-play"></i> Trade Button</h6>
-                                                        <ul class="small text-muted mb-0">
-                                                            <li>Starts paper trading session</li>
-                                                            <li>Uses virtual money (no real risk)</li>
-                                                            <li>Applies selected strategy automatically</li>
-                                                            <li>Shows real-time position updates</li>
-                                                            <li>Track performance and P&L</li>
+                                                            <li>Unified workflow: Train AI model + Start trading</li>
+                                                            <li>Configure model type and trading strategy</li>
+                                                            <li>Watch real-time training progress</li>
+                                                            <li>Automatically transitions to live trading</li>
+                                                            <li>Monitor portfolio performance in real-time</li>
+                                                            <li>Seamless experience from training to execution</li>
                                                         </ul>
                                                     </div>
                                                 </div>
@@ -1594,7 +1583,7 @@
                                         <div class="card-body">
                                             <div class="d-grid gap-2">
                                                 <button class="btn btn-primary" id="fq-train-model-btn">
-                                                    <i class="fas fa-brain"></i> Train New Model
+                                                    <i class="fas fa-rocket"></i> Train & Trade
                                                 </button>
                                                 <button class="btn btn-outline-primary" id="fq-backtest-btn">
                                                     <i class="fas fa-chart-bar"></i> Run Backtest
@@ -1623,7 +1612,7 @@
                                         <div class="card-body">
                                             <div class="d-grid gap-2">
                                                 <button class="btn btn-success" id="fq-start-paper-trading-btn">
-                                                    <i class="fas fa-play"></i> Start Session
+                                                    <i class="fas fa-rocket"></i> Train & Trade
                                                 </button>
                                                 <button class="btn btn-danger" id="fq-stop-paper-trading-btn">
                                                     <i class="fas fa-stop"></i> Stop Session

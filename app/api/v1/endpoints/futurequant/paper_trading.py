@@ -422,6 +422,58 @@ async def get_session_dashboard(
         )
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/sessions/{session_id}", response_model=dict)
+async def get_session_info(
+    session_id: str = Path(..., description="Paper trading session ID"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get detailed information about a paper trading session including P&L projections"""
+    try:
+        if session_id not in paper_broker_service.active_sessions:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = paper_broker_service.active_sessions[session_id]
+        
+        # Generate P&L projections for the session
+        daily_projections = await paper_broker_service._generate_daily_pnl_projections(
+            None,  # Strategy object not needed for existing session
+            session.get('symbols', []),
+            session.get('initial_capital', 100000),
+            session.get('risk_params', {}),
+            is_demo=(session.get('user_id') == 999)
+        )
+        
+        await usage_service.track_request(
+            endpoint="futurequant_get_session_info",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "success": True,
+            "session_info": {
+                "session_id": session_id,
+                "strategy_name": session.get('strategy_name', 'Unknown'),
+                "initial_capital": session.get('initial_capital', 0),
+                "current_capital": session.get('current_capital', 0),
+                "status": session.get('status', 'unknown'),
+                "start_time": session.get('start_time', '').isoformat() if session.get('start_time') else '',
+                "symbols": session.get('symbols', []),
+                "risk_params": session.get('risk_params', {})
+            },
+            "daily_projections": daily_projections
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting session info: {str(e)}")
+        await usage_service.track_request(
+            endpoint="futurequant_get_session_info",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/market-data/{symbol}", response_model=dict)
 async def get_market_data(
     symbol: str = Path(..., description="Symbol to get market data for"),
