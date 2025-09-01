@@ -1,4 +1,6 @@
 # Comprehensive requirements for Railway deployment - Python 3.11 compatible
+# Python version constraint
+python-version>=3.11,<3.12
 
 # PyTorch CPU wheels index
 --extra-index-url https://download.pytorch.org/whl/cpu
