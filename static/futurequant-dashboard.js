@@ -751,6 +751,12 @@ class FutureQuantDashboard {
                                     </div>
                                     <h4 class="text-success mb-2">🎉 Training Complete!</h4>
                                     <p class="text-muted">Your AI model is ready to trade</p>
+                                    <script>
+                                        // Enable the Trade button when training completes
+                                        if (typeof window.enableTradeButton === 'function') {
+                                            window.enableTradeButton();
+                                        }
+                                    </script>
                                 </div>
                                 
                                 <!-- Model Status Card -->
@@ -2164,6 +2170,11 @@ class FutureQuantDashboard {
                     
                     // Also update the main training dialog if it exists
                     this.updateMainTrainingDialog(modelId, 'completed', statusData);
+                    
+                    // Enable the Trade button after training completion
+                    if (typeof window.enableTradeButton === 'function') {
+                        window.enableTradeButton();
+                    }
                 } else if (statusData.status === 'failed') {
                     // Training failed
                     clearInterval(pollInterval);
@@ -3610,6 +3621,11 @@ class FutureQuantDashboard {
                 // Show success message
                 this.showTrainingCompletionMessage();
                 
+                // Enable the Trade button after training completion
+                if (typeof window.enableTradeButton === 'function') {
+                    window.enableTradeButton();
+                }
+                
                 // Training complete, move to step 3
                 setTimeout(() => {
                     this.goToStep(3);
@@ -4265,6 +4281,11 @@ function updateTrainingProgress(progress, message) {
 // Function to start trading with the trained model
 function startTradingWithModel() {
     console.log('Starting trading with trained model...');
+    
+    // Enable the Trade button after training completion
+    if (typeof window.enableTradeButton === 'function') {
+        window.enableTradeButton();
+    }
     
     // Close the training modal
     const trainingModal = bootstrap.Modal.getInstance(document.getElementById('trainingModal'));
