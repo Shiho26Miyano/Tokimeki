@@ -23,6 +23,112 @@ from app.services.cache_service import AsyncCacheService
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+async def auto_cleanup_models():
+    """Automatically clean up old model files on server startup"""
+    try:
+        import os
+        import re
+        from datetime import datetime
+        from pathlib import Path
+        
+        logger.info("Starting automatic model cleanup...")
+        
+        # Define the models directory
+        models_dir = Path("models")
+        
+        if not models_dir.exists():
+            logger.info("Models directory not found, skipping cleanup")
+            return
+        
+        # Find all .joblib files
+        model_files = list(models_dir.glob("*.joblib"))
+        
+        if not model_files:
+            logger.info("No model files found, skipping cleanup")
+            return
+        
+        logger.info(f"Found {len(model_files)} model files for cleanup")
+        
+        # Group models by type (symbol_modeltype_horizon)
+        model_groups = {}
+        
+        for model_file in model_files:
+            # Parse filename: ES=F_transformer_0.5m_20250831_224805.joblib
+            filename = model_file.name
+            
+            # Use regex to extract parts more reliably
+            pattern = r'^(.+)_(\d{8}_\d{6})\.joblib$'
+            match = re.match(pattern, filename)
+            
+            if match:
+                base_id = match.group(1)  # e.g., ES=F_transformer_0.5m
+                timestamp_str = match.group(2)  # e.g., 20250831_224805
+                
+                # Parse timestamp
+                try:
+                    timestamp = datetime.strptime(timestamp_str, '%Y%m%d_%H%M%S')
+                    
+                    if base_id not in model_groups:
+                        model_groups[base_id] = []
+                    
+                    model_groups[base_id].append({
+                        'file': model_file,
+                        'timestamp': timestamp,
+                        'filename': filename
+                    })
+                    
+                except ValueError:
+                    logger.warning(f"Could not parse timestamp from {filename}")
+                    continue
+            else:
+                logger.warning(f"Could not parse filename format: {filename}")
+                continue
+        
+        logger.info(f"Grouped into {len(model_groups)} model types")
+        
+        # For each group, keep only the most recent model
+        total_removed = 0
+        total_kept = 0
+        
+        for base_id, models in model_groups.items():
+            if len(models) > 1:
+                # Sort by timestamp (newest first)
+                models.sort(key=lambda x: x['timestamp'], reverse=True)
+                
+                # Keep the newest one
+                newest = models[0]
+                older_models = models[1:]
+                
+                logger.info(f"{base_id}: Keeping {newest['filename']} (newest)")
+                
+                # Remove older models
+                for old_model in older_models:
+                    try:
+                        os.remove(old_model['file'])
+                        logger.info(f"Removed old model: {old_model['filename']}")
+                        total_removed += 1
+                    except OSError as e:
+                        logger.error(f"Error removing {old_model['filename']}: {e}")
+                
+                total_kept += 1
+            else:
+                # Only one model of this type, keep it
+                logger.info(f"{base_id}: Keeping {models[0]['filename']} (only one)")
+                total_kept += 1
+        
+        logger.info(f"Model cleanup completed: {total_kept} kept, {total_removed} removed")
+        
+        # Show remaining models
+        remaining_files = list(models_dir.glob("*.joblib"))
+        if remaining_files:
+            logger.info(f"Remaining models ({len(remaining_files)}):")
+            for model_file in sorted(remaining_files):
+                logger.info(f"  {model_file.name}")
+                
+    except Exception as e:
+        logger.error(f"Error during automatic model cleanup: {e}")
+        # Don't fail startup if cleanup fails
+
 # Get the absolute path to the static directory
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 logger.info(f"Static directory path: {STATIC_DIR}")
@@ -51,6 +157,10 @@ async def startup_event():
         logger.info(f"API key configured: {bool(settings.openrouter_api_key)}")
         logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
         logger.info(f"Port: {os.getenv('PORT', '8000')}")
+        
+        # Auto-cleanup old models on startup
+        await auto_cleanup_models()
+        
         logger.info("Application startup completed successfully")
     except Exception as e:
         logger.error(f"Startup error: {str(e)}")
