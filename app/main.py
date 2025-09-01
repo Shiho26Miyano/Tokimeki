@@ -158,13 +158,17 @@ async def startup_event():
         logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
         logger.info(f"Port: {os.getenv('PORT', '8000')}")
         
-        # Auto-cleanup old models on startup
-        await auto_cleanup_models()
+        # Auto-cleanup old models on startup (non-blocking)
+        try:
+            await auto_cleanup_models()
+        except Exception as cleanup_error:
+            logger.warning(f"Model cleanup failed (non-critical): {cleanup_error}")
         
         logger.info("Application startup completed successfully")
     except Exception as e:
         logger.error(f"Startup error: {str(e)}")
-        raise e
+        # Don't raise the error - let the app start even if cleanup fails
+        logger.warning("Continuing with startup despite errors...")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -200,7 +204,12 @@ async def favicon():
 # Health check endpoint for Docker
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": time.time()}
+    """Simple health check that responds immediately"""
+    try:
+        return {"status": "healthy", "timestamp": time.time(), "service": "Tokimeki"}
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return {"status": "unhealthy", "error": str(e), "timestamp": time.time()}
 
 # Error handlers
 @app.exception_handler(500)
@@ -636,10 +645,7 @@ async def root_volatility_endpoint(
 
 
 
-@app.get("/health")
-async def legacy_root_health():
-    """Backward-compatible root health endpoint"""
-    return {"status": "healthy", "service": "app", "timestamp": time.time()}
+# Legacy health endpoint removed - duplicate route
 
 @app.get("/available_tickers")
 async def legacy_available_tickers(
