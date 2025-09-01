@@ -3,9 +3,8 @@ import logging
 import numpy as np
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -23,6 +22,10 @@ from app.services.cache_service import AsyncCacheService
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Get the absolute path to the static directory
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+logger.info(f"Static directory path: {STATIC_DIR}")
 
 # Create FastAPI app
 app = FastAPI(
@@ -61,7 +64,7 @@ async def shutdown_event():
     await cleanup_http_client()
 
 # Mount static files with cache busting
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Add middleware to prevent caching of static files
 @app.middleware("http")
@@ -76,7 +79,13 @@ async def add_cache_headers(request: Request, call_next):
 # Add favicon route
 @app.get("/favicon.ico")
 async def favicon():
-    return FileResponse("static/favicon.ico")
+    try:
+        favicon_path = os.path.join(STATIC_DIR, "favicon.ico")
+        logger.info(f"Serving favicon from: {favicon_path}")
+        return FileResponse(favicon_path)
+    except Exception as e:
+        logger.error(f"Error serving favicon: {e}")
+        return JSONResponse(status_code=404, content={"error": "Favicon not found"})
 
 # Health check endpoint for Docker
 @app.get("/health")
@@ -102,16 +111,21 @@ async def not_found_handler(request: Request, exc: Exception):
 # Include API router
 app.include_router(api_router, prefix="/api/v1")
 
-# Root endpoint for debugging
-@app.get("/")
-async def root():
-    return {
-        "message": "Tokimeki FastAPI is running",
-        "status": "healthy",
-        "timestamp": time.time(),
-        "environment": os.getenv("ENVIRONMENT", "development"),
-        "version": "1.0.0"
-    }
+# Root endpoint removed - duplicate route
+
+# FutureQuant dashboard route
+@app.get("/futurequant")
+async def futurequant_dashboard():
+    try:
+        dashboard_path = os.path.join(STATIC_DIR, "futurequant-enhanced.html")
+        logger.info(f"Serving FutureQuant dashboard from: {dashboard_path}")
+        return FileResponse(dashboard_path)
+    except Exception as e:
+        logger.error(f"Error serving FutureQuant dashboard: {e}")
+        return JSONResponse(
+            status_code=500, 
+            content={"error": "Failed to serve FutureQuant dashboard", "details": str(e)}
+        )
 
 # Core app endpoints (not part of API v1)
 
@@ -414,14 +428,23 @@ async def get_stock_symbols_endpoint():
 
 
 
-# Root endpoint - serve the main HTML page
+# Root endpoint - serve the main HTML page (using absolute path)
 @app.get("/")
 async def root():
-    response = FileResponse("static/index.html")
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    return response
+    try:
+        index_path = os.path.join(STATIC_DIR, "index.html")
+        logger.info(f"Serving index.html from: {index_path}")
+        response = FileResponse(index_path)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+    except Exception as e:
+        logger.error(f"Error serving index.html: {e}")
+        return JSONResponse(
+            status_code=500, 
+            content={"error": "Failed to serve main page", "details": str(e)}
+        )
 
 # Add missing root-level endpoints for backward compatibility
 @app.post("/analyze")
