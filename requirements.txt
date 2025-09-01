@@ -1,7 +1,8 @@
-# PyTorch CPU wheels index (needed for sentence-transformers on servers without GPU)
+# Railway deployment requirements - optimized for Python 3.11 compatibility
+# PyTorch CPU wheels index
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-# FastAPI Migration Dependencies
+# Core web framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 gunicorn==21.2.0
@@ -10,56 +11,65 @@ h2==4.2.0
 python-multipart==0.0.6
 slowapi==0.1.9
 pydantic-settings==2.1.0
+
+# Core dependencies
 redis==5.0.1
 psutil==5.9.8
 python-dotenv==1.0.0
+requests==2.31.0
 
-# Existing dependencies
+# Data processing
 yfinance==0.2.63
 scikit-learn==1.4.2
 numpy==1.26.4
 pandas==2.2.1
+scipy==1.15.3
+
+# AI/ML
 transformers==4.38.2
 datasets==2.18.0
 beautifulsoup4==4.12.3
 transformers-interpret==0.10.0
 vaderSentiment==3.3.2
-requests==2.31.0
+torch==2.3.1
 
-# FutureQuant Trader Dependencies
+# Database
 sqlalchemy==2.0.23
 sqlmodel==0.0.14
 alembic==1.13.1
 psycopg2-binary==2.9.9
 asyncpg==0.29.0
+
+# ML/Analytics
 mlflow==2.8.1
 pytorch-lightning==2.1.3
-# ta-lib==0.4.28  # Removed due to deployment compatibility issues
-pandas-ta==0.3.14b0  # Alternative technical analysis library (pure Python)
+pandas-ta==0.3.14b0
 polars==0.20.3
+
+# Task scheduling
 celery==5.3.4
 apscheduler==3.10.4
+
+# Cloud storage
 minio==7.2.0
 boto3==1.34.34
 
-# Quantitative Finance Libraries
-vectorbt==0.28.1  # Vectorized backtesting and analysis
-qf-lib==4.0.3     # Quantitative Finance Library
-empyrical==0.5.5  # Financial risk and performance analytics
-alphalens==0.4.0  # Alpha factor analysis
-arch==6.2.0       # Autoregressive conditional heteroskedasticity models
-statsmodels==0.14.1  # Statistical models and tests
-scipy==1.15.3     # Scientific computing
+# Quantitative Finance (compatible versions)
+vectorbt==0.28.1
+qf-lib==4.0.3
+empyrical==0.5.6
+alphalens==0.4.0
+arch==6.2.0
+statsmodels==0.14.1
 
-# Development dependencies
-pytest==7.4.3
-pytest-asyncio==0.21.1 
-
-# RAG / LangChain
+# RAG/LangChain
 langchain==0.2.11
 langchain-community==0.2.10
 faiss-cpu==1.8.0.post1
 sentence-transformers==2.7.0
 langchain-text-splitters==0.2.2
-torch==2.3.1
 pdfminer.six==20231228
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
