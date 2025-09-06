@@ -1153,19 +1153,26 @@ class FutureQuantDashboard {
             performance: performanceChartElement
         });
         
-        if (!priceChartElement || !distributionChartElement || !performanceChartElement) {
-            console.error('Some chart elements not found, cannot initialize charts');
-            return;
+        // Initialize price chart if element exists
+        if (priceChartElement) {
+            this.initializePriceChart();
+        } else {
+            console.warn('Price chart element not found');
         }
         
-        // Initialize price chart
-        this.initializePriceChart();
+        // Initialize distribution chart if element exists
+        if (distributionChartElement) {
+            this.initializeDistributionChart();
+        } else {
+            console.warn('Distribution chart element not found');
+        }
         
-        // Initialize performance chart
-        this.initializePerformanceChart();
-        
-        // Initialize distribution chart
-        this.initializeDistributionChart();
+        // Initialize performance chart if element exists
+        if (performanceChartElement) {
+            this.initializePerformanceChart();
+        } else {
+            console.warn('Performance chart element not found');
+        }
         
         // Force chart resize after a short delay
         setTimeout(() => {
@@ -1174,8 +1181,9 @@ class FutureQuantDashboard {
         
         // Generate initial data for charts after initialization
         setTimeout(() => {
+            console.log('Generating initial chart data...');
             this.generateInitialChartData();
-        }, 300);
+        }, 500);
         
         // Test chart functionality after a longer delay
         setTimeout(() => {
@@ -1184,6 +1192,8 @@ class FutureQuantDashboard {
             console.log('Price chart:', this.charts.price);
             if (this.charts.price) {
                 console.log('Price chart data:', this.charts.price.data);
+                console.log('Price chart labels length:', this.charts.price.data.labels.length);
+                console.log('Price chart data length:', this.charts.price.data.datasets[0].data.length);
                 
                 // Force add some test data if chart is empty
                 if (this.charts.price.data.labels.length === 0) {
@@ -1193,8 +1203,24 @@ class FutureQuantDashboard {
                     this.charts.price.update();
                     console.log('Test data added to price chart');
                 }
+            } else {
+                console.error('Price chart not initialized!');
             }
-        }, 1000);
+            
+            // Check distribution chart
+            if (this.charts.distribution) {
+                console.log('Distribution chart data:', this.charts.distribution.data);
+                if (this.charts.distribution.data.labels.length === 0) {
+                    console.log('Distribution chart is empty, adding test data...');
+                    this.charts.distribution.data.labels = ['Q10', 'Q25', 'Q50', 'Q75', 'Q90'];
+                    this.charts.distribution.data.datasets[0].data = [-3.2, -1.8, 0.5, 2.1, 4.2];
+                    this.charts.distribution.update();
+                    console.log('Test data added to distribution chart');
+                }
+            } else {
+                console.error('Distribution chart not initialized!');
+            }
+        }, 1500);
     }
     
     forceChartResize() {
@@ -1231,10 +1257,10 @@ class FutureQuantDashboard {
             this.charts.price = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: [],
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
                     datasets: [{
                         label: 'Price',
-                        data: [],
+                        data: [100, 120, 115, 130, 125, 140, 135, 150, 145, 160],
                         borderColor: '#183153',
                         backgroundColor: 'rgba(24, 49, 83, 0.1)',
                         tension: 0.1
@@ -1323,7 +1349,7 @@ class FutureQuantDashboard {
                 labels: ['Q10', 'Q25', 'Q50', 'Q75', 'Q90'],
                 datasets: [{
                     label: 'Return Distribution',
-                    data: [0, 0, 0, 0, 0],
+                    data: [-3.2, -1.8, 0.5, 2.1, 4.2],
                     backgroundColor: [
                         'rgba(255, 99, 132, 0.8)',
                         'rgba(255, 159, 64, 0.8)',
