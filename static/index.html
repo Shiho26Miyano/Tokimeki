@@ -154,6 +154,94 @@
         .tab-content > .active {
             display: block;
         }
+        
+        /* Futures Exploratorium Styles */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes slideInUp {
+            0% { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            100% { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px rgba(0, 212, 255, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.6); }
+            100% { box-shadow: 0 0 5px rgba(0, 212, 255, 0.3); }
+        }
+        
+        @keyframes numberChange {
+            0% { transform: scale(1); color: inherit; }
+            50% { transform: scale(1.1); color: #00d4ff; }
+            100% { transform: scale(1); color: inherit; }
+        }
+        
+        @keyframes priceUpdate {
+            0% { 
+                transform: scale(1);
+                background-color: rgba(0, 212, 255, 0.1);
+            }
+            50% { 
+                transform: scale(1.02);
+                background-color: rgba(0, 212, 255, 0.2);
+            }
+            100% { 
+                transform: scale(1);
+                background-color: rgba(0, 212, 255, 0.05);
+            }
+        }
+        
+        @keyframes sparklineDraw {
+            0% { stroke-dasharray: 0 1000; }
+            100% { stroke-dasharray: 1000 0; }
+        }
+        
+        @keyframes fadeInScale {
+            0% { 
+                opacity: 0;
+                transform: scale(0.9) translateY(10px);
+            }
+            100% { 
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        
+        @keyframes priceFlash {
+            0% { color: inherit; }
+            50% { color: #00d4ff; }
+            100% { color: inherit; }
+        }
+        
+        #futures-exploratorium-root {
+            min-height: 100vh;
+        }
+        
+        @media (max-width: 768px) {
+            #futures-exploratorium-root .dashboard-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            #futures-exploratorium-root .main-content {
+                padding: 0 1rem !important;
+            }
+        }
 
         .tooltip-container {
             position: relative;
@@ -304,7 +392,10 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="futurequant-dashboard-tab" data-bs-toggle="pill" data-bs-target="#futurequant-dashboard-content" role="tab" aria-controls="futurequant-dashboard-content" aria-selected="true">📊 FutureQuant Simulator</a>
+                        <a class="nav-link active" id="futures-exploratorium-tab" data-bs-toggle="pill" data-bs-target="#futures-exploratorium-content" role="tab" aria-controls="futures-exploratorium-content" aria-selected="true">🚀 Futures Exploratorium</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="futurequant-dashboard-tab" data-bs-toggle="pill" data-bs-target="#futurequant-dashboard-content" role="tab" aria-controls="futurequant-dashboard-content" aria-selected="false">📊 FutureQuant Simulator</a>
                     </li>
 
                     <li class="nav-item" role="presentation">
@@ -337,7 +428,10 @@
 
             <div class="col-md-10 py-4">
                 <div class="tab-content" id="main-tab-content">
-                    <div class="tab-pane fade show active" id="futurequant-dashboard-content" role="tabpanel" aria-labelledby="futurequant-dashboard-tab">
+                    <div class="tab-pane fade show active" id="futures-exploratorium-content" role="tabpanel" aria-labelledby="futures-exploratorium-tab">
+                        <div id="futures-exploratorium-root"></div>
+                    </div>
+                    <div class="tab-pane fade" id="futurequant-dashboard-content" role="tabpanel" aria-labelledby="futurequant-dashboard-tab">
                         <div id="futurequant-dashboard-root">
                             <!-- Compact Header -->
                             <div class="card shadow-sm mb-3">
@@ -1731,9 +1825,971 @@
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <script src="https://unpkg.com/date-fns@2.30.0/index.js"></script>
             <script src="static/main.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
         <script src="static/mnq-dashboard.js"></script>
                         <script src="static/futurequant-dashboard.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
+    
+    <!-- Futures Exploratorium React App -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // Utility functions
+        const formatCurrency = (value) => `$${value.toFixed(2)}`;
+        const formatPercent = (value) => `${(value * 100).toFixed(2)}%`;
+        const formatNumber = (value) => value.toLocaleString();
+        
+        // API Service
+        const apiService = {
+            async get(endpoint) {
+                try {
+                    const response = await fetch(`/api/v1${endpoint}`);
+                    return await response.json();
+                } catch (error) {
+                    console.error(`API Error (${endpoint}):`, error);
+                    return { success: false, error: error.message };
+                }
+            },
+            async post(endpoint, data) {
+                try {
+                    const response = await fetch(`/api/v1${endpoint}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    return await response.json();
+                } catch (error) {
+                    console.error(`API Error (${endpoint}):`, error);
+                    return { success: false, error: error.message };
+                }
+            }
+        };
+        
+        // WebSocket Service
+        class WebSocketService {
+            constructor() {
+                this.ws = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 5;
+                this.listeners = new Map();
+            }
+            
+            connect() {
+                try {
+                    this.ws = new WebSocket('ws://localhost:8000/ws');
+                    
+                    this.ws.onopen = () => {
+                        console.log('WebSocket connected');
+                        this.reconnectAttempts = 0;
+                        this.emit('connected', true);
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        this.emit('message', data);
+                    };
+                    
+                    this.ws.onclose = () => {
+                        console.log('WebSocket disconnected');
+                        this.emit('connected', false);
+                        // Don't reconnect in demo mode
+                        console.log('WebSocket reconnection disabled in demo mode');
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        // Simulate connection for demo
+                        this.emit('connected', false);
+                    };
+                } catch (error) {
+                    console.error('WebSocket connection failed:', error);
+                    // Simulate connection for demo
+                    this.emit('connected', false);
+                }
+            }
+            
+            reconnect() {
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    setTimeout(() => this.connect(), 2000 * this.reconnectAttempts);
+                }
+            }
+            
+            subscribe(event, callback) {
+                if (!this.listeners.has(event)) {
+                    this.listeners.set(event, []);
+                }
+                this.listeners.get(event).push(callback);
+                
+                return () => {
+                    const callbacks = this.listeners.get(event);
+                    if (callbacks) {
+                        const index = callbacks.indexOf(callback);
+                        if (index > -1) callbacks.splice(index, 1);
+                    }
+                };
+            }
+            
+            emit(event, data) {
+                const callbacks = this.listeners.get(event);
+                if (callbacks) {
+                    callbacks.forEach(callback => callback(data));
+                }
+            }
+            
+            disconnect() {
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+            }
+        }
+        
+        const wsService = new WebSocketService();
+        
+        // Store (Zustand-like state management)
+        const createStore = (initialState) => {
+            let state = { ...initialState };
+            const listeners = new Set();
+            
+            return {
+                getState: () => state,
+                setState: (newState) => {
+                    state = { ...state, ...newState };
+                    listeners.forEach(listener => listener(state));
+                },
+                subscribe: (listener) => {
+                    listeners.add(listener);
+                    return () => listeners.delete(listener);
+                }
+            };
+        };
+        
+        const store = createStore({
+            systemHealth: { status: 'unknown', score: 0, uptime: 0, lastUpdate: null },
+            marketData: {
+                ES: { price: 4250.50, change: 12.50, changePercent: 0.0029, volume: 1500000, sparkline: [] },
+                NQ: { price: 14500.25, change: -25.75, changePercent: -0.0018, volume: 800000, sparkline: [] },
+                RTY: { price: 1850.75, change: 8.25, changePercent: 0.0045, volume: 450000, sparkline: [] }
+            },
+            strategyPerformance: {
+                pnl: 1250.75,
+                sharpe: 1.85,
+                drawdown: -0.08,
+                winRate: 0.68,
+                equityCurve: [],
+                isRunningBacktest: false
+            },
+            isConnected: false,
+            lastUpdate: new Date()
+        });
+        
+        // Header Component
+        const Header = () => {
+            const [state, setState] = useState(store.getState());
+            
+            useEffect(() => {
+                const unsubscribe = store.subscribe(setState);
+                return unsubscribe;
+            }, []);
+            
+            const getHealthColor = (status) => {
+                switch (status) {
+                    case 'healthy': return '#00ff88';
+                    case 'warning': return '#ffaa00';
+                    case 'error': return '#ff4444';
+                    default: return '#666666';
+                }
+            };
+            
+            return (
+                <div style={{
+                    background: 'linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%)',
+                    padding: '1rem 2rem',
+                    marginBottom: '2rem',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+                    border: '1px solid #333'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <h1 style={{ 
+                                margin: 0, 
+                                fontSize: '2rem', 
+                                fontWeight: '700',
+                                background: 'linear-gradient(135deg, #00d4ff 0%, #ff6b35 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text'
+                            }}>
+                                Futures Exploratorium
+                            </h1>
+                            <p style={{ margin: '0.5rem 0 0 0', color: '#888', fontSize: '0.9rem' }}>
+                                Experimental Trading Platform
+                                <span style={{ 
+                                    marginLeft: '1rem', 
+                                    padding: '0.25rem 0.5rem', 
+                                    background: 'rgba(0, 212, 255, 0.2)', 
+                                    borderRadius: '4px',
+                                    fontSize: '0.8rem',
+                                    color: '#00d4ff'
+                                }}>
+                                    DEMO MODE
+                                </span>
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ 
+                                    color: getHealthColor(state.systemHealth.status),
+                                    fontSize: '0.9rem',
+                                    fontWeight: '500'
+                                }}>
+                                    System: {state.systemHealth.status.toUpperCase()}
+                                </div>
+                                <div style={{ color: '#888', fontSize: '0.8rem' }}>
+                                    Score: {(state.systemHealth.score * 100).toFixed(0)}%
+                                </div>
+                            </div>
+                            <div style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                backgroundColor: state.isConnected ? '#00ff88' : '#ff4444',
+                                boxShadow: state.isConnected ? '0 0 10px #00ff88' : '0 0 10px #ff4444'
+                            }} />
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // Market Overview Component
+        const MarketOverview = () => {
+            const [state, setState] = useState(store.getState());
+            const [expandedSymbol, setExpandedSymbol] = useState(null);
+            const [isAnimating, setIsAnimating] = useState(false);
+            
+            useEffect(() => {
+                const unsubscribe = store.subscribe(setState);
+                return unsubscribe;
+            }, []);
+            
+            // Animation effect when market data changes
+            useEffect(() => {
+                setIsAnimating(true);
+                const timer = setTimeout(() => setIsAnimating(false), 1000);
+                return () => clearTimeout(timer);
+            }, [state.marketData.ES.price, state.marketData.NQ.price, state.marketData.RTY.price]);
+            
+            const symbols = ['ES', 'NQ', 'RTY'];
+            
+            const Sparkline = ({ data, color, isAnimating }) => {
+                if (!data || data.length < 2) return null;
+                
+                const width = 80;
+                const height = 30;
+                const min = Math.min(...data);
+                const max = Math.max(...data);
+                const range = max - min || 1;
+                
+                const points = data.map((value, index) => {
+                    const x = (index / (data.length - 1)) * width;
+                    const y = height - ((value - min) / range) * height;
+                    return `${x},${y}`;
+                }).join(' ');
+                
+                return (
+                    <svg width={width} height={height} style={{ marginLeft: '0.5rem' }}>
+                        <polyline
+                            points={points}
+                            fill="none"
+                            stroke={color}
+                            strokeWidth="2"
+                            strokeDasharray={isAnimating ? "1000" : "none"}
+                            strokeDashoffset={isAnimating ? "1000" : "0"}
+                            style={{
+                                animation: isAnimating ? 'sparklineDraw 1.5s ease-out forwards' : 'none',
+                                transition: 'all 0.3s ease'
+                            }}
+                        />
+                    </svg>
+                );
+            };
+            
+            return (
+                <div style={{
+                    background: 'linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%)',
+                    padding: '1.5rem',
+                    borderRadius: '12px',
+                    boxShadow: isAnimating ? '0 4px 30px rgba(0, 212, 255, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.3)',
+                    border: isAnimating ? '1px solid #00d4ff' : '1px solid #333',
+                    transition: 'all 0.3s ease',
+                    animation: isAnimating ? 'glow 1s ease-in-out' : 'none'
+                }}>
+                    <h3 style={{ 
+                        margin: '0 0 1.5rem 0', 
+                        color: '#fff',
+                        fontSize: '1.2rem',
+                        fontWeight: '600',
+                        animation: isAnimating ? 'slideInUp 0.6s ease-out' : 'none'
+                    }}>
+                        Market Overview
+                    </h3>
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                        {symbols.map((symbol, index) => {
+                            const data = state.marketData[symbol];
+                            const isPositive = data.change >= 0;
+                            const changeColor = isPositive ? '#00ff88' : '#ff4444';
+                            
+                            return (
+                                <div key={symbol} style={{
+                                    background: isAnimating ? 'rgba(0, 212, 255, 0.05)' : 'rgba(255, 255, 255, 0.05)',
+                                    padding: '1rem',
+                                    borderRadius: '8px',
+                                    border: isAnimating ? '1px solid rgba(0, 212, 255, 0.3)' : '1px solid #333',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    animation: isAnimating ? `priceUpdate 1s ease-out ${index * 0.1}s` : 'none',
+                                    transform: isAnimating ? 'scale(1.02)' : 'scale(1)',
+                                    ':hover': { 
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        transform: 'scale(1.02)'
+                                    }
+                                }}
+                                onClick={() => setExpandedSymbol(expandedSymbol === symbol ? null : symbol)}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <div style={{ 
+                                                fontSize: '1.1rem', 
+                                                fontWeight: '600', 
+                                                color: '#fff',
+                                                marginBottom: '0.25rem'
+                                            }}>
+                                                {symbol}
+                                            </div>
+                                            <div style={{ 
+                                                fontSize: '1.5rem', 
+                                                fontWeight: '700', 
+                                                color: '#fff',
+                                                marginBottom: '0.25rem',
+                                                animation: isAnimating ? 'priceFlash 0.8s ease-out' : 'none',
+                                                transition: 'all 0.3s ease'
+                                            }}>
+                                                {formatCurrency(data.price)}
+                                            </div>
+                                            <div style={{ 
+                                                color: changeColor, 
+                                                fontSize: '0.9rem',
+                                                fontWeight: '500',
+                                                animation: isAnimating ? 'numberChange 0.8s ease-out 0.2s' : 'none',
+                                                transition: 'all 0.3s ease'
+                                            }}>
+                                                {isPositive ? '+' : ''}{formatCurrency(data.change)} ({formatPercent(data.changePercent)})
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            <Sparkline data={data.sparkline} color={changeColor} isAnimating={isAnimating} />
+                                        </div>
+                                    </div>
+                                    <div style={{ 
+                                        marginTop: '0.5rem', 
+                                        fontSize: '0.8rem', 
+                                        color: '#888',
+                                        animation: isAnimating ? 'fadeInScale 0.6s ease-out 0.4s both' : 'none',
+                                        transition: 'all 0.3s ease'
+                                    }}>
+                                        Vol: {formatNumber(data.volume)}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+        
+        // Equity Curve Chart Component
+        const EquityCurveChart = ({ data, isAnimating }) => {
+            const chartRef = useRef(null);
+            
+            useEffect(() => {
+                if (!chartRef.current) return;
+                
+                // Clear previous chart
+                d3.select(chartRef.current).selectAll("*").remove();
+                
+                // Generate sample data if none provided
+                const chartData = data && data.length > 0 ? data : generateSampleEquityCurve();
+                
+                const margin = { top: 20, right: 30, bottom: 30, left: 40 };
+                const width = 400 - margin.left - margin.right;
+                const height = 160 - margin.top - margin.bottom;
+                
+                const svg = d3.select(chartRef.current)
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom);
+                
+                const g = svg.append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+                
+                // Scales
+                const xScale = d3.scaleLinear()
+                    .domain([0, chartData.length - 1])
+                    .range([0, width]);
+                
+                const yScale = d3.scaleLinear()
+                    .domain(d3.extent(chartData))
+                    .range([height, 0]);
+                
+                // Line generator
+                const line = d3.line()
+                    .x((d, i) => xScale(i))
+                    .y(d => yScale(d))
+                    .curve(d3.curveMonotoneX);
+                
+                // Area generator
+                const area = d3.area()
+                    .x((d, i) => xScale(i))
+                    .y0(height)
+                    .y1(d => yScale(d))
+                    .curve(d3.curveMonotoneX);
+                
+                // Add gradient
+                const gradient = svg.append("defs")
+                    .append("linearGradient")
+                    .attr("id", "equityGradient")
+                    .attr("gradientUnits", "userSpaceOnUse")
+                    .attr("x1", 0).attr("y1", height)
+                    .attr("x2", 0).attr("y2", 0);
+                
+                gradient.append("stop")
+                    .attr("offset", "0%")
+                    .attr("stop-color", "rgba(0, 212, 255, 0.3)");
+                
+                gradient.append("stop")
+                    .attr("offset", "100%")
+                    .attr("stop-color", "rgba(0, 212, 255, 0.05)");
+                
+                // Add area
+                g.append("path")
+                    .datum(chartData)
+                    .attr("fill", "url(#equityGradient)")
+                    .attr("d", area)
+                    .style("opacity", 0)
+                    .transition()
+                    .duration(1000)
+                    .style("opacity", 1);
+                
+                // Add line
+                g.append("path")
+                    .datum(chartData)
+                    .attr("fill", "none")
+                    .attr("stroke", "#00d4ff")
+                    .attr("stroke-width", 2)
+                    .attr("d", line)
+                    .style("opacity", 0)
+                    .transition()
+                    .duration(1000)
+                    .delay(500)
+                    .style("opacity", 1);
+                
+                // Add dots for data points
+                g.selectAll(".dot")
+                    .data(chartData)
+                    .enter().append("circle")
+                    .attr("class", "dot")
+                    .attr("cx", (d, i) => xScale(i))
+                    .attr("cy", d => yScale(d))
+                    .attr("r", 3)
+                    .attr("fill", "#00d4ff")
+                    .style("opacity", 0)
+                    .transition()
+                    .duration(200)
+                    .delay((d, i) => i * 50)
+                    .style("opacity", 0.8);
+                
+                // Add axes
+                const xAxis = d3.axisBottom(xScale)
+                    .ticks(5)
+                    .tickFormat(d => `Day ${d + 1}`);
+                
+                const yAxis = d3.axisLeft(yScale)
+                    .ticks(5)
+                    .tickFormat(d => `$${d.toFixed(0)}`);
+                
+                g.append("g")
+                    .attr("class", "x axis")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(xAxis)
+                    .style("color", "#888")
+                    .style("font-size", "10px");
+                
+                g.append("g")
+                    .attr("class", "y axis")
+                    .call(yAxis)
+                    .style("color", "#888")
+                    .style("font-size", "10px");
+                
+                // Add grid lines
+                g.append("g")
+                    .attr("class", "grid")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(xScale)
+                        .ticks(5)
+                        .tickSize(-height)
+                        .tickFormat(""))
+                    .style("color", "#333")
+                    .style("opacity", 0.3);
+                
+                g.append("g")
+                    .attr("class", "grid")
+                    .call(d3.axisLeft(yScale)
+                        .ticks(5)
+                        .tickSize(-width)
+                        .tickFormat(""))
+                    .style("color", "#333")
+                    .style("opacity", 0.3);
+                
+            }, [data, isAnimating]);
+            
+            return <div ref={chartRef} style={{ width: '100%', height: '100%' }} />;
+        };
+        
+        // Helper function to generate sample equity curve data
+        const generateSampleEquityCurve = () => {
+            const data = [];
+            let value = 100000; // Starting value
+            const days = 30;
+            
+            for (let i = 0; i < days; i++) {
+                // Add some random walk with slight upward bias
+                const change = (Math.random() - 0.4) * 2000; // Slight positive bias
+                value += change;
+                data.push(Math.max(value, 50000)); // Minimum value
+            }
+            
+            return data;
+        };
+        
+        // Strategy Performance Component
+        const StrategyPerformance = () => {
+            const [state, setState] = useState(store.getState());
+            const [isAnimating, setIsAnimating] = useState(false);
+            
+            useEffect(() => {
+                const unsubscribe = store.subscribe(setState);
+                return unsubscribe;
+            }, []);
+            
+            // Animation effect when performance data changes
+            useEffect(() => {
+                setIsAnimating(true);
+                const timer = setTimeout(() => setIsAnimating(false), 1000);
+                return () => clearTimeout(timer);
+            }, [state.strategyPerformance.pnl, state.strategyPerformance.sharpe, state.strategyPerformance.drawdown, state.strategyPerformance.winRate]);
+            
+            const runBacktest = async () => {
+                store.setState({ 
+                    strategyPerformance: { 
+                        ...state.strategyPerformance, 
+                        isRunningBacktest: true 
+                    } 
+                });
+                
+                try {
+                    // Demo mode: Use mock data directly without API calls
+                    console.log('Demo mode: Using mock backtest data');
+                    
+                    // Add a small delay to simulate processing
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    const backtestResult = {
+                        success: true,
+                        performance: {
+                            total_return: Math.random() * 5000 - 1000, // Random PnL between -1000 and 4000
+                            sharpe_ratio: 1.2 + Math.random() * 1.0, // Random Sharpe between 1.2 and 2.2
+                            max_drawdown: -0.05 - Math.random() * 0.1, // Random drawdown between -5% and -15%
+                            win_rate: 0.6 + Math.random() * 0.2, // Random win rate between 60% and 80%
+                            equity_curve: generateSampleEquityCurve()
+                        }
+                    };
+                    
+                    if (backtestResult.success) {
+                        // Update with backtest results
+                        store.setState({
+                            strategyPerformance: {
+                                ...state.strategyPerformance,
+                                pnl: backtestResult.performance?.total_return || 1250.75,
+                                sharpe: backtestResult.performance?.sharpe_ratio || 1.85,
+                                drawdown: backtestResult.performance?.max_drawdown || -0.08,
+                                winRate: backtestResult.performance?.win_rate || 0.68,
+                                equityCurve: backtestResult.performance?.equity_curve || [],
+                                isRunningBacktest: false
+                            }
+                        });
+                        
+                        // Add success alert
+                        store.setState(prevState => ({
+                            alerts: [{
+                                id: Date.now() + Math.random(),
+                                type: 'backtest_success',
+                                level: 'info',
+                                message: `Backtest completed successfully. PnL: ${formatCurrency(backtestResult.performance?.total_return || 0)}`,
+                                timestamp: new Date(),
+                                symbol: 'ALL'
+                            }, ...prevState.alerts.slice(0, 49)]
+                        }));
+                    } else {
+                        throw new Error(backtestResult.error || 'Backtest failed');
+                    }
+                } catch (error) {
+                    console.error('Backtest failed:', error);
+                    store.setState({ 
+                        strategyPerformance: { 
+                            ...state.strategyPerformance, 
+                            isRunningBacktest: false 
+                        } 
+                    });
+                    
+                    // Add error alert
+                    store.setState(prevState => ({
+                        alerts: [{
+                            id: Date.now() + Math.random(),
+                            type: 'backtest_error',
+                            level: 'error',
+                            message: `Backtest failed: ${error.message}`,
+                            timestamp: new Date(),
+                            symbol: 'ALL'
+                        }, ...prevState.alerts.slice(0, 49)]
+                    }));
+                }
+            };
+            
+            return (
+                <div style={{
+                    background: 'linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%)',
+                    padding: '1.5rem',
+                    borderRadius: '12px',
+                    boxShadow: isAnimating ? '0 4px 30px rgba(0, 212, 255, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.3)',
+                    border: isAnimating ? '1px solid #00d4ff' : '1px solid #333',
+                    transition: 'all 0.3s ease',
+                    animation: isAnimating ? 'glow 1s ease-in-out' : 'none'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <h3 style={{ 
+                            margin: 0, 
+                            color: '#fff',
+                            fontSize: '1.2rem',
+                            fontWeight: '600',
+                            animation: isAnimating ? 'slideInUp 0.6s ease-out' : 'none'
+                        }}>
+                            Strategy Performance
+                        </h3>
+                        <button
+                            onClick={runBacktest}
+                            disabled={state.strategyPerformance.isRunningBacktest}
+                            style={{
+                                background: state.strategyPerformance.isRunningBacktest 
+                                    ? '#666' 
+                                    : 'linear-gradient(135deg, #00d4ff 0%, #ff6b35 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                cursor: state.strategyPerformance.isRunningBacktest ? 'not-allowed' : 'pointer',
+                                fontWeight: '500',
+                                fontSize: '0.9rem',
+                                transition: 'all 0.3s ease',
+                                transform: state.strategyPerformance.isRunningBacktest ? 'scale(0.95)' : 'scale(1)',
+                                animation: state.strategyPerformance.isRunningBacktest ? 'pulse 1s infinite' : 'none',
+                                boxShadow: state.strategyPerformance.isRunningBacktest ? 'none' : '0 2px 10px rgba(0, 212, 255, 0.3)'
+                            }}
+                        >
+                            {state.strategyPerformance.isRunningBacktest ? 'Running...' : 'Run Backtest'}
+                        </button>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                        <div style={{ 
+                            textAlign: 'center',
+                            animation: isAnimating ? 'slideInUp 0.6s ease-out 0.1s both' : 'none'
+                        }}>
+                            <div style={{ color: '#888', fontSize: '0.9rem', marginBottom: '0.25rem' }}>PnL</div>
+                            <div style={{ 
+                                color: state.strategyPerformance.pnl >= 0 ? '#00ff88' : '#ff4444',
+                                fontSize: '1.5rem',
+                                fontWeight: '700',
+                                animation: isAnimating ? 'numberChange 0.8s ease-out' : 'none',
+                                transition: 'all 0.3s ease'
+                            }}>
+                                {formatCurrency(state.strategyPerformance.pnl)}
+                            </div>
+                        </div>
+                        <div style={{ 
+                            textAlign: 'center',
+                            animation: isAnimating ? 'slideInUp 0.6s ease-out 0.2s both' : 'none'
+                        }}>
+                            <div style={{ color: '#888', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Sharpe</div>
+                            <div style={{ 
+                                color: '#fff', 
+                                fontSize: '1.5rem', 
+                                fontWeight: '700',
+                                animation: isAnimating ? 'numberChange 0.8s ease-out 0.1s' : 'none',
+                                transition: 'all 0.3s ease'
+                            }}>
+                                {state.strategyPerformance.sharpe.toFixed(2)}
+                            </div>
+                        </div>
+                        <div style={{ 
+                            textAlign: 'center',
+                            animation: isAnimating ? 'slideInUp 0.6s ease-out 0.3s both' : 'none'
+                        }}>
+                            <div style={{ color: '#888', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Drawdown</div>
+                            <div style={{ 
+                                color: '#ff4444', 
+                                fontSize: '1.5rem', 
+                                fontWeight: '700',
+                                animation: isAnimating ? 'numberChange 0.8s ease-out 0.2s' : 'none',
+                                transition: 'all 0.3s ease'
+                            }}>
+                                {formatPercent(state.strategyPerformance.drawdown)}
+                            </div>
+                        </div>
+                        <div style={{ 
+                            textAlign: 'center',
+                            animation: isAnimating ? 'slideInUp 0.6s ease-out 0.4s both' : 'none'
+                        }}>
+                            <div style={{ color: '#888', fontSize: '0.9rem', marginBottom: '0.25rem' }}>Win Rate</div>
+                            <div style={{ 
+                                color: '#fff', 
+                                fontSize: '1.5rem', 
+                                fontWeight: '700',
+                                animation: isAnimating ? 'numberChange 0.8s ease-out 0.3s' : 'none',
+                                transition: 'all 0.3s ease'
+                            }}>
+                                {formatPercent(state.strategyPerformance.winRate)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        padding: '1rem',
+                        borderRadius: '8px',
+                        border: '1px solid #333',
+                        height: '200px',
+                        animation: isAnimating ? 'slideInUp 0.6s ease-out 0.5s both' : 'none',
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}>
+                        <EquityCurveChart 
+                            data={state.strategyPerformance.equityCurve}
+                            isAnimating={isAnimating}
+                        />
+                    </div>
+                </div>
+            );
+        };
+        
+        
+        
+        // Main App Component
+        const FuturesExploratoriumApp = () => {
+            const [state, setState] = useState(store.getState());
+            const [loading, setLoading] = useState(true);
+            
+            useEffect(() => {
+                const unsubscribe = store.subscribe(setState);
+                return unsubscribe;
+            }, []);
+            
+            // Initialize app data
+            useEffect(() => {
+                const initializeApp = async () => {
+                    try {
+                        setLoading(true);
+                        
+                        // Demo mode: Skip API calls and use mock data directly
+                        console.log('Demo mode: Using mock data instead of API calls');
+                        
+                        // Simulate API call delay
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        // Initialize with mock system health data
+                        store.setState({
+                            systemHealth: {
+                                status: 'healthy',
+                                score: 0.95,
+                                uptime: '99.9%',
+                                lastUpdate: new Date()
+                            }
+                        });
+                        
+                        // Initialize with mock market data
+                        const generateSparkline = (basePrice, volatility = 0.02) => {
+                            const points = [];
+                            for (let i = 0; i < 20; i++) {
+                                const change = (Math.random() - 0.5) * volatility * basePrice;
+                                points.push(basePrice + change);
+                            }
+                            return points;
+                        };
+                        
+                        store.setState({
+                            marketData: {
+                                ES: {
+                                    price: 4250.50 + (Math.random() - 0.5) * 50,
+                                    change: (Math.random() - 0.5) * 20,
+                                    changePercent: (Math.random() - 0.5) * 0.01,
+                                    volume: 1500000 + Math.random() * 500000,
+                                    sparkline: generateSparkline(4250.50)
+                                },
+                                NQ: {
+                                    price: 14500.25 + (Math.random() - 0.5) * 100,
+                                    change: (Math.random() - 0.5) * 40,
+                                    changePercent: (Math.random() - 0.5) * 0.01,
+                                    volume: 800000 + Math.random() * 300000,
+                                    sparkline: generateSparkline(14500.25)
+                                },
+                                RTY: {
+                                    price: 1850.75 + (Math.random() - 0.5) * 20,
+                                    change: (Math.random() - 0.5) * 10,
+                                    changePercent: (Math.random() - 0.5) * 0.01,
+                                    volume: 450000 + Math.random() * 200000,
+                                    sparkline: generateSparkline(1850.75)
+                                }
+                            }
+                        });
+                        
+                        // Initialize with mock strategy performance data
+                        store.setState({
+                            strategyPerformance: {
+                                pnl: 1250.75 + (Math.random() - 0.5) * 1000,
+                                sharpe: 1.2 + Math.random() * 1.0,
+                                drawdown: -0.05 - Math.random() * 0.1,
+                                winRate: 0.6 + Math.random() * 0.2,
+                                equityCurve: generateSampleEquityCurve(),
+                                isRunningBacktest: false
+                            }
+                        });
+                        
+                        
+                        store.setState({ lastUpdate: new Date() });
+                        
+                        setLoading(false);
+                        
+                    } catch (error) {
+                        console.error('Error initializing app:', error);
+                        setLoading(false);
+                    }
+                };
+                
+                initializeApp();
+            }, []);
+            
+            // Demo mode: Skip WebSocket connection entirely
+            useEffect(() => {
+                // Skip WebSocket in demo mode
+                console.log('Demo mode: WebSocket connection disabled');
+                store.setState({ isConnected: false });
+                
+                // Skip WebSocket subscriptions in demo mode
+                
+                // Demo mode: simulate real-time updates
+                const demoUpdateInterval = setInterval(() => {
+                    const symbols = ['ES', 'NQ', 'RTY'];
+                    const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+                    const currentData = store.getState().marketData[randomSymbol];
+                    
+                    if (currentData) {
+                        const priceChange = (Math.random() - 0.5) * 10;
+                        const newPrice = currentData.price + priceChange;
+                        const newChange = currentData.change + priceChange;
+                        const newChangePercent = newChange / (newPrice - newChange);
+                        
+                        store.setState(prevState => ({
+                            marketData: {
+                                ...prevState.marketData,
+                                [randomSymbol]: {
+                                    ...prevState.marketData[randomSymbol],
+                                    price: newPrice,
+                                    change: newChange,
+                                    changePercent: newChangePercent,
+                                    volume: prevState.marketData[randomSymbol].volume + Math.floor(Math.random() * 10000),
+                                    sparkline: [...(prevState.marketData[randomSymbol]?.sparkline || []).slice(-19), newPrice]
+                                }
+                            }
+                        }));
+                    }
+                }, 5000); // Update every 5 seconds
+                
+                
+                return () => {
+                    clearInterval(demoUpdateInterval);
+                };
+            }, []);
+            
+            if (loading) {
+                return (
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        height: '400px',
+                        color: '#888'
+                    }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{
+                                width: '40px',
+                                height: '40px',
+                                border: '3px solid #333',
+                                borderTop: '3px solid #00d4ff',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite',
+                                margin: '0 auto 1rem'
+                            }} />
+                            Loading Futures Exploratorium...
+                        </div>
+                    </div>
+                );
+            }
+            
+            return (
+                <div style={{
+                    minHeight: '100vh',
+                    background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
+                    color: '#ffffff',
+                    padding: '0'
+                }}>
+                    <Header />
+                    
+                    <div className="main-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2rem' }}>
+                        <div className="dashboard-grid" style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '1.5rem',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <MarketOverview />
+                            <StrategyPerformance />
+                        </div>
+                        
+                    </div>
+                </div>
+            );
+        };
+        
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('futures-exploratorium-root'));
+        root.render(<FuturesExploratoriumApp />);
+    </script>
     
     <script>
         // Auto-clear cache and force reload
