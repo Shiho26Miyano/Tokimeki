@@ -16,6 +16,7 @@
     "zustand": "^4.4.7",
     "recharts": "^2.8.0",
     "styled-components": "^6.1.1",
+    "framer-motion": "^10.16.16",
     "react-hot-toast": "^2.4.1",
     "lucide-react": "^0.294.0",
     "date-fns": "^2.30.0"

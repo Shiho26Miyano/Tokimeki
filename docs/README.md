@@ -18,28 +18,53 @@ Tokimeki/
 │   ├── services/                 # Business logic services
 │   │   ├── ai_service.py        # AI integration (OpenRouter)
 │   │   ├── brpc_service.py      # High-performance BRPC service
-
-│   │   ├── mnq_investment_service.py  # Investment analysis service
-│   │   ├── stock_service.py     # Market data service
 │   │   ├── cache_service.py     # Redis caching layer
 │   │   ├── rag_service.py       # RAG system service
-│   │   └── usage_service.py     # Usage tracking and analytics
+│   │   ├── stock_service.py     # Market data service
+│   │   ├── usage_service.py     # Usage tracking and analytics
+│   │   ├── futureexploratorium/ # Futures Exploratorium services
+│   │   │   ├── analytics_service.py
+│   │   │   ├── core_service.py
+│   │   │   ├── dashboard_service.py
+│   │   │   ├── event_analysis_service.py
+│   │   │   ├── market_intelligence_service.py
+│   │   │   └── strategy_service.py
+│   │   └── futurequant/         # FutureQuant trading services
+│   │       ├── backtest_service.py
+│   │       ├── data_service.py
+│   │       ├── feature_service.py
+│   │       ├── model_service.py
+│   │       ├── signal_service.py
+│   │       └── unified_quant_service.py
 │   └── api/                     # REST API endpoints
 │       └── v1/                  # API version 1
 │           ├── api.py           # Main router configuration
 │           └── endpoints/       # Feature-specific endpoints
 │               ├── chat.py      # AI chat interface
-
-│               ├── mnq.py       # Investment analysis endpoints
 │               ├── stocks.py    # Market data endpoints
 │               ├── rag.py       # RAG system endpoints
 │               ├── speech.py    # Speech processing endpoints
 │               ├── sentiment.py # Sentiment analysis endpoints
-│               └── monitoring.py # System monitoring endpoints
+│               ├── monitoring.py # System monitoring endpoints
+│               ├── websocket.py # WebSocket endpoints
+│               ├── quantitative_analysis.py # Quantitative analysis
+│               ├── futureexploratorium/ # Futures Exploratorium API
+│               │   ├── analytics.py
+│               │   ├── core.py
+│               │   ├── dashboard.py
+│               │   ├── event_analysis.py
+│               │   └── strategy.py
+│               └── futurequant/ # FutureQuant trading API
+│                   ├── backtests.py
+│                   ├── data.py
+│                   ├── features.py
+│                   ├── models.py
+│                   ├── paper_trading.py
+│                   └── signals.py
 ├── static/                       # Frontend assets
 │   ├── index.html               # Main application interface
 │   ├── main.js                  # Core JavaScript functionality
-│   ├── mnq-dashboard.js         # Dashboard interface
+│   ├── futurequant-dashboard.js # FutureQuant trading dashboard
 │   ├── style.css                # Application styling
 │   └── img/                     # Images and icons
 ├── main.py                      # Application entry point
@@ -114,13 +139,15 @@ PORT=8080
 ### API Endpoints
 
 1. **AI Chat**: `/api/v1/chat` - Interactive AI conversations
-
-3. **Market Data**: `/api/v1/stocks` - Stock market information
-4. **Investment Analysis**: `/api/v1/mnq` - Investment strategy endpoints
-5. **RAG System**: `/api/v1/rag` - Retrieval-augmented generation
-6. **Speech Processing**: `/api/v1/speech` - Audio analysis
-7. **Sentiment Analysis**: `/api/v1/sentiment` - Text sentiment processing
-8. **System Monitoring**: `/api/v1/monitoring` - Performance metrics
+2. **Market Data**: `/api/v1/stocks` - Stock market information
+3. **RAG System**: `/api/v1/rag` - Retrieval-augmented generation
+4. **Speech Processing**: `/api/v1/speech` - Audio analysis
+5. **Sentiment Analysis**: `/api/v1/sentiment` - Text sentiment processing
+6. **System Monitoring**: `/api/v1/monitoring` - Performance metrics
+7. **WebSocket**: `/ws` - Real-time data streaming
+8. **Quantitative Analysis**: `/api/v1/quantitative-analysis` - Advanced analytics
+9. **Futures Exploratorium**: `/api/v1/futureexploratorium/*` - Futures trading platform
+10. **FutureQuant Trading**: `/api/v1/futurequant/*` - Quantitative trading system
 
 ## 🔬 Technical Details
 
@@ -145,6 +172,13 @@ PORT=8080
 - **DeepSeek R1**: Alternative AI model option
 - **DeepSeek Chat**: Conversational AI capabilities
 - **Llama 3.1 405B**: Large language model support
+
+### Frontend Architecture
+- **Single Page Application**: Clean HTML5 interface with embedded JavaScript
+- **Modular Design**: Separate JavaScript modules for different features
+- **Real-time Updates**: WebSocket integration for live data streaming
+- **Responsive UI**: Mobile-friendly design with modern CSS
+- **No External Dependencies**: Self-contained frontend without React/Vue frameworks
 
 
 
