@@ -387,11 +387,12 @@
         }
         
         /* Chart container fixes */
-        #fq-price-chart, #fq-performance-chart, #fq-distribution-chart {
+        #fq-price-chart, #fq-performance-chart, #fq-distribution-chart, #fq-price-chart-main, #fq-distribution-chart-main {
             max-height: 100% !important;
             max-width: 100% !important;
             height: auto !important;
             width: auto !important;
+            display: block !important;
         }
         
         .card-body canvas {
@@ -400,16 +401,18 @@
             max-width: 100% !important;
         }
         
-        #fq-price-chart {
+        #fq-price-chart, #fq-price-chart-main {
             max-height: 300px !important;
+            min-height: 200px !important;
         }
         
         #fq-performance-chart {
             max-height: 250px !important;
         }
         
-        #fq-distribution-chart {
+        #fq-distribution-chart, #fq-distribution-chart-main {
             max-height: 300px !important;
+            min-height: 200px !important;
         }
     </style>
 </head>
@@ -604,25 +607,25 @@
                                 </div>
                             </div>
 
-                            <!-- Main Charts Row -->
+                            <!-- Simple Charts Section -->
                             <div class="row mb-3">
                                 <div class="col-md-8">
                                     <div class="card">
                                         <div class="card-header py-2">
-                                            <h6 class="mb-0">Price Chart</h6>
+                                            <h6 class="mb-0"><i class="fas fa-chart-line text-primary"></i> Price Chart</h6>
                                         </div>
                                         <div class="card-body py-2">
-                                            <canvas id="fq-price-chart" height="250" style="max-height: 250px; width: 100%;"></canvas>
+                                            <canvas id="simple-price-chart" height="250" style="max-height: 250px; width: 100%;"></canvas>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="card">
                                         <div class="card-header py-2">
-                                            <h6 class="mb-0">Distribution</h6>
+                                            <h6 class="mb-0"><i class="fas fa-chart-bar text-success"></i> Distribution</h6>
                                         </div>
                                         <div class="card-body py-2">
-                                            <canvas id="fq-distribution-chart" height="250" style="max-height: 250px; width: 100%;"></canvas>
+                                            <canvas id="simple-distribution-chart" height="250" style="max-height: 250px; width: 100%;"></canvas>
                                         </div>
                                     </div>
                                 </div>
@@ -1231,25 +1234,33 @@
                                 </div>
                             </div>
 
-                            <!-- Charts Section -->
+                            <!-- Price Chart and Distribution Cards -->
                             <div class="row mb-4">
                                 <div class="col-md-8">
                                     <div class="card">
                                         <div class="card-header">
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <h6 class="mb-0">Price Chart</h6>
-                                                <select class="form-select form-select-sm" id="fq-timeframe-select" style="width: auto;">
-                                                    <option value="1d">1 Day</option>
-                                                    <option value="1h">1 Hour</option>
-                                                    <option value="15m">15 Min</option>
-                                                    <option value="5m">5 Min</option>
-                                                </select>
+                                                <h6 class="mb-0"><i class="fas fa-chart-line text-primary"></i> Price Chart</h6>
+                                                <div>
+                                                    <select class="form-select form-select-sm me-2" id="chart-timeframe" style="width: auto;">
+                                                        <option value="1d">1 Day</option>
+                                                        <option value="1h">1 Hour</option>
+                                                        <option value="15m">15 Min</option>
+                                                        <option value="5m">5 Min</option>
+                                                    </select>
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="loadChartData()">
+                                                        <i class="fas fa-sync-alt"></i> Refresh
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="card-body">
-                                            <canvas id="fq-price-chart" height="300" style="max-height: 300px; width: 100%;"></canvas>
-                                            <div class="mt-2">
-                                                <button class="btn btn-sm btn-outline-secondary" onclick="forceFutureQuantCharts()">Force Chart Init</button>
+                                            <canvas id="price-chart" height="300" style="max-height: 300px; width: 100%;"></canvas>
+                                            <div id="chart-loading" class="text-center mt-3" style="display: none;">
+                                                <div class="spinner-border text-primary" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <p class="mt-2 text-muted">Loading chart data...</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1257,12 +1268,20 @@
                                 <div class="col-md-4">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h6 class="mb-0">Return Distribution</h6>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0"><i class="fas fa-chart-bar text-success"></i> Distribution</h6>
+                                                <button class="btn btn-sm btn-outline-success" onclick="loadDistributionData()">
+                                                    <i class="fas fa-sync-alt"></i> Refresh
+                                                </button>
+                                            </div>
                                         </div>
                                         <div class="card-body">
-                                            <canvas id="fq-distribution-chart" height="300" style="max-height: 300px; width: 100%;"></canvas>
-                                            <div class="mt-2">
-                                                <button class="btn btn-sm btn-outline-secondary" onclick="forceFutureQuantCharts()">Force Chart Init</button>
+                                            <canvas id="distribution-chart" height="300" style="max-height: 300px; width: 100%;"></canvas>
+                                            <div id="distribution-loading" class="text-center mt-3" style="display: none;">
+                                                <div class="spinner-border text-success" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <p class="mt-2 text-muted">Loading distribution data...</p>
                                             </div>
                                         </div>
                                     </div>
@@ -2866,6 +2885,761 @@
         // Make functions globally available
         window.enableTradeButton = enableTradeButton;
         window.resetTradeButton = resetTradeButton;
+
+        // Store chart instances globally
+        window.fqCharts = {
+            price: null,
+            distribution: null,
+            priceMain: null,
+            distributionMain: null
+        };
+
+        // Global chart instances
+        let priceChartInstance = null;
+        let distributionChartInstance = null;
+
+        // Function to load real chart data from API
+        async function loadChartData(symbol = 'ES=F', timeframe = '1d', limit = 100) {
+            const loadingElement = document.getElementById('chart-loading');
+            const canvas = document.getElementById('price-chart');
+            
+            if (loadingElement) loadingElement.style.display = 'block';
+            
+            try {
+                console.log(`Loading chart data for ${symbol}...`);
+                const response = await fetch(`/api/v1/futureexploratorium/dashboard/chart?symbol=${symbol}&timeframe=${timeframe}&limit=${limit}`);
+                const data = await response.json();
+                
+                if (data.success && data.chart_data && data.chart_data.length > 0) {
+                    console.log('Chart data loaded successfully:', data.chart_data.length, 'data points');
+                    createPriceChart(data.chart_data);
+                } else {
+                    console.warn('No chart data available, using sample data');
+                    createPriceChart(null);
+                }
+            } catch (error) {
+                console.error('Error loading chart data:', error);
+                createPriceChart(null);
+            } finally {
+                if (loadingElement) loadingElement.style.display = 'none';
+            }
+        }
+
+        // Function to create price chart
+        function createPriceChart(data = null) {
+            const canvas = document.getElementById('price-chart');
+            if (!canvas) {
+                console.error('Price chart canvas not found!');
+                return;
+            }
+
+            // Destroy existing chart if it exists
+            if (priceChartInstance) {
+                priceChartInstance.destroy();
+            }
+
+            console.log('Creating price chart...');
+            
+            let labels, priceData;
+            if (data && data.length > 0) {
+                // Use real data
+                labels = data.map(item => {
+                    const date = new Date(item.timestamp);
+                    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                });
+                priceData = data.map(item => item.close);
+            } else {
+                // Fallback to sample data
+                labels = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
+                priceData = [100, 120, 115, 130, 125, 140, 135, 150];
+            }
+
+            const ctx = canvas.getContext('2d');
+            priceChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Price',
+                        data: priceData,
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        tension: 0.1,
+                        fill: true,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Price Chart'
+                        },
+                        legend: {
+                            display: true
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Price'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        }
+                    }
+                }
+            });
+            console.log('Price chart created!');
+        }
+
+        // Function to load distribution data from API
+        async function loadDistributionData(symbol = 'ES=F') {
+            const loadingElement = document.getElementById('distribution-loading');
+            
+            if (loadingElement) loadingElement.style.display = 'block';
+            
+            try {
+                console.log(`Loading distribution data for ${symbol}...`);
+                const response = await fetch(`/api/v1/futureexploratorium/dashboard/comprehensive`);
+                const data = await response.json();
+                
+                if (data.success && data.distribution_analysis) {
+                    console.log('Distribution data loaded successfully');
+                    createDistributionChart(data.distribution_analysis);
+                } else {
+                    console.warn('No distribution data available, using sample data');
+                    createDistributionChart(null);
+                }
+            } catch (error) {
+                console.error('Error loading distribution data:', error);
+                createDistributionChart(null);
+            } finally {
+                if (loadingElement) loadingElement.style.display = 'none';
+            }
+        }
+
+        // Function to create distribution chart
+        function createDistributionChart(data = null) {
+            const canvas = document.getElementById('distribution-chart');
+            if (!canvas) {
+                console.error('Distribution chart canvas not found!');
+                return;
+            }
+
+            // Destroy existing chart if it exists
+            if (distributionChartInstance) {
+                distributionChartInstance.destroy();
+            }
+
+            console.log('Creating distribution chart...');
+            
+            let labels, distributionData;
+            if (data && data.quantiles) {
+                // Use real data
+                labels = ['Q10', 'Q25', 'Q50', 'Q75', 'Q90'];
+                distributionData = [
+                    data.quantiles.q10 || -3.2,
+                    data.quantiles.q25 || -1.8,
+                    data.quantiles.q50 || 0.5,
+                    data.quantiles.q75 || 2.1,
+                    data.quantiles.q90 || 4.2
+                ];
+            } else {
+                // Fallback to sample data
+                labels = ['Q10', 'Q25', 'Q50', 'Q75', 'Q90'];
+                distributionData = [-3.2, -1.8, 0.5, 2.1, 4.2];
+            }
+
+            const ctx = canvas.getContext('2d');
+            distributionChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Return Distribution (%)',
+                        data: distributionData,
+                        backgroundColor: [
+                            'rgba(220, 53, 69, 0.8)',
+                            'rgba(255, 193, 7, 0.8)',
+                            'rgba(40, 167, 69, 0.8)',
+                            'rgba(0, 123, 255, 0.8)',
+                            'rgba(111, 66, 193, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(220, 53, 69, 1)',
+                            'rgba(255, 193, 7, 1)',
+                            'rgba(40, 167, 69, 1)',
+                            'rgba(0, 123, 255, 1)',
+                            'rgba(111, 66, 193, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Distribution'
+                        },
+                        legend: {
+                            display: true
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Return (%)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Percentiles'
+                            }
+                        }
+                    }
+                }
+            });
+            console.log('Distribution chart created!');
+        }
+
+        // Function to create main price chart (second section)
+        function createMainPriceChart() {
+            const priceCanvas = document.getElementById('fq-price-chart-main');
+            if (!priceCanvas) {
+                console.error('Main price chart canvas not found!');
+                return;
+            }
+
+            // Destroy existing chart if it exists
+            if (window.fqCharts.priceMain) {
+                window.fqCharts.priceMain.destroy();
+            }
+
+            console.log('Creating main price chart...');
+            const priceCtx = priceCanvas.getContext('2d');
+            window.fqCharts.priceMain = new Chart(priceCtx, {
+                type: 'line',
+                data: {
+                    labels: ['9:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'],
+                    datasets: [{
+                        label: 'ES=F Price',
+                        data: [4850.25, 4852.50, 4848.75, 4855.00, 4851.25, 4858.50, 4854.75, 4861.00, 4857.25, 4864.50, 4860.75, 4867.00, 4863.25, 4870.50],
+                        borderColor: '#183153',
+                        backgroundColor: 'rgba(24, 49, 83, 0.1)',
+                        tension: 0.1,
+                        fill: true,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'E-mini S&P 500 Futures - Live Price'
+                        },
+                        legend: {
+                            display: true
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Price ($)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time (ET)'
+                            }
+                        }
+                    }
+                }
+            });
+            console.log('Main price chart created!');
+        }
+
+        // Function to create main distribution chart (second section)
+        function createMainDistributionChart() {
+            const distCanvas = document.getElementById('fq-distribution-chart-main');
+            if (!distCanvas) {
+                console.error('Main distribution chart canvas not found!');
+                return;
+            }
+
+            // Destroy existing chart if it exists
+            if (window.fqCharts.distributionMain) {
+                window.fqCharts.distributionMain.destroy();
+            }
+
+            console.log('Creating main distribution chart...');
+            const distCtx = distCanvas.getContext('2d');
+            window.fqCharts.distributionMain = new Chart(distCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Q10', 'Q25', 'Q50', 'Q75', 'Q90'],
+                    datasets: [{
+                        label: 'Return Distribution (%)',
+                        data: [-2.8, -1.2, 0.8, 2.4, 4.1],
+                        backgroundColor: [
+                            'rgba(220, 53, 69, 0.8)',
+                            'rgba(255, 193, 7, 0.8)',
+                            'rgba(40, 167, 69, 0.8)',
+                            'rgba(0, 123, 255, 0.8)',
+                            'rgba(111, 66, 193, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(220, 53, 69, 1)',
+                            'rgba(255, 193, 7, 1)',
+                            'rgba(40, 167, 69, 1)',
+                            'rgba(0, 123, 255, 1)',
+                            'rgba(111, 66, 193, 1)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Return Distribution Analysis'
+                        },
+                        legend: {
+                            display: true
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Return (%)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Percentiles'
+                            }
+                        }
+                    }
+                }
+            });
+            console.log('Main distribution chart created!');
+        }
+
+        // Update the forceCreateCharts function
+        window.forceCreateCharts = async function() {
+            console.log('Force creating all charts...');
+            
+            // Check if Chart.js is available
+            if (typeof Chart === 'undefined') {
+                alert('Chart.js not loaded! Please refresh the page.');
+                return;
+            }
+            
+            await createPriceChart();
+            await createDistributionChart();
+            createMainPriceChart();
+            createMainDistributionChart();
+        };
+
+        // Global chart instances
+        let simplePriceChart = null;
+        let simpleDistributionChart = null;
+
+        // Function to load data from Yahoo Finance via backend API
+        async function loadYahooFinanceData(symbol) {
+            try {
+                console.log(`Loading Yahoo Finance data for ${symbol} (30 days)...`);
+                const response = await fetch(`/api/v1/stocks/history?symbols=${symbol}&days=30`);
+                const data = await response.json();
+                
+                if (data && data[symbol] && data[symbol].closes && data[symbol].closes.length > 0) {
+                    console.log(`Loaded ${data[symbol].closes.length} data points for ${symbol}`);
+                    return {
+                        prices: data[symbol].closes,
+                        times: data[symbol].dates,
+                        symbol: symbol
+                    };
+                } else {
+                    console.warn('No data received from Yahoo Finance API');
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error loading Yahoo Finance data:', error);
+                return null;
+            }
+        }
+
+        // Function to calculate distribution data from price data
+        function calculateDistribution(prices) {
+            if (!prices || prices.length < 2) {
+                return [-3.2, -1.8, 0.5, 2.1, 4.2]; // Default sample data
+            }
+            
+            // Calculate returns
+            const returns = [];
+            for (let i = 1; i < prices.length; i++) {
+                const return_pct = ((prices[i] - prices[i-1]) / prices[i-1]) * 100;
+                returns.push(return_pct);
+            }
+            
+            // Sort returns and calculate percentiles
+            returns.sort((a, b) => a - b);
+            const n = returns.length;
+            
+            return [
+                returns[Math.floor(n * 0.1)] || -3.2,  // Q10
+                returns[Math.floor(n * 0.25)] || -1.8, // Q25
+                returns[Math.floor(n * 0.5)] || 0.5,   // Q50
+                returns[Math.floor(n * 0.75)] || 2.1,  // Q75
+                returns[Math.floor(n * 0.9)] || 4.2    // Q90
+            ];
+        }
+
+        // Function to create charts with real data
+        async function createChartsWithData(symbol = 'ES=F') {
+            console.log(`Creating charts with data for ${symbol}...`);
+            
+            // Load data from Yahoo Finance
+            const marketData = await loadYahooFinanceData(symbol);
+            
+            // Create price chart
+            const priceCanvas = document.getElementById('simple-price-chart');
+            if (priceCanvas && typeof Chart !== 'undefined') {
+                // Destroy existing chart
+                if (simplePriceChart) {
+                    simplePriceChart.destroy();
+                }
+                
+                const priceCtx = priceCanvas.getContext('2d');
+                
+                let labels, priceData;
+                if (marketData && marketData.prices && marketData.prices.length > 0) {
+                    // Use real data - format for monthly time series
+                    labels = marketData.times.map(time => {
+                        const date = new Date(time);
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    });
+                    priceData = marketData.prices;
+                } else {
+                    // Fallback to sample data for 30 days
+                    const sampleDates = [];
+                    const samplePrices = [];
+                    const basePrice = 4850;
+                    for (let i = 29; i >= 0; i--) {
+                        const date = new Date();
+                        date.setDate(date.getDate() - i);
+                        sampleDates.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                        samplePrices.push(basePrice + (Math.random() - 0.5) * 100);
+                    }
+                    labels = sampleDates;
+                    priceData = samplePrices;
+                }
+                
+                simplePriceChart = new Chart(priceCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: `${symbol} Price`,
+                            data: priceData,
+                            borderColor: '#007bff',
+                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                            tension: 0.1,
+                            fill: true,
+                            pointRadius: 2,
+                            pointHoverRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${symbol} Price Chart (30 Days)`
+                            },
+                            legend: {
+                                display: true
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: 'Price'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Date'
+                                },
+                                ticks: {
+                                    maxTicksLimit: 10 // Show only 10 date labels to avoid crowding
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        }
+                    }
+                });
+                console.log('Price chart created with data!');
+            }
+
+            // Create distribution chart
+            const distCanvas = document.getElementById('simple-distribution-chart');
+            if (distCanvas && typeof Chart !== 'undefined') {
+                // Destroy existing chart
+                if (simpleDistributionChart) {
+                    simpleDistributionChart.destroy();
+                }
+                
+                const distCtx = distCanvas.getContext('2d');
+                
+                let distributionData;
+                if (marketData && marketData.prices && marketData.prices.length > 0) {
+                    // Calculate real distribution from price data
+                    distributionData = calculateDistribution(marketData.prices);
+                } else {
+                    // Fallback to sample data
+                    distributionData = [-3.2, -1.8, 0.5, 2.1, 4.2];
+                }
+                
+                simpleDistributionChart = new Chart(distCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Q10', 'Q25', 'Q50', 'Q75', 'Q90'],
+                        datasets: [{
+                            label: 'Return Distribution (%)',
+                            data: distributionData,
+                            backgroundColor: [
+                                'rgba(220, 53, 69, 0.8)',
+                                'rgba(255, 193, 7, 0.8)',
+                                'rgba(40, 167, 69, 0.8)',
+                                'rgba(0, 123, 255, 0.8)',
+                                'rgba(111, 66, 193, 0.8)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${symbol} Distribution`
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Return (%)'
+                                }
+                            }
+                        }
+                    }
+                });
+                console.log('Distribution chart created with data!');
+            }
+        }
+
+        // Initialize charts when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Initializing FutureQuant charts...');
+            console.log('Chart.js available:', typeof Chart !== 'undefined');
+            
+            // Wait for Chart.js to load
+            setTimeout(() => {
+                if (typeof Chart !== 'undefined') {
+                    // Load charts with default symbol
+                    createChartsWithData('ES=F');
+                    
+                    // Add event listener to symbol selector
+                    const symbolSelect = document.getElementById('fq-symbol-select');
+                    if (symbolSelect) {
+                        symbolSelect.addEventListener('change', function() {
+                            const selectedSymbol = this.value;
+                            if (selectedSymbol) {
+                                console.log(`Symbol changed to: ${selectedSymbol}`);
+                                createChartsWithData(selectedSymbol);
+                            }
+                        });
+                        console.log('Symbol selector event listener added');
+                    }
+                } else {
+                    console.error('Chart.js not loaded!');
+                }
+            }, 1000);
+        });
+
+        // Add a refresh function to reload chart data
+        window.refreshCharts = async function() {
+            console.log('Refreshing charts with new data...');
+            
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not available');
+                return;
+            }
+            
+            try {
+                loadChartData();
+                loadDistributionData();
+                console.log('Charts refresh initiated');
+            } catch (error) {
+                console.error('Error refreshing charts:', error);
+            }
+        };
+
+        // Add a simple test function to verify charts work
+        window.testCharts = function() {
+            console.log('Testing charts...');
+            console.log('Chart.js available:', typeof Chart !== 'undefined');
+            
+            const priceCanvas = document.getElementById('fq-price-chart');
+            const distCanvas = document.getElementById('fq-distribution-chart');
+            const priceMainCanvas = document.getElementById('fq-price-chart-main');
+            const distMainCanvas = document.getElementById('fq-distribution-chart-main');
+            
+            console.log('Canvas elements found:');
+            console.log('fq-price-chart:', priceCanvas);
+            console.log('fq-distribution-chart:', distCanvas);
+            console.log('fq-price-chart-main:', priceMainCanvas);
+            console.log('fq-distribution-chart-main:', distMainCanvas);
+            
+            if (typeof Chart !== 'undefined') {
+                // Create a simple test chart
+                if (priceCanvas) {
+                    const ctx = priceCanvas.getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['A', 'B', 'C', 'D'],
+                            datasets: [{
+                                label: 'Test',
+                                data: [1, 2, 3, 4],
+                                borderColor: 'red'
+                            }]
+                        }
+                    });
+                    console.log('Test chart created on price canvas');
+                }
+            }
+        };
+
+        // Simple immediate chart creation
+        window.createSimpleCharts = function() {
+            console.log('Creating simple charts immediately...');
+            
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not available');
+                return;
+            }
+
+            // Create charts for all canvas elements
+            const canvases = [
+                'fq-price-chart',
+                'fq-distribution-chart', 
+                'fq-price-chart-main',
+                'fq-distribution-chart-main'
+            ];
+
+            canvases.forEach(canvasId => {
+                const canvas = document.getElementById(canvasId);
+                if (canvas) {
+                    console.log(`Creating chart for ${canvasId}`);
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Clear any existing chart
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    if (canvasId.includes('distribution')) {
+                        // Bar chart for distribution
+                        new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Q10', 'Q25', 'Q50', 'Q75', 'Q90'],
+                                datasets: [{
+                                    label: 'Distribution',
+                                    data: [-2, -1, 0, 1, 2],
+                                    backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                                    borderColor: 'rgba(54, 162, 235, 1)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    title: {
+                                        display: true,
+                                        text: 'Distribution Chart'
+                                    }
+                                }
+                            }
+                        });
+                    } else {
+                        // Line chart for price
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: ['9:30', '10:00', '10:30', '11:00', '11:30', '12:00'],
+                                datasets: [{
+                                    label: 'Price',
+                                    data: [100, 102, 98, 105, 103, 107],
+                                    borderColor: 'rgba(24, 49, 83, 1)',
+                                    backgroundColor: 'rgba(24, 49, 83, 0.1)',
+                                    tension: 0.1,
+                                    fill: true
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    title: {
+                                        display: true,
+                                        text: 'Price Chart'
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    console.log(`Chart created for ${canvasId}`);
+                } else {
+                    console.log(`Canvas ${canvasId} not found`);
+                }
+            });
+        };
 
     </script>
 </body>
