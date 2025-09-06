@@ -2,7 +2,7 @@
 API v1 router configuration
 """
 from fastapi import APIRouter
-from .endpoints import chat, stocks, sentiment, speech, monitoring, rag, mnq
+from .endpoints import chat, stocks, sentiment, speech, monitoring, rag
 from .endpoints.futurequant import (
     data_router, features_router, models_router, 
     signals_router, backtests_router, paper_trading_router
@@ -10,6 +10,7 @@ from .endpoints.futurequant import (
 from .endpoints.futureexploratorium import (
     core_router, dashboard_router, analytics_router, strategy_router
 )
+from .endpoints.futureexploratorium.event_analysis import router as event_analysis_router
 from .endpoints import quantitative_analysis, websocket
 
 # Create main API router
@@ -22,7 +23,6 @@ api_router.include_router(sentiment.router, prefix="/sentiment", tags=["sentimen
 api_router.include_router(speech.router, prefix="/speech", tags=["speech"])
 api_router.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
 api_router.include_router(rag.router, prefix="/rag", tags=["rag"])
-api_router.include_router(mnq.router, prefix="/mnq", tags=["mnq"])
 
 
 # Include FutureQuant Trader endpoints
@@ -38,6 +38,7 @@ api_router.include_router(core_router, prefix="/futureexploratorium/core", tags=
 api_router.include_router(dashboard_router, prefix="/futureexploratorium/dashboard", tags=["futureexploratorium_dashboard"])
 api_router.include_router(analytics_router, prefix="/futureexploratorium/analytics", tags=["futureexploratorium_analytics"])
 api_router.include_router(strategy_router, prefix="/futureexploratorium/strategy", tags=["futureexploratorium_strategy"])
+api_router.include_router(event_analysis_router, prefix="/futureexploratorium/events", tags=["futureexploratorium_events"])
 
 # Include Quantitative Analysis endpoints
 api_router.include_router(quantitative_analysis.router, prefix="/quantitative-analysis", tags=["quantitative_analysis"])
@@ -59,7 +60,6 @@ async def api_info():
             "speech": "/speech",
             "monitoring": "/monitoring",
             "rag": "/rag",
-            "mnq": "/mnq",
     
             "futurequant": {
                 "data": "/futurequant/data",
@@ -73,7 +73,8 @@ async def api_info():
                 "core": "/futureexploratorium/core",
                 "dashboard": "/futureexploratorium/dashboard",
                 "analytics": "/futureexploratorium/analytics",
-                "strategy": "/futureexploratorium/strategy"
+                "strategy": "/futureexploratorium/strategy",
+                "events": "/futureexploratorium/events"
             },
             "quantitative_analysis": "/quantitative-analysis",
             "websocket": "/ws"
@@ -138,7 +139,6 @@ async def test_api():
             "chat": "/api/v1/chat",
             "rag": "/api/v1/rag",
             "monitoring": "/api/v1/monitoring",
-            "mnq": "/api/v1/mnq",
             "futurequant": "/api/v1/futurequant",
             "futureexploratorium": "/api/v1/futureexploratorium"
         }

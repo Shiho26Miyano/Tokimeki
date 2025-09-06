@@ -231,6 +231,12 @@
             min-height: 100vh;
         }
         
+        @media (max-width: 1200px) {
+            #futures-exploratorium-root .dashboard-grid {
+                grid-template-columns: 1fr 1fr !important;
+            }
+        }
+        
         @media (max-width: 768px) {
             #futures-exploratorium-root .dashboard-grid {
                 grid-template-columns: 1fr !important;
@@ -415,9 +421,6 @@
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">⚡ Trading Strategy Analyzer</a>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="mnq-dashboard-tab" data-bs-toggle="pill" data-bs-target="#mnq-dashboard-content" role="tab" aria-controls="mnq-dashboard-content" aria-selected="false">🧪 Experimental Trading Hub</a>
                     </li>
 
                 </ul>
@@ -1122,341 +1125,9 @@
                         <div id="react-deepseek-chatbot"></div>
                     </div>
 
-                    <div class="tab-pane fade" id="mnq-dashboard-content" role="tabpanel" aria-labelledby="mnq-dashboard-tab">
-                        <div class="card shadow-sm flex-fill d-flex flex-column" style="max-width: 1200px; margin: 0 auto; border-radius: 16px;">
+                    <div class="tab-pane fade" id="event-analysis-content" role="tabpanel" aria-labelledby="event-analysis-tab">
+                        <div class="card shadow-sm flex-fill d-flex flex-column" style="max-width: 1400px; margin: 0 auto; border-radius: 16px;">
                             <div class="card-body d-flex flex-column" style="padding: 32px;">
-                                <div class="card-header-row mb-3">
-                                    <span class="card-title" style="font-size: 2rem; font-weight: 600; color: #183153;">🧪 Experimental Trading Hub</span>
-                                </div>
-                                <div class="alert alert-info mb-4" style="background: #f1f5fa; color: #27457c; border: none; border-radius: 10px;">
-                                    <strong>What is this?</strong> This experimental hub tests various investment strategies and amounts to discover optimal performance patterns. Currently analyzing MNQ (Micro E-mini NASDAQ-100) futures using Dollar-Cost Averaging (DCA) with dynamic position sizing.
-                                </div>
-                                
-                                <!-- Investment Parameters -->
-                                <div class="card mb-4" style="border-radius: 12px;">
-                                    <div class="card-body">
-                                        <h5 class="card-title mb-3">Investment Parameters</h5>
-                                        <div class="row g-3">
-                                            <div class="col-md-4">
-                                                <label for="mnq-weekly-amount" class="form-label">Weekly Investment Amount ($)</label>
-                                                <input type="number" class="form-control" id="mnq-weekly-amount" value="1000" min="100" max="10000" step="100">
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label for="mnq-start-date" class="form-label">Start Date</label>
-                                                <input type="date" class="form-control" id="mnq-start-date">
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label for="mnq-end-date" class="form-label">End Date</label>
-                                                <input type="date" class="form-control" id="mnq-end-date">
-                                            </div>
-                                        </div>
-                                        <div class="mt-2">
-                                            <small class="text-muted">
-                                                <i class="fas fa-info-circle"></i> 
-                                                Default start date is 1 year ago. Maximum date range is 5 years.
-                                            </small>
-                                        </div>
-                                        <div class="mt-3">
-                                            <button class="btn btn-dark-bbg" id="mnq-calculate-btn">Calculate Performance</button>
-                                            <button class="btn btn-outline-secondary ms-2" id="mnq-reset-btn">Reset to Defaults</button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Performance Summary Table -->
-                                <div class="card mb-4" style="border-radius: 12px;" id="mnq-performance-cards">
-                                    <div class="card-header" style="background: #f8f9fa; border-bottom: 1px solid #dee2e6; border-radius: 12px 12px 0 0;">
-                                        <h6 class="mb-0" style="color: #495057; font-weight: 600;">📊 Performance Summary</h6>
-                                    </div>
-                                    <div class="card-body p-0">
-                                        <div class="table-responsive">
-                                            <table class="table table-sm mb-0" style="margin: 0;">
-                                                <tbody>
-                                                    <tr>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #e8f5e8, #d4edda); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Total Invested</div>
-                                                                <div class="h5 mb-0" id="mnq-total-invested" style="color: #28a745; font-weight: 700;">$0</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #e8f4fd, #d1ecf1); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Current Value</div>
-                                                                <div class="h5 mb-0" id="mnq-current-value" style="color: #17a2b8; font-weight: 700;">$0</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #fff3cd, #ffeaa7); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Total Return</div>
-                                                                <div class="h5 mb-0" id="mnq-total-return" style="color: #ffc107; font-weight: 700;">0.00%</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #f8d7da, #f5c6cb); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">CAGR</div>
-                                                                <div class="h5 mb-0" id="mnq-cagr" style="color: #dc3545; font-weight: 700;">0.00%</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #e2e3e5, #d6d8db); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Volatility</div>
-                                                                <div class="h5 mb-0" id="mnq-volatility" style="color: #6c757d; font-weight: 700;">0.00%</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #d1ecf1, #bee5eb); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Sharpe Ratio</div>
-                                                                <div class="h5 mb-0" id="mnq-sharpe" style="color: #0c5460; font-weight: 700;">0.00</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #fff3cd, #ffeaa7); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Max Drawdown</div>
-                                                                <div class="h5 mb-0" id="mnq-max-drawdown" style="color: #856404; font-weight: 700;">0.00%</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #d4edda, #c3e6cb); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Win Rate</div>
-                                                                <div class="h5 mb-0" id="mnq-win-rate" style="color: #155724; font-weight: 700;">0.00%</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #e8f4fd, #d1ecf1); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Profit Factor</div>
-                                                                <div class="h5 mb-0" id="mnq-profit-factor" style="color: #0c5460; font-weight: 700;">0.00</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #f8d7da, #f5c6cb); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Total Weeks</div>
-                                                                <div class="h5 mb-0" id="mnq-total-weeks" style="color: #721c24; font-weight: 700;">0</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #fff3cd, #ffeaa7); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Total Contracts</div>
-                                                                <div class="h5 mb-0" id="mnq-total-contracts" style="color: #856404; font-weight: 700;">0</div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-center" style="background: linear-gradient(135deg, #e8f5e8, #d4edda); border: none;">
-                                                            <div class="py-3">
-                                                                <div class="text-muted small">Avg Price</div>
-                                                                <div class="h5 mb-0" id="mnq-avg-price" style="color: #28a745; font-weight: 700;">$0</div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-
-
-
-
-
-                                <!-- AI Analysis Section -->
-                                <div class="card mb-4" style="border-radius: 12px;">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <h5 class="card-title mb-0">🔍 Diagnostic Event Analysis</h5>
-                                            <div class="d-flex align-items-center gap-3">
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <div class="spinner-border spinner-border-sm text-primary" id="ai-analysis-spinner" style="display: none;" role="status">
-                                                        <span class="visually-hidden">Loading...</span>
-                                                    </div>
-                                                    <div class="text-muted small" id="ai-analysis-timer">00:00</div>
-                                                </div>
-                                                <button class="btn btn-primary btn-sm" onclick="refreshDiagnosticAnalysis()" title="Refresh Diagnostic Analysis" id="ai-refresh-btn">
-                                                    Refresh
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div id="ai-combined-analysis" class="text-muted">
-                                            Click "Calculate Performance" to identify the worst week and analyze market factor impacts.
-                                        </div>
-                                        <style>
-                                            #ai-combined-analysis h1, #ai-combined-analysis h2, #ai-combined-analysis h3 {
-                                                color: #183153;
-                                                margin-top: 1rem;
-                                                margin-bottom: 0.5rem;
-                                                font-weight: 600;
-                                            }
-                                            #ai-combined-analysis strong {
-                                                color: #183153;
-                                                font-weight: 600;
-                                            }
-                                            #ai-combined-analysis table {
-                                                width: 100%;
-                                                border-collapse: collapse;
-                                                margin: 1rem 0;
-                                            }
-                                            #ai-combined-analysis th, #ai-combined-analysis td {
-                                                border: 1px solid #dee2e6;
-                                                padding: 0.5rem;
-                                                text-align: left;
-                                            }
-                                            #ai-combined-analysis th {
-                                                background-color: #f8f9fa;
-                                                font-weight: 600;
-                                            }
-                                            #ai-combined-analysis ul {
-                                                margin: 0.5rem 0;
-                                                padding-left: 1.5rem;
-                                            }
-                                            #ai-combined-analysis li {
-                                                margin: 0.25rem 0;
-                                            }
-                                            
-                                            /* Diagnostic Analysis Styles - Compact */
-                                            .diagnostic-analysis {
-                                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                                                max-width: 800px;
-                                                margin: 0 auto;
-                                            }
-                                            
-                                            .diagnostic-header h4 {
-                                                color: #0d6efd;
-                                                font-weight: 700;
-                                                margin-bottom: 0.5rem;
-                                            }
-                                            
-                                            .factor-impact-section table {
-                                                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                                                border-radius: 6px;
-                                                overflow: hidden;
-                                                font-size: 0.9rem;
-                                            }
-                                            
-                                            .factor-impact-section th {
-                                                background: linear-gradient(135deg, #343a40, #495057) !important;
-                                                color: white;
-                                                font-weight: 600;
-                                                text-transform: uppercase;
-                                                letter-spacing: 0.3px;
-                                                padding: 8px 12px;
-                                            }
-                                            
-                                            .factor-impact-section td {
-                                                padding: 8px 12px;
-                                                vertical-align: middle;
-                                            }
-                                            
-                                            .factor-impact-section tr:hover {
-                                                background-color: #f8f9fa;
-                                            }
-                                            
-                                            .key-drivers .card {
-                                                border-radius: 6px;
-                                                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                                                transition: all 0.2s ease;
-                                                cursor: pointer;
-                                            }
-                                            
-                                            .key-drivers .card:hover {
-                                                transform: translateY(-1px);
-                                                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-                                            }
-                                            
-                                            .key-drivers .card-body {
-                                                padding: 6px 8px;
-                                                font-weight: 500;
-                                                font-size: 0.85rem;
-                                            }
-                                            
-                                            .alert {
-                                                margin-bottom: 1rem;
-                                                border-radius: 6px;
-                                            }
-                                        </style>
-                                    </div>
-                                </div>
-
-
-                                <div class="card mb-4" style="border-radius: 12px;">
-                                    <div class="card-body">
-                                        <h5 class="card-title mb-3">📊 Top 5 Weekly Amounts by Performance</h5>
-                                        <div class="row">
-                                            <!-- Left Column: By Return % -->
-                                            <div class="col-md-6">
-                                                <div class="card" style="border: 1px solid #e9ecef; background: #f8f9fa;">
-                                                    <div class="card-header text-center" style="background: #e3f2fd; border-bottom: 1px solid #e9ecef;">
-                                                        <h6 class="mb-0" style="color: #1976d2; font-weight: 600;">🏆 By Return %</h6>
-                                                    </div>
-                                                    <div class="card-body p-0">
-                                                        <div id="top-by-percentage" class="list-group list-group-flush">
-                                                            <div class="list-group-item text-center text-muted py-3">
-                                                                Click "Calculate Performance" to see top amounts by return percentage
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Right Column: By Sharpe Ratio -->
-                                            <div class="col-md-6">
-                                                <div class="card" style="border: 1px solid #e9ecef; background: #f8f9fa;">
-                                                    <div class="card-header text-center" style="background: #e8f5e8; border-bottom: 1px solid #e9ecef;">
-                                                        <h6 class="mb-0" style="color: #2e7d32; font-weight: 600;">💰 By Dollar Profit</h6>
-                                                    </div>
-                                                    <div class="card-body p-0">
-                                                        <div id="top-by-amount" class="list-group list-group-flush">
-                                                            <div class="list-group-item text-center text-muted py-3">
-                                                                Click "Calculate Performance" to see top amounts by money invested
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Weekly Breakdown Table -->
-                                <div class="card mb-4" style="border-radius: 12px;">
-                                    <div class="card-body">
-                                        <h5 class="card-title mb-3">Weekly Investment Breakdown</h5>
-                                        <div class="table-responsive">
-                                            <table class="table table-striped" id="mnq-weekly-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Week</th>
-                                                        <th>Date</th>
-                                                        <th>Price</th>
-                                                        <th>Investment</th>
-                                                        <th>Contracts Bought</th>
-                                                        <th>Total Contracts</th>
-                                                        <th>Total Invested</th>
-                                                        <th>Current Value</th>
-                                                        <th>P&L</th>
-                                                        <th>Return %</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="mnq-weekly-tbody">
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Loading and Error States -->
-                                <div id="mnq-loading" class="text-center" style="display: none;">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p class="mt-2">Calculating MNQ investment performance...</p>
-                                </div>
-                                
-                                <div id="mnq-error" class="alert alert-danger" style="display: none;">
-                                    <strong>Error:</strong> <span id="mnq-error-message"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- FutureQuant Dashboard Content -->
-                    <div class="tab-pane fade" id="futurequant-dashboard-content" role="tabpanel" aria-labelledby="futurequant-dashboard-tab">
                         <div id="futurequant-dashboard-root">
                             <!-- FutureQuant Dashboard Header -->
                             <div class="card shadow-sm mb-4">
@@ -1829,7 +1500,6 @@
     <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
     <script src="https://unpkg.com/date-fns@2.30.0/index.js"></script>
             <script src="static/main.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
-        <script src="static/mnq-dashboard.js"></script>
                         <script src="static/futurequant-dashboard.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
     
     <!-- Futures Exploratorium React App -->
@@ -2598,7 +2268,246 @@
             );
         };
         
-        
+        // Event Analysis Component
+        const EventAnalysis = () => {
+            const [diagnosticData, setDiagnosticData] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [lastUpdate, setLastUpdate] = useState('00:00');
+            const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+            const [dateChanged, setDateChanged] = useState(false);
+
+            const fetchDiagnosticAnalysis = async (date = selectedDate) => {
+                setLoading(true);
+                try {
+                    // Add cache-busting parameter to ensure fresh data
+                    const timestamp = new Date().getTime();
+                    const response = await fetch(`/api/v1/futureexploratorium/events/diagnostic?date=${date}&_t=${timestamp}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        setDiagnosticData(data);
+                        setDateChanged(false); // Reset date changed flag
+                        setLastUpdate(new Date().toLocaleTimeString('en-US', { 
+                            hour12: false, 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        }));
+                    } else {
+                        console.error('Diagnostic analysis failed:', data.error);
+                        setDiagnosticData(null);
+                    }
+                } catch (error) {
+                    console.error('Error fetching diagnostic analysis:', error);
+                    setDiagnosticData(null);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => {
+                fetchDiagnosticAnalysis();
+            }, []);
+
+            const handleDateChange = (e) => {
+                const newDate = e.target.value;
+                setSelectedDate(newDate);
+                setDateChanged(true); // Mark that date has changed
+                // Don't automatically fetch - user must click analyze button
+            };
+
+            if (loading) {
+                return (
+                    <div style={{
+                        background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+                        borderRadius: '16px',
+                        padding: '1.5rem',
+                        border: '1px solid #333',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                        height: 'fit-content'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <h3 style={{ margin: 0, color: '#ffffff', fontSize: '1.25rem', fontWeight: '600' }}>
+                                🔍 Diagnostic Event Analysis
+                            </h3>
+                            <button onClick={() => fetchDiagnosticAnalysis()} style={{
+                                background: '#007bff', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer'
+                            }}>
+                                🔄
+                            </button>
+                        </div>
+                        <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af' }}>
+                            <div style={{ marginBottom: '10px' }}>🤖 AI is analyzing market events...</div>
+                            <div style={{ fontSize: '0.8rem' }}>This may take a few moments</div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div style={{
+                    background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+                    borderRadius: '16px',
+                    padding: '1.5rem',
+                    border: '1px solid #333',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                    height: 'fit-content'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <h3 style={{ margin: 0, color: '#ffffff', fontSize: '1.25rem', fontWeight: '600' }}>
+                            🔍 Diagnostic Event Analysis
+                        </h3>
+                        <div>
+                            <span style={{ marginRight: '12px', color: '#9ca3af', fontSize: '0.8rem' }}>{lastUpdate}</span>
+                            <button onClick={() => fetchDiagnosticAnalysis()} style={{
+                                background: '#007bff', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer'
+                            }}>
+                                🔄
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Date Selector */}
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1', minWidth: '120px' }}>
+                            <label style={{ display: 'block', color: '#9ca3af', fontSize: '0.8rem', marginBottom: '4px' }}>Date</label>
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={handleDateChange}
+                                style={{
+                                    width: '100%',
+                                    padding: '6px 8px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #444',
+                                    background: '#333',
+                                    color: '#ffffff',
+                                    fontSize: '0.8rem'
+                                }}
+                            />
+                        </div>
+                        <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'end', gap: '8px' }}>
+                            {dateChanged && (
+                                <span style={{ 
+                                    color: '#ffc107', 
+                                    fontSize: '0.8rem', 
+                                    fontWeight: '500',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}>
+                                    ⚠️ Date changed - click analyze
+                                </span>
+                            )}
+                            <button 
+                                onClick={() => fetchDiagnosticAnalysis(selectedDate)}
+                                disabled={loading}
+                                style={{
+                                    background: loading ? '#6c757d' : (dateChanged ? '#ffc107' : '#28a745'),
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: '6px',
+                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.9rem',
+                                    fontWeight: '500',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    height: 'fit-content'
+                                }}
+                            >
+                                {loading ? '⏳' : '🔍'} {loading ? 'Analyzing...' : 'Analyze Date'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Worst Week Alert */}
+                    {diagnosticData?.worst_week && (
+                        <div style={{
+                            background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
+                            color: 'white',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            marginBottom: '16px',
+                            textAlign: 'center',
+                            fontWeight: '600',
+                            fontSize: '0.9rem'
+                        }}>
+                            Worst Week: {selectedDate} ({diagnosticData.worst_week.loss_percentage?.toFixed(2) || '100.00'}% loss)
+                        </div>
+                    )}
+
+                    {/* Factor Impact Table */}
+                    {diagnosticData?.factor_impact_table && (
+                        <div style={{ marginBottom: '16px' }}>
+                            <h4 style={{ marginBottom: '12px', color: '#ffffff', fontSize: '1rem' }}>FACTOR IMPACT ON {selectedDate}</h4>
+                            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr>
+                                            <th style={{ background: '#333', padding: '8px', textAlign: 'left', fontWeight: '600', color: '#ffffff', border: '1px solid #444', fontSize: '0.8rem' }}>FACTOR</th>
+                                            <th style={{ background: '#333', padding: '8px', textAlign: 'left', fontWeight: '600', color: '#ffffff', border: '1px solid #444', fontSize: '0.8rem' }}>TYPE</th>
+                                            <th style={{ background: '#333', padding: '8px', textAlign: 'left', fontWeight: '600', color: '#ffffff', border: '1px solid #444', fontSize: '0.8rem' }}>IMPACT ON {selectedDate}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {diagnosticData.factor_impact_table.map((factor, index) => (
+                                            <tr key={index}>
+                                                <td style={{ padding: '8px', border: '1px solid #444', color: '#ffffff', fontSize: '0.8rem', fontWeight: '500' }}>
+                                                    {factor.factor}
+                                                </td>
+                                                <td style={{ padding: '8px', border: '1px solid #444', color: '#ffffff', fontSize: '0.8rem' }}>
+                                                    <span style={{
+                                                        background: '#444',
+                                                        color: '#ffffff',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '0.7rem'
+                                                    }}>
+                                                        {factor.factor_type || 'Unknown'}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '8px', border: '1px solid #444', color: '#ffffff', fontSize: '0.8rem' }}>
+                                                    {factor.impact}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+
+                    {/* No Factor Data Message */}
+                    {diagnosticData && !diagnosticData.factor_impact_table && (
+                        <div style={{
+                            textAlign: 'center',
+                            color: '#ff6b6b',
+                            padding: '20px',
+                            fontSize: '0.9rem',
+                            background: '#2a2a2a',
+                            borderRadius: '8px',
+                            marginBottom: '16px'
+                        }}>
+                            No factor impact data available for this date.
+                        </div>
+                    )}
+
+                    {/* No Data Message */}
+                    {!diagnosticData && !loading && (
+                        <div style={{
+                            textAlign: 'center',
+                            padding: '20px',
+                            color: '#9ca3af',
+                            fontSize: '0.9rem'
+                        }}>
+                            No diagnostic data available for {selectedDate}
+                        </div>
+                    )}
+                </div>
+            );
+        };
         
         // Main App Component
         const FuturesExploratoriumApp = () => {
@@ -2773,12 +2682,13 @@
                     <div className="main-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2rem' }}>
                         <div className="dashboard-grid" style={{
                             display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
+                            gridTemplateColumns: '1fr 1fr 1fr',
                             gap: '1.5rem',
                             marginBottom: '1.5rem'
                         }}>
                             <MarketOverview />
                             <StrategyPerformance />
+                            <EventAnalysis />
                         </div>
                         
                     </div>
