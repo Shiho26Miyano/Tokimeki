@@ -161,10 +161,37 @@
             100% { transform: rotate(360deg); }
         }
         
+        @keyframes slideInLeft {
+            0% { transform: translateX(-50px); opacity: 0; }
+            100% { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideInRight {
+            0% { transform: translateX(50px); opacity: 0; }
+            100% { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideInUp {
+            0% { transform: translateY(30px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
+        }
+        
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px rgba(0, 212, 255, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.8); }
+            100% { box-shadow: 0 0 5px rgba(0, 212, 255, 0.5); }
         }
         
         @keyframes slideInUp {
@@ -1111,9 +1138,6 @@
                                 <div class="card-header-row">
                                     <div class="d-flex align-items-center">
                                         <span class="card-title">Trading Strategy Analyzer</span>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary ms-3 how-it-works-btn" data-bs-target="#tradingStrategyHelpModal">
-                                            How it works
-                                        </button>
                                     </div>
                                 </div>
                                 <div class="container py-4"><div id="react-hedge-fund-tool"></div></div>
@@ -2276,12 +2300,15 @@
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [dateChanged, setDateChanged] = useState(false);
 
-            const fetchDiagnosticAnalysis = async (date = selectedDate) => {
+            const fetchDiagnosticAnalysis = async (date = null) => {
                 setLoading(true);
                 try {
+                    // Use provided date or current selectedDate
+                    const targetDate = date || selectedDate;
+                    
                     // Add cache-busting parameter to ensure fresh data
                     const timestamp = new Date().getTime();
-                    const response = await fetch(`/api/v1/futureexploratorium/events/diagnostic?date=${date}&_t=${timestamp}`);
+                    const response = await fetch(`/api/v1/futureexploratorium/events/diagnostic?date=${targetDate}&_t=${timestamp}`);
                     const data = await response.json();
                     
                     if (data.success) {
@@ -2305,13 +2332,17 @@
             };
 
             useEffect(() => {
-                fetchDiagnosticAnalysis();
+                // Only fetch on initial load when selectedDate is set
+                if (selectedDate) {
+                    fetchDiagnosticAnalysis(selectedDate);
+                }
             }, []);
 
             const handleDateChange = (e) => {
                 const newDate = e.target.value;
                 setSelectedDate(newDate);
                 setDateChanged(true); // Mark that date has changed
+                setDiagnosticData(null); // Clear previous data when date changes
                 // Don't automatically fetch - user must click analyze button
             };
 
@@ -2421,24 +2452,9 @@
                         </div>
                     </div>
 
-                    {/* Worst Week Alert */}
-                    {diagnosticData?.worst_week && (
-                        <div style={{
-                            background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
-                            color: 'white',
-                            padding: '12px',
-                            borderRadius: '8px',
-                            marginBottom: '16px',
-                            textAlign: 'center',
-                            fontWeight: '600',
-                            fontSize: '0.9rem'
-                        }}>
-                            Worst Week: {selectedDate} ({diagnosticData.worst_week.loss_percentage?.toFixed(2) || '100.00'}% loss)
-                        </div>
-                    )}
 
                     {/* Factor Impact Table */}
-                    {diagnosticData?.factor_impact_table && (
+                    {diagnosticData?.factor_impact_table ? (
                         <div style={{ marginBottom: '16px' }}>
                             <h4 style={{ marginBottom: '12px', color: '#ffffff', fontSize: '1rem' }}>FACTOR IMPACT ON {selectedDate}</h4>
                             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
@@ -2476,11 +2492,7 @@
                                 </table>
                             </div>
                         </div>
-                    )}
-
-
-                    {/* No Factor Data Message */}
-                    {diagnosticData && !diagnosticData.factor_impact_table && (
+                    ) : diagnosticData && !diagnosticData.factor_impact_table ? (
                         <div style={{
                             textAlign: 'center',
                             color: '#ff6b6b',
@@ -2490,9 +2502,11 @@
                             borderRadius: '8px',
                             marginBottom: '16px'
                         }}>
-                            No factor impact data available for this date.
+                            No factor impact data available for {selectedDate}.
                         </div>
-                    )}
+                    ) : null}
+
+
 
                     {/* No Data Message */}
                     {!diagnosticData && !loading && (
@@ -2510,6 +2524,7 @@
         };
         
         // Main App Component
+
         const FuturesExploratoriumApp = () => {
             const [state, setState] = useState(store.getState());
             const [loading, setLoading] = useState(true);
@@ -2680,6 +2695,7 @@
                     <Header />
                     
                     <div className="main-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2rem' }}>
+                        
                         <div className="dashboard-grid" style={{
                             display: 'grid',
                             gridTemplateColumns: '1fr 1fr 1fr',
