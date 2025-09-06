@@ -707,6 +707,18 @@ class FutureExploratoriumEventAnalysisService:
                                    contracts_bought: Optional[int] = None) -> Dict[str, Any]:
         """Get AI-powered factor analysis for a specific date using OpenRouter"""
         try:
+            # Check if API key is available
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            if not api_key:
+                logger.error("OPENROUTER_API_KEY environment variable is not set")
+                return {
+                    "success": False,
+                    "error": "OpenRouter API key not configured",
+                    "fallback_used": True
+                }
+            
+            logger.info(f"Calling OpenRouter API for date: {date}, symbol: {symbol}")
+            
             # Call OpenRouter to get factor analysis
             factors_result = await fetch_factors_from_openrouter(
                 date=date,
@@ -860,7 +872,10 @@ class FutureExploratoriumEventAnalysisService:
             
             # If AI analysis fails, provide fallback mock data
             if not ai_result["success"]:
-                logger.warning(f"AI analysis failed for {date}, using fallback data: {ai_result.get('error', 'Unknown error')}")
+                error_msg = ai_result.get('error', 'Unknown error')
+                logger.warning(f"AI analysis failed for {date}, using fallback data: {error_msg}")
+                if ai_result.get('fallback_used'):
+                    logger.error("OpenRouter API key is missing or invalid - check Railway environment variables")
                 return self._generate_fallback_diagnostic_analysis(date)
             
             # Extract factor table from AI analysis

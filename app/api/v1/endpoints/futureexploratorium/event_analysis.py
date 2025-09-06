@@ -252,6 +252,49 @@ async def get_ai_factor_analysis(
         )
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/test-openrouter", response_model=dict)
+async def test_openrouter_connection(
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Test OpenRouter API connection and key validity"""
+    try:
+        from app.services.futureexploratorium.event_analysis_service import fetch_factors_from_openrouter
+        
+        # Test with a simple request
+        result = await fetch_factors_from_openrouter(
+            date="2025-01-17",
+            symbol="ES=F",
+            price_change=1.5,
+            contracts_bought=10
+        )
+        
+        await usage_service.track_request(
+            endpoint="futureexploratorium_test_openrouter",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "success": True,
+            "message": "OpenRouter API connection successful",
+            "test_result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"OpenRouter test error: {str(e)}")
+        await usage_service.track_request(
+            endpoint="futureexploratorium_test_openrouter",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "OpenRouter API connection failed"
+        }
+
 @router.get("/types", response_model=dict)
 async def get_event_types(
     usage_service: AsyncUsageService = Depends(get_usage_service)
@@ -314,6 +357,8 @@ async def get_diagnostic_event_analysis(
 ):
     """Get diagnostic event analysis for a specific date with factor impact table"""
     try:
+        logger.info(f"Diagnostic analysis requested for date: {date}")
+        
         # Initialize event analysis service
         event_service = FutureExploratoriumEventAnalysisService()
         
@@ -322,6 +367,14 @@ async def get_diagnostic_event_analysis(
             date=date,
             weekly_amount=weekly_amount
         )
+        
+        # Log whether we got real AI data or fallback data
+        if result.get("success"):
+            factor_table = result.get("factor_impact_table", [])
+            if factor_table and any("Market Volatility Spike" in str(factor) for factor in factor_table):
+                logger.warning(f"Diagnostic analysis for {date} returned FALLBACK data (static factors detected)")
+            else:
+                logger.info(f"Diagnostic analysis for {date} returned REAL AI data")
         
         if not result["success"]:
             raise HTTPException(status_code=400, detail=result["error"])
