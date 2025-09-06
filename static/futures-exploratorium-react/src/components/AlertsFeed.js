@@ -242,64 +242,36 @@ const AlertsFeed = () => {
   const [filter, setFilter] = useState('all');
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
 
-  // Mock data generation
+  // Generate initial mock data only
   useEffect(() => {
-    const generateMockAlerts = () => {
-      const alertTypes = [
-        { type: 'VaR Alert', level: 'high', message: 'VaR threshold exceeded for ES position' },
-        { type: 'Volatility', level: 'medium', message: 'High volatility detected in NQ futures' },
-        { type: 'Correlation', level: 'low', message: 'Correlation between ES and NQ increased' },
-        { type: 'System', level: 'info', message: 'Backtest completed successfully' },
-        { type: 'Risk', level: 'high', message: 'Portfolio drawdown approaching limit' }
-      ];
+    const initialAlerts = [
+      { type: 'VaR Alert', level: 'high', message: 'VaR threshold exceeded for ES position' },
+      { type: 'Volatility', level: 'medium', message: 'High volatility detected in NQ futures' },
+      { type: 'System', level: 'info', message: 'Backtest completed successfully' }
+    ];
 
-      const randomAlert = alertTypes[Math.floor(Math.random() * alertTypes.length)];
-      const alert = {
+    const initialActivity = [
+      { type: 'TRADE', message: 'ES position opened at $4,250.50' },
+      { type: 'SIGNAL', message: 'Buy signal generated for NQ futures' },
+      { type: 'BACKTEST', message: 'Strategy backtest completed' }
+    ];
+
+    initialAlerts.forEach(alert => {
+      addAlert({
         id: Date.now() + Math.random(),
-        type: randomAlert.type,
-        level: randomAlert.level,
-        message: randomAlert.message,
+        ...alert,
         timestamp: new Date(),
         symbol: ['ES', 'NQ', 'RTY'][Math.floor(Math.random() * 3)]
-      };
+      });
+    });
 
-      addAlert(alert);
-    };
-
-    const generateMockActivity = () => {
-      const activityTypes = [
-        { type: 'TRADE', message: 'ES position opened at $4,250.50' },
-        { type: 'SIGNAL', message: 'Buy signal generated for NQ futures' },
-        { type: 'BACKTEST', message: 'Strategy backtest completed' },
-        { type: 'RISK', message: 'Risk parameters updated' },
-        { type: 'SYSTEM', message: 'Market data connection restored' }
-      ];
-
-      const randomActivity = activityTypes[Math.floor(Math.random() * activityTypes.length)];
-      const activityItem = {
+    initialActivity.forEach(activity => {
+      addActivity({
         id: Date.now() + Math.random(),
-        type: randomActivity.type,
-        message: randomActivity.message,
+        ...activity,
         timestamp: new Date()
-      };
-
-      addActivity(activityItem);
-    };
-
-    // Generate initial data
-    for (let i = 0; i < 5; i++) {
-      generateMockAlerts();
-      generateMockActivity();
-    }
-
-    // Generate new data periodically
-    const alertInterval = setInterval(generateMockAlerts, 30000); // Every 30 seconds
-    const activityInterval = setInterval(generateMockActivity, 45000); // Every 45 seconds
-
-    return () => {
-      clearInterval(alertInterval);
-      clearInterval(activityInterval);
-    };
+      });
+    });
   }, [addAlert, addActivity]);
 
   const getAlertIcon = (level) => {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Shield, AlertTriangle, TrendingUp, Activity, AlertCircle } from 'lucide-react';
-import Plot from 'react-plotly.js';
 import useStore from '../store/useStore';
 
 const RiskMetricsContainer = styled.div`
@@ -89,12 +88,40 @@ const ChartSection = styled.div`
   margin-bottom: 1.5rem;
 `;
 
-const ChartContainer = styled.div`
+const CorrelationTable = styled.div`
   background: linear-gradient(135deg, #2a2a2a 0%, #1e1e1e 100%);
   border-radius: 12px;
   padding: 1rem;
   border: 1px solid #333;
-  height: 300px;
+  overflow-x: auto;
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+`;
+
+const TableHeader = styled.th`
+  background: #333;
+  color: #ffffff;
+  padding: 0.75rem;
+  text-align: center;
+  font-weight: 600;
+  border: 1px solid #444;
+`;
+
+const TableCell = styled.td`
+  padding: 0.75rem;
+  text-align: center;
+  border: 1px solid #444;
+  color: ${props => {
+    if (props.value >= 0.7) return '#22c55e';
+    if (props.value >= 0.3) return '#f59e0b';
+    if (props.value >= -0.3) return '#6b7280';
+    return '#ef4444';
+  }};
+  font-weight: 600;
 `;
 
 const ChartTitle = styled.div`
@@ -180,30 +207,7 @@ const RiskMetrics = () => {
       });
     });
 
-    // Prepare data for Plotly heatmap
-    const z = symbols.map(symbol1 => 
-      symbols.map(symbol2 => correlationMatrix[symbol1][symbol2])
-    );
-
-    setCorrelationData({
-      z,
-      x: symbols,
-      y: symbols,
-      type: 'heatmap',
-      colorscale: [
-        [0, '#ef4444'],
-        [0.5, '#f59e0b'],
-        [1, '#22c55e']
-      ],
-      showscale: true,
-      colorbar: {
-        title: 'Correlation',
-        titleside: 'right',
-        tickmode: 'array',
-        tickvals: [-1, -0.5, 0, 0.5, 1],
-        ticktext: ['-1', '-0.5', '0', '0.5', '1']
-      }
-    });
+    setCorrelationData(correlationMatrix);
   }, []);
 
   const formatPercent = (value) => {
@@ -246,26 +250,6 @@ const RiskMetrics = () => {
     }
   ];
 
-  const plotlyConfig = {
-    displayModeBar: false,
-    responsive: true
-  };
-
-  const plotlyLayout = {
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)',
-    font: { color: '#ffffff' },
-    xaxis: { 
-      color: '#9ca3af',
-      gridcolor: '#333',
-      zerolinecolor: '#333'
-    },
-    yaxis: { 
-      color: '#9ca3af',
-      gridcolor: '#333',
-      zerolinecolor: '#333'
-    }
-  };
 
   return (
     <RiskMetricsContainer>
@@ -311,27 +295,34 @@ const RiskMetrics = () => {
       <ChartSection>
         <ChartTitle>
           <Activity size={14} />
-          Correlation Heatmap
+          Correlation Matrix
         </ChartTitle>
-        <ChartContainer>
+        <CorrelationTable>
           {correlationData && (
-            <Plot
-              data={[correlationData]}
-              layout={{
-                ...plotlyLayout,
-                title: {
-                  text: 'Asset Correlation Matrix',
-                  font: { color: '#ffffff', size: 14 }
-                },
-                width: '100%',
-                height: 250,
-                margin: { l: 50, r: 50, t: 40, b: 50 }
-              }}
-              config={plotlyConfig}
-              style={{ width: '100%', height: '100%' }}
-            />
+            <Table>
+              <thead>
+                <tr>
+                  <TableHeader></TableHeader>
+                  {Object.keys(correlationData).map(symbol => (
+                    <TableHeader key={symbol}>{symbol}</TableHeader>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Object.keys(correlationData).map(symbol1 => (
+                  <tr key={symbol1}>
+                    <TableHeader>{symbol1}</TableHeader>
+                    {Object.keys(correlationData[symbol1]).map(symbol2 => (
+                      <TableCell key={symbol2} value={correlationData[symbol1][symbol2]}>
+                        {correlationData[symbol1][symbol2].toFixed(2)}
+                      </TableCell>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
           )}
-        </ChartContainer>
+        </CorrelationTable>
       </ChartSection>
 
       <ChartTitle>

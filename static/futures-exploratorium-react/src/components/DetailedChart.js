@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { X, Maximize2, Minimize2, BarChart3, TrendingUp, Volume2 } from 'lucide-react';
-import Plot from 'react-plotly.js';
+import { X, BarChart3, TrendingUp, Volume2 } from 'lucide-react';
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import useStore from '../store/useStore';
 import apiService from '../services/api';
 
@@ -197,45 +197,16 @@ const DetailedChart = ({ symbol, isOpen, onClose }) => {
     return data;
   };
 
-  const prepareCandlestickData = () => {
-    if (!chartData) return null;
+  const prepareChartData = () => {
+    if (!chartData) return [];
     
-    return [{
-      x: chartData.map(d => d.timestamp),
-      open: chartData.map(d => d.open),
-      high: chartData.map(d => d.high),
-      low: chartData.map(d => d.low),
-      close: chartData.map(d => d.close),
-      type: 'candlestick',
-      name: symbol,
-      increasing: { line: { color: '#22c55e' } },
-      decreasing: { line: { color: '#ef4444' } }
-    }];
-  };
-
-  const prepareLineData = () => {
-    if (!chartData) return null;
-    
-    return [{
-      x: chartData.map(d => d.timestamp),
-      y: chartData.map(d => d.close),
-      type: 'scatter',
-      mode: 'lines',
-      name: symbol,
-      line: { color: '#00d4ff', width: 2 }
-    }];
-  };
-
-  const prepareVolumeData = () => {
-    if (!chartData) return null;
-    
-    return [{
-      x: chartData.map(d => d.timestamp),
-      y: chartData.map(d => d.volume),
-      type: 'bar',
-      name: 'Volume',
-      marker: { color: '#6b7280' }
-    }];
+    return chartData.map(d => ({
+      time: new Date(d.timestamp).toLocaleTimeString(),
+      close: d.close,
+      volume: d.volume,
+      high: d.high,
+      low: d.low
+    }));
   };
 
   const getCurrentPrice = () => {
@@ -265,30 +236,6 @@ const DetailedChart = ({ symbol, isOpen, onClose }) => {
     return Math.min(...chartData.map(d => d.low));
   };
 
-  const plotlyConfig = {
-    displayModeBar: true,
-    responsive: true,
-    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
-  };
-
-  const plotlyLayout = {
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)',
-    font: { color: '#ffffff' },
-    xaxis: { 
-      color: '#9ca3af',
-      gridcolor: '#333',
-      zerolinecolor: '#333',
-      type: 'date'
-    },
-    yaxis: { 
-      color: '#9ca3af',
-      gridcolor: '#333',
-      zerolinecolor: '#333'
-    },
-    margin: { l: 50, r: 50, t: 20, b: 50 },
-    showlegend: false
-  };
 
   if (!isOpen) return null;
 
@@ -347,20 +294,41 @@ const DetailedChart = ({ symbol, isOpen, onClose }) => {
           {loading ? (
             <LoadingSpinner>Loading chart data...</LoadingSpinner>
           ) : (
-            <Plot
-              data={chartType === 'candlestick' ? prepareCandlestickData() : prepareLineData()}
-              layout={{
-                ...plotlyLayout,
-                title: {
-                  text: `${symbol} Price Chart`,
-                  font: { color: '#ffffff', size: 16 }
-                },
-                width: '100%',
-                height: 400
-              }}
-              config={plotlyConfig}
-              style={{ width: '100%', height: '100%' }}
-            />
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={prepareChartData()}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis 
+                  dataKey="time" 
+                  stroke="#9ca3af"
+                  fontSize={12}
+                />
+                <YAxis 
+                  stroke="#9ca3af"
+                  fontSize={12}
+                  tickFormatter={(value) => `$${value.toFixed(0)}`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1a1a1a',
+                    border: '1px solid #333',
+                    borderRadius: '8px',
+                    color: '#ffffff'
+                  }}
+                  formatter={(value, name) => [
+                    `$${value.toFixed(2)}`,
+                    name === 'close' ? 'Price' : name
+                  ]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="close"
+                  stroke="#00d4ff"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4, fill: '#00d4ff' }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           )}
         </ChartContent>
 

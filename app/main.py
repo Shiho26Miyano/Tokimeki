@@ -142,6 +142,15 @@ app = FastAPI(
 # Setup middleware
 setup_middleware(app)
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify actual origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Add exception handlers
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

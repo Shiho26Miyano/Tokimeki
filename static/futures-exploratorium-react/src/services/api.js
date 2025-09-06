@@ -27,23 +27,11 @@ class ApiService {
   }
 
   // Core endpoints
-  async getSystemStatus() {
-    return this.request('/core/status');
-  }
-
-  async getPlatformOverview() {
-    return this.request('/core/overview');
-  }
-
   async getHealthCheck() {
     return this.request('/core/health');
   }
 
   // Dashboard endpoints
-  async getComprehensiveDashboard() {
-    return this.request('/dashboard/comprehensive');
-  }
-
   async getMarketOverview() {
     return this.request('/dashboard/market/overview');
   }
@@ -54,14 +42,6 @@ class ApiService {
 
   async getRiskMetrics() {
     return this.request('/dashboard/risk');
-  }
-
-  async getAlerts() {
-    return this.request('/dashboard/alerts');
-  }
-
-  async getRecentActivity() {
-    return this.request('/dashboard/activity');
   }
 
   async getChartData(symbol = 'ES=F', timeframe = '1d', limit = 100) {
