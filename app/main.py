@@ -228,19 +228,6 @@ async def not_found_handler(request: Request, exc: Exception):
 # Include API router
 app.include_router(api_router, prefix="/api/v1")
 
-# FutureQuant dashboard route
-@app.get("/futurequant")
-async def futurequant_dashboard():
-    try:
-        dashboard_path = os.path.join(STATIC_DIR, "futurequant-enhanced.html")
-        logger.info(f"Serving FutureQuant dashboard from: {dashboard_path}")
-        return FileResponse(dashboard_path)
-    except Exception as e:
-        logger.error(f"Error serving FutureQuant dashboard: {e}")
-        return JSONResponse(
-            status_code=500, 
-            content={"error": "Failed to serve FutureQuant dashboard", "details": str(e)}
-        )
 
 # Root endpoint - serve the main HTML page (using absolute path)
 @app.get("/")
