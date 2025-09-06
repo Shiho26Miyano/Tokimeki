@@ -7,6 +7,9 @@ from .endpoints.futurequant import (
     data_router, features_router, models_router, 
     signals_router, backtests_router, paper_trading_router
 )
+from .endpoints.futureexploratorium import (
+    core_router, dashboard_router, analytics_router, strategy_router
+)
 from .endpoints import quantitative_analysis, websocket
 
 # Create main API router
@@ -29,6 +32,12 @@ api_router.include_router(models_router, prefix="/futurequant/models", tags=["fu
 api_router.include_router(signals_router, prefix="/futurequant/signals", tags=["futurequant_signals"])
 api_router.include_router(backtests_router, prefix="/futurequant/backtests", tags=["futurequant_backtests"])
 api_router.include_router(paper_trading_router, prefix="/futurequant/paper-trading", tags=["futurequant_paper_trading"])
+
+# Include FutureExploratorium endpoints (separate service)
+api_router.include_router(core_router, prefix="/futureexploratorium/core", tags=["futureexploratorium_core"])
+api_router.include_router(dashboard_router, prefix="/futureexploratorium/dashboard", tags=["futureexploratorium_dashboard"])
+api_router.include_router(analytics_router, prefix="/futureexploratorium/analytics", tags=["futureexploratorium_analytics"])
+api_router.include_router(strategy_router, prefix="/futureexploratorium/strategy", tags=["futureexploratorium_strategy"])
 
 # Include Quantitative Analysis endpoints
 api_router.include_router(quantitative_analysis.router, prefix="/quantitative-analysis", tags=["quantitative_analysis"])
@@ -59,6 +68,12 @@ async def api_info():
                 "signals": "/futurequant/signals",
                 "backtests": "/futurequant/backtests",
                 "paper_trading": "/futurequant/paper-trading"
+            },
+            "futureexploratorium": {
+                "core": "/futureexploratorium/core",
+                "dashboard": "/futureexploratorium/dashboard",
+                "analytics": "/futureexploratorium/analytics",
+                "strategy": "/futureexploratorium/strategy"
             },
             "quantitative_analysis": "/quantitative-analysis",
             "websocket": "/ws"
@@ -124,6 +139,7 @@ async def test_api():
             "rag": "/api/v1/rag",
             "monitoring": "/api/v1/monitoring",
             "mnq": "/api/v1/mnq",
-            "futurequant": "/api/v1/futurequant"
+            "futurequant": "/api/v1/futurequant",
+            "futureexploratorium": "/api/v1/futureexploratorium"
         }
     } 
