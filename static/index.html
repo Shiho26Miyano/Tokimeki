@@ -9,7 +9,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
     <meta name="version" content="20250117-1704067200">
     <meta name="last-modified" content="2025-01-17">
-    <title>Tokimeki - AI-Powered Investment Analysis Platform</title>
+    <title>Tokimeki - AI-Powered Investment Analysis Platform | CaddieAlpha™ Golf Strategy</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -93,6 +93,60 @@
         .row.g-4 > [class^='col-'] { display: flex; flex-direction: column; }
         .card-body { flex: 1 1 auto; display: flex; flex-direction: column; padding: 0.6rem 1rem 0.6rem 1rem; }
         .divider { display: none; }
+        
+        /* Golf Factor Analysis Styles */
+        .score-excellent { background: #2a9d8f; color: white; }
+        .score-good { background: #7fb069; color: white; }
+        .score-fair { background: #f4a261; color: white; }
+        .score-poor { background: #e76f51; color: white; }
+        
+        /* Loading Timer Styles */
+        .loading-timer-container {
+            padding: 1.5rem;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+        }
+        
+        .loading-progress {
+            margin: 0 auto;
+            max-width: 300px;
+        }
+        
+        .progress {
+            background-color: rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+        
+        .loading-text {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+        
+        .loading-timer-container small {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .loading-timer-container .spinner-border {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-width: 0.3em;
+        }
+        
+        .grade-a { color: #2a9d8f; }
+        .grade-b { color: #7fb069; }
+        .grade-c { color: #f4a261; }
+        .grade-d { color: #e76f51; }
+        
         @media (max-width: 991px) {
             .container { padding: 0.5rem; }
             .card-header-row, .market-controls, .explore-controls, .poetry-controls { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
@@ -451,6 +505,9 @@
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">⚡ Trading Strategy Analyzer</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="minigolf-strategy-tab" data-bs-toggle="pill" data-bs-target="#minigolf-strategy-content" role="tab" aria-controls="minigolf-strategy-content" aria-selected="false">🏌️ Mini Golf Strategy</a>
                     </li>
 
                 </ul>
@@ -1150,6 +1207,225 @@
 
                     <div class="tab-pane fade" id="deepseek-chatbot-content" role="tabpanel" aria-labelledby="deepseek-chatbot-tab">
                         <div id="react-deepseek-chatbot"></div>
+                    </div>
+
+                    <div class="tab-pane fade" id="minigolf-strategy-content" role="tabpanel" aria-labelledby="minigolf-strategy-tab">
+                        <div class="card shadow-sm flex-fill d-flex flex-column" style="max-width: 1400px; margin: 0 auto; border-radius: 16px;">
+                            <div class="card-body d-flex flex-column" style="padding: 32px;">
+                                <div class="text-center mb-4" style="position: sticky; top: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 20px 0; z-index: 100; border-bottom: 1px solid rgba(0, 0, 0, 0.1); margin: -32px -32px 30px -32px; padding-left: 32px; padding-right: 32px;">
+                                    <h1 style="color: #2c3e50; font-size: 2.2rem; font-weight: 700; margin-bottom: 10px;">
+                                        🏌️ Golf Factor Analysis
+                                    </h1>
+                                    <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 0;">
+                                        AI-powered analysis to determine the optimal time to play golf courses across the United States
+                                    </p>
+                                </div>
+
+                                <!-- Search Section -->
+                                <div class="card mb-4" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                    <div class="card-body">
+                                        <h3 style="color: #2c3e50; font-size: 1.5rem; font-weight: 600; margin-bottom: 15px;">
+                                            <i class="fas fa-search me-2"></i>Search Golf Courses
+                                        </h3>
+                                        
+                                        <!-- Search Form -->
+                                        <div class="row g-3 mb-4">
+                                            <div class="col-md-6">
+                                                <label for="searchQuery" class="form-label">Course Name or Location</label>
+                                                <input type="text" class="form-control" id="searchQuery" 
+                                                       placeholder="e.g., Pebble Beach, Augusta National, or City Name">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label for="stateFilter" class="form-label">State (Optional)</label>
+                                                <select class="form-select" id="stateFilter">
+                                                    <option value="">All States</option>
+                                                    <option value="CA">California</option>
+                                                    <option value="FL">Florida</option>
+                                                    <option value="TX">Texas</option>
+                                                    <option value="NY">New York</option>
+                                                    <option value="GA">Georgia</option>
+                                                    <option value="SC">South Carolina</option>
+                                                    <option value="NC">North Carolina</option>
+                                                    <option value="AZ">Arizona</option>
+                                                    <option value="NV">Nevada</option>
+                                                    <option value="OR">Oregon</option>
+                                                    <option value="WA">Washington</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label for="targetDate" class="form-label">Target Date</label>
+                                                <input type="date" class="form-control" id="targetDate">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="text-center">
+                                            <button class="btn btn-primary btn-lg" onclick="searchCourses()" style="background: linear-gradient(135deg, #2c5530, #4a7c59); border: none; border-radius: 25px; padding: 0.75rem 2rem; font-weight: 600;">
+                                                <i class="fas fa-search me-2"></i>Search Courses
+                                            </button>
+                                        </div>
+
+                                        <!-- Loading State -->
+                                        <div class="text-center mt-3" id="searchLoading" style="display: none;">
+                                            <div class="loading-timer-container">
+                                                <div class="spinner-border text-primary mb-3" role="status">
+                                                    <span class="visually-hidden">Searching...</span>
+                                                </div>
+                                                <div class="loading-progress mb-2">
+                                                    <div class="progress" style="height: 8px; border-radius: 10px;">
+                                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                             role="progressbar" 
+                                                             id="searchProgress" 
+                                                             style="width: 0%; background: linear-gradient(45deg, #28a745, #1e7e34);">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <p class="loading-text mb-1" id="searchLoadingText">Searching for courses...</p>
+                                                <small class="text-muted" id="searchTimer">Starting search...</small>
+                                            </div>
+                                        </div>
+
+                                        <!-- Error/Success Messages -->
+                                        <div class="alert alert-danger" id="errorMessage" style="display: none;"></div>
+                                        <div class="alert alert-success" id="successMessage" style="display: none;"></div>
+
+                                        <!-- Search Results -->
+                                        <div id="searchResults" class="mt-4" style="display: none;">
+                                            <h4>Search Results</h4>
+                                            <div id="courseList" style="max-height: 400px; overflow-y: auto;">
+                                                <!-- Course results will be populated here -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Course Analysis Section -->
+                                <div id="courseAnalysis" class="mb-4" style="display: none;">
+                                    <div class="row">
+                                        <!-- Course Details -->
+                                        <div class="col-lg-8">
+                                            <div class="card" style="border-left: 5px solid #7fb069; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                                <div class="card-header" style="background: linear-gradient(135deg, #7fb069, #2a9d8f); color: white; border-radius: 12px 12px 0 0;">
+                                                    <h3 class="mb-0" id="selectedCourseName">
+                                                        <i class="fas fa-golf-ball-tee me-2"></i>Course Analysis
+                                                    </h3>
+                                                </div>
+                                                <div class="card-body">
+                                                    <!-- Factor Analysis -->
+                                                    <div class="mb-4">
+                                                        <h5>Factor Analysis</h5>
+                                                        <div id="factorAnalysis">
+                                                            <!-- Factor items will be populated here -->
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Weather Information -->
+                                                    <div class="mb-4">
+                                                        <h5>Current Weather</h5>
+                                                        <div id="weatherInfo">
+                                                            <!-- Weather info will be populated here -->
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- AI Recommendation -->
+                                                    <div class="card" style="background: linear-gradient(135deg, #e8f5e8, #f0f8f0); border: 2px solid #7fb069;">
+                                                        <div class="card-body">
+                                                            <h5 class="card-title">
+                                                                <i class="fas fa-robot me-2"></i>AI Recommendation
+                                                            </h5>
+                                                            <p class="card-text" id="aiRecommendation">
+                                                                <!-- AI recommendation will be populated here -->
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Timing Grade & Summary -->
+                                        <div class="col-lg-4">
+                                            <div class="card" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                                <div class="card-header text-center" style="background: linear-gradient(135deg, #2c5530, #4a7c59); color: white;">
+                                                    <h4 class="mb-0">Timing Grade</h4>
+                                                </div>
+                                                <div class="card-body text-center">
+                                                    <div class="timing-grade" id="timingGrade" style="font-size: 3rem; font-weight: 900; margin: 1rem 0;">-</div>
+                                                    <div class="score-badge" id="overallScore" style="display: inline-block; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 700; font-size: 1.1rem;">0/100</div>
+                                                    <p class="mt-3 text-muted" id="gradeExplanation">
+                                                        <!-- Grade explanation will be populated here -->
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <!-- Quick Actions -->
+                                            <div class="card mt-3" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                                <div class="card-header">
+                                                    <h5 class="mb-0">Quick Actions</h5>
+                                                </div>
+                                                <div class="card-body">
+                                                    <button class="btn btn-outline-primary w-100 mb-2" onclick="getWeatherForecast()" style="border: 2px solid #2c5530; color: #2c5530; border-radius: 25px; padding: 0.5rem 1.5rem; font-weight: 600;">
+                                                        <i class="fas fa-cloud-sun me-2"></i>5-Day Forecast
+                                                    </button>
+                                                    <button class="btn btn-outline-primary w-100 mb-2" onclick="analyzeDifferentDate()" style="border: 2px solid #2c5530; color: #2c5530; border-radius: 25px; padding: 0.5rem 1.5rem; font-weight: 600;">
+                                                        <i class="fas fa-calendar me-2"></i>Different Date
+                                                    </button>
+                                                    <button class="btn btn-outline-primary w-100" onclick="shareAnalysis()" style="border: 2px solid #2c5530; color: #2c5530; border-radius: 25px; padding: 0.5rem 1.5rem; font-weight: 600;">
+                                                        <i class="fas fa-share me-2"></i>Share Analysis
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Top Recommendations Section -->
+                                <div class="card mb-4" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                    <div class="card-header" style="background: linear-gradient(135deg, #2c5530, #4a7c59); color: white;">
+                                        <h3 class="mb-0">
+                                            <i class="fas fa-star me-2"></i>Top Recommendations
+                                        </h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="text-center" id="recommendationsLoading" style="display: none;">
+                                            <div class="loading-timer-container">
+                                                <div class="spinner-border text-primary mb-3" role="status">
+                                                    <span class="visually-hidden">Loading recommendations...</span>
+                                                </div>
+                                                <div class="loading-progress mb-2">
+                                                    <div class="progress" style="height: 8px; border-radius: 10px;">
+                                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                             role="progressbar" 
+                                                             id="recommendationsProgress" 
+                                                             style="width: 0%; background: linear-gradient(45deg, #007bff, #0056b3);">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <p class="loading-text mb-1">Loading top recommendations...</p>
+                                                <small class="text-muted" id="recommendationsTimer">Starting analysis...</small>
+                                            </div>
+                                        </div>
+                                        <div id="recommendationsList">
+                                            <!-- Recommendations will be populated here -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Weather Forecast Section -->
+                                <div id="weatherForecast" class="mb-4" style="display: none;">
+                                    <div class="card" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                        <div class="card-header" style="background: linear-gradient(135deg, #2c5530, #4a7c59); color: white;">
+                                            <h3 class="mb-0">
+                                                <i class="fas fa-cloud-sun me-2"></i>5-Day Weather Forecast
+                                            </h3>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row" id="forecastContainer">
+                                                <!-- Forecast items will be populated here -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="tab-pane fade" id="event-analysis-content" role="tabpanel" aria-labelledby="event-analysis-tab">
@@ -3641,6 +3917,776 @@
             });
         };
 
+        // Mini Golf Strategy functions
+        const API_BASE = 'http://localhost:8000/api/v1';
+
+        async function generateGolfStrategy() {
+            const resultDiv = document.getElementById('golfStrategyResult');
+            resultDiv.innerHTML = '<div class="alert alert-info">🤖 Generating AI strategy...</div>';
+            resultDiv.style.display = 'block';
+
+            try {
+                const response = await fetch(`${API_BASE}/minigolfstrategy/core/strategy/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        course_id: "demo-course",
+                        hole_data: {
+                            par: 4,
+                            total_yardage: 420,
+                            fairway_width: 35,
+                            hazards: [
+                                {
+                                    start_distance: 240,
+                                    end_distance: 270,
+                                    penalty_strokes: 1.0,
+                                    hazard_type: "water"
+                                }
+                            ],
+                            green_size: 5000
+                        },
+                        conditions: {
+                            wind_speed: -8,
+                            wind_direction: 0,
+                            temperature: 72,
+                            humidity: 60,
+                            course_firmness: 0.6
+                        },
+                        player_bag: [
+                            { name: "Driver", carry_distance: 250, roll_distance: 22, accuracy_sigma: 20, loft_angle: 10 },
+                            { name: "3W", carry_distance: 235, roll_distance: 15, accuracy_sigma: 18, loft_angle: 15 },
+                            { name: "5i", carry_distance: 180, roll_distance: 6, accuracy_sigma: 12, loft_angle: 25 },
+                            { name: "7i", carry_distance: 160, roll_distance: 4, accuracy_sigma: 10, loft_angle: 35 },
+                            { name: "9i", carry_distance: 140, roll_distance: 2, accuracy_sigma: 8, loft_angle: 45 }
+                        ]
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayGolfStrategyResult(data.strategy);
+                } else {
+                    resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.error || 'Failed to generate strategy'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+            }
+        }
+
+        function displayGolfStrategyResult(strategy) {
+            const resultDiv = document.getElementById('golfStrategyResult');
+            const recommended = strategy.recommended_strategy;
+            
+            resultDiv.innerHTML = `
+                <div class="card" style="border-left: 4px solid #3498db;">
+                    <div class="card-body">
+                        <h5 class="card-title">🎯 Recommended Strategy</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-2"><strong>Club:</strong> ${recommended.club}</div>
+                                <div class="mb-2"><strong>Expected Strokes:</strong> ${recommended.expected_strokes}</div>
+                                <div class="mb-2"><strong>Confidence:</strong> ${(recommended.confidence_score * 100).toFixed(1)}%</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-2"><strong>Risk Level:</strong> <span style="color: ${recommended.risk_level === 'low' ? '#27ae60' : recommended.risk_level === 'medium' ? '#f39c12' : '#e74c3c'}">${recommended.risk_level.toUpperCase()}</span></div>
+                                <div class="mb-2"><strong>Hazard Probability:</strong> ${(recommended.hazard_probability * 100).toFixed(1)}%</div>
+                                <div class="mb-2"><strong>Remaining Distance:</strong> ${recommended.remaining_distance} yards</div>
+                            </div>
+                        </div>
+                        
+                        <h6 class="mt-3 mb-2">All Club Options</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Club</th>
+                                        <th>Expected Strokes</th>
+                                        <th>Confidence</th>
+                                        <th>Risk</th>
+                                        <th>Hazard Prob</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${strategy.all_strategies.map(s => `
+                                        <tr style="${s.club === recommended.club ? 'background-color: #e8f5e8;' : ''}">
+                                            <td><strong>${s.club}</strong></td>
+                                            <td>${s.expected_strokes}</td>
+                                            <td>${(s.confidence_score * 100).toFixed(1)}%</td>
+                                            <td><span style="color: ${s.risk_level === 'low' ? '#27ae60' : s.risk_level === 'medium' ? '#f39c12' : '#e74c3c'}">${s.risk_level.toUpperCase()}</span></td>
+                                            <td>${(s.hazard_probability * 100).toFixed(1)}%</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function searchGolfCourses() {
+            const resultDiv = document.getElementById('golfCourseResults');
+            const query = document.getElementById('golfCourseQuery').value;
+            
+            resultDiv.innerHTML = '<div class="alert alert-info">🔍 Searching courses...</div>';
+            resultDiv.style.display = 'block';
+
+            try {
+                const response = await fetch(`${API_BASE}/minigolfstrategy/core/courses/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        limit: 10
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayGolfCourseResults(data.courses);
+                } else {
+                    resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.error || 'Failed to search courses'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+            }
+        }
+
+        function displayGolfCourseResults(courses) {
+            const resultDiv = document.getElementById('golfCourseResults');
+            
+            if (courses.length === 0) {
+                resultDiv.innerHTML = '<div class="alert alert-warning">No courses found. Try a different search term.</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = `
+                <h6 class="mb-3">🏌️ Found ${courses.length} Courses</h6>
+                ${courses.map(course => `
+                    <div class="card mb-2" style="border-left: 4px solid #27ae60;">
+                        <div class="card-body py-2">
+                            <h6 class="card-title mb-1">${course.name}</h6>
+                            <p class="card-text mb-1 text-muted small">${course.location || 'Unknown'} ${course.country ? `(${course.country})` : ''}</p>
+                            <p class="card-text mb-0 small">Par: ${course.par || 'Unknown'} | Yardage: ${course.yardage || 'Unknown'} ${course.slope_rating ? `| Slope: ${course.slope_rating}` : ''}</p>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        function showComingSoon() {
+            alert('🚧 This feature is coming soon! Stay tuned for updates.');
+        }
+
+        // Golf Factor Analysis functions
+        let selectedCourseId = null;
+        let currentAnalysis = null;
+        let recommendationsLoaded = false;
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set default date to today
+            const today = new Date().toISOString().split('T')[0];
+            const targetDateInput = document.getElementById('targetDate');
+            if (targetDateInput) {
+                targetDateInput.value = today;
+            }
+            
+            // Add event listener for Mini Golf Strategy tab
+            const minigolfTab = document.getElementById('minigolf-strategy-tab');
+            if (minigolfTab) {
+                minigolfTab.addEventListener('click', function() {
+                    // Load recommendations only when tab is clicked and not already loaded
+                    if (!recommendationsLoaded) {
+                        setTimeout(() => {
+                            loadTopRecommendations();
+                        }, 100); // Small delay to ensure tab content is visible
+                    }
+                });
+            }
+        });
+
+        // Search courses function
+        async function searchCourses() {
+            const query = document.getElementById('searchQuery').value.trim();
+            const state = document.getElementById('stateFilter').value;
+            
+            if (!query) {
+                showError('Please enter a search term');
+                return;
+            }
+
+            showLoading('searchLoading');
+            startLoadingTimer('searchLoading', 'course search', 20);
+            hideMessages();
+
+            try {
+                const params = new URLSearchParams({
+                    query: query,
+                    limit: '25'
+                });
+                
+                if (state) {
+                    params.append('state', state);
+                }
+
+                const response = await fetch(`${API_BASE}/minigolfstrategy/factor-analysis/courses/search?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displaySearchResults(data.courses);
+                showSuccess(`Found ${data.courses.length} courses`);
+                
+            } catch (error) {
+                console.error('Search error:', error);
+                showError(`Search failed: ${error.message}`);
+            } finally {
+                stopLoadingTimer('searchLoading');
+                setTimeout(() => {
+                    hideLoading('searchLoading');
+                }, 500); // Small delay to show completion
+            }
+        }
+
+        // Display search results
+        function displaySearchResults(courses) {
+            const container = document.getElementById('courseList');
+            const resultsDiv = document.getElementById('searchResults');
+            
+            if (courses.length === 0) {
+                container.innerHTML = '<p class="text-muted">No courses found. Try a different search term.</p>';
+            } else {
+                container.innerHTML = courses.map(course => `
+                    <div class="card mb-2" onclick="selectCourse('${course.id}', '${course.name}', '${course.club_name}')" style="border-left: 5px solid #7fb069; transition: all 0.3s ease; cursor: pointer;">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h6 class="card-title mb-1">${course.name}</h6>
+                                    <p class="card-text text-muted mb-0">
+                                        <i class="fas fa-building me-1"></i>${course.club_name}
+                                        <br>
+                                        <i class="fas fa-map-marker-alt me-1"></i>${course.location.city}, ${course.location.state}
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-md-end">
+                                    <button class="btn btn-outline-primary btn-sm" style="border: 2px solid #2c5530; color: #2c5530; border-radius: 25px;">
+                                        <i class="fas fa-chart-line me-1"></i>Analyze
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            resultsDiv.style.display = 'block';
+        }
+
+        // Select course for analysis
+        async function selectCourse(courseId, courseName, clubName) {
+            selectedCourseId = courseId;
+            document.getElementById('selectedCourseName').innerHTML = 
+                `<i class="fas fa-golf-ball-tee me-2"></i>${courseName}`;
+            
+            const targetDate = document.getElementById('targetDate').value;
+            await analyzeCourse(courseId, targetDate);
+        }
+
+        // Analyze course timing
+        async function analyzeCourse(courseId, targetDate) {
+            showLoading('searchLoading');
+            startLoadingTimer('searchLoading', 'timing analysis', 30);
+            hideMessages();
+
+            try {
+                const params = new URLSearchParams();
+                if (targetDate) {
+                    params.append('target_date', targetDate);
+                }
+
+                const response = await fetch(`${API_BASE}/minigolfstrategy/factor-analysis/courses/${courseId}/timing-analysis?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const analysis = await response.json();
+                currentAnalysis = analysis;
+                displayAnalysis(analysis);
+                document.getElementById('courseAnalysis').style.display = 'block';
+                scrollToElement('courseAnalysis');
+                
+            } catch (error) {
+                console.error('Analysis error:', error);
+                showError(`Analysis failed: ${error.message}`);
+            } finally {
+                stopLoadingTimer('searchLoading');
+                setTimeout(() => {
+                    hideLoading('searchLoading');
+                }, 500); // Small delay to show completion
+            }
+        }
+
+        // Display analysis results
+        function displayAnalysis(analysis) {
+            // Display factor analysis
+            const factorContainer = document.getElementById('factorAnalysis');
+            const scores = analysis.scores;
+            
+            factorContainer.innerHTML = `
+                <div class="factor-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin: 0.5rem 0; background: #f8f9fa; border-radius: 10px;">
+                    <div class="factor-name" style="font-weight: 600; color: #2d3436;">
+                        <i class="fas fa-thermometer-half me-2"></i>Weather Conditions
+                    </div>
+                    <div class="factor-score ${getScoreClass(scores.weather)}" style="font-weight: 700; font-size: 1.1rem;">${scores.weather}/100</div>
+                </div>
+                <div class="factor-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin: 0.5rem 0; background: #f8f9fa; border-radius: 10px;">
+                    <div class="factor-name" style="font-weight: 600; color: #2d3436;">
+                        <i class="fas fa-calendar-alt me-2"></i>Seasonal Timing
+                    </div>
+                    <div class="factor-score ${getScoreClass(scores.seasonal)}" style="font-weight: 700; font-size: 1.1rem;">${scores.seasonal}/100</div>
+                </div>
+                <div class="factor-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin: 0.5rem 0; background: #f8f9fa; border-radius: 10px;">
+                    <div class="factor-name" style="font-weight: 600; color: #2d3436;">
+                        <i class="fas fa-users me-2"></i>Crowd Level
+                    </div>
+                    <div class="factor-score ${getScoreClass(scores.crowd)}" style="font-weight: 700; font-size: 1.1rem;">${scores.crowd}/100</div>
+                </div>
+                <div class="factor-item" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin: 0.5rem 0; background: #f8f9fa; border-radius: 10px;">
+                    <div class="factor-name" style="font-weight: 600; color: #2d3436;">
+                        <i class="fas fa-golf-ball-tee me-2"></i>Course Condition
+                    </div>
+                    <div class="factor-score ${getScoreClass(scores.course_condition)}" style="font-weight: 700; font-size: 1.1rem;">${scores.course_condition}/100</div>
+                </div>
+            `;
+
+            // Display weather information
+            const weatherContainer = document.getElementById('weatherInfo');
+            const weather = analysis.weather_data;
+            
+            weatherContainer.innerHTML = `
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-thermometer-half" style="font-size: 2rem; margin-right: 1rem; color: #007bff;"></i>
+                        <div><strong>${weather.temperature}°F</strong></div>
+                        <small class="text-muted">Temperature</small>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-tint" style="font-size: 2rem; margin-right: 1rem; color: #17a2b8;"></i>
+                        <div><strong>${weather.humidity}%</strong></div>
+                        <small class="text-muted">Humidity</small>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-wind" style="font-size: 2rem; margin-right: 1rem; color: #ffc107;"></i>
+                        <div><strong>${weather.wind_speed} mph</strong></div>
+                        <small class="text-muted">Wind Speed</small>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-cloud" style="font-size: 2rem; margin-right: 1rem; color: #6c757d;"></i>
+                        <div><strong>${weather.conditions}</strong></div>
+                        <small class="text-muted">Conditions</small>
+                    </div>
+                </div>
+            `;
+
+            // Display AI recommendation
+            document.getElementById('aiRecommendation').textContent = analysis.recommendation;
+
+            // Display timing grade and overall score
+            const overallScore = scores.overall;
+            const grade = analysis.timing_grade;
+            
+            document.getElementById('timingGrade').textContent = grade;
+            document.getElementById('timingGrade').className = `timing-grade grade-${grade.charAt(0).toLowerCase()}`;
+            document.getElementById('overallScore').textContent = `${overallScore}/100`;
+            document.getElementById('overallScore').className = `score-badge ${getScoreClass(overallScore)}`;
+            
+            // Grade explanation
+            const explanations = {
+                'A+': 'Excellent timing! Perfect conditions for golf.',
+                'A': 'Great timing! Very good conditions.',
+                'A-': 'Good timing! Favorable conditions.',
+                'B+': 'Decent timing. Good conditions overall.',
+                'B': 'Fair timing. Average conditions.',
+                'B-': 'Okay timing. Some factors could be better.',
+                'C+': 'Below average timing. Consider waiting.',
+                'C': 'Poor timing. Not ideal conditions.',
+                'C-': 'Bad timing. Wait for better conditions.',
+                'D': 'Very poor timing. Avoid this time.'
+            };
+            
+            document.getElementById('gradeExplanation').textContent = explanations[grade] || 'Timing analysis complete.';
+        }
+
+        // Get score CSS class
+        function getScoreClass(score) {
+            if (score >= 85) return 'score-excellent';
+            if (score >= 70) return 'score-good';
+            if (score >= 55) return 'score-fair';
+            return 'score-poor';
+        }
+
+        // Load top recommendations
+        async function loadTopRecommendations() {
+            // Prevent multiple simultaneous calls
+            if (recommendationsLoaded) {
+                return;
+            }
+            
+            const loadingDiv = document.getElementById('recommendationsLoading');
+            if (loadingDiv) {
+                loadingDiv.style.display = 'block';
+                startLoadingTimer('recommendationsLoading', 'recommendations analysis', 45);
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/minigolfstrategy/factor-analysis/courses/top-recommendations?limit=5`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayRecommendations(data.recommendations);
+                recommendationsLoaded = true; // Mark as loaded
+                
+            } catch (error) {
+                console.error('Recommendations error:', error);
+                const container = document.getElementById('recommendationsList');
+                if (container) {
+                    container.innerHTML = '<p class="text-muted">Unable to load recommendations at this time.</p>';
+                }
+            } finally {
+                if (loadingDiv) {
+                    stopLoadingTimer('recommendationsLoading');
+                    setTimeout(() => {
+                        loadingDiv.style.display = 'none';
+                    }, 500); // Small delay to show completion
+                }
+            }
+        }
+
+        // Display recommendations
+        function displayRecommendations(recommendations) {
+            const container = document.getElementById('recommendationsList');
+            
+            if (!container) return;
+            
+            if (recommendations.length === 0) {
+                container.innerHTML = '<p class="text-muted">No recommendations available at this time.</p>';
+                return;
+            }
+
+            container.innerHTML = recommendations.map((rec, index) => `
+                <div class="card mb-3" onclick="selectCourse('${rec.course_id}', '${rec.course_name}', '${rec.club_name}')" style="border-left: 5px solid #7fb069; transition: all 0.3s ease; cursor: pointer;">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-1">
+                                <div class="badge bg-primary rounded-circle" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                    ${index + 1}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="card-title mb-1">${rec.course_name}</h6>
+                                <p class="card-text text-muted mb-0">
+                                    <i class="fas fa-building me-1"></i>${rec.club_name}
+                                    <br>
+                                    <i class="fas fa-map-marker-alt me-1"></i>${rec.location.city}, ${rec.location.state}
+                                </p>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="score-badge ${getScoreClass(rec.overall_score)}" style="display: inline-block; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 700; font-size: 1.1rem;">${rec.overall_score}/100</div>
+                                    <div class="timing-grade grade-${rec.timing_grade.charAt(0).toLowerCase()}" style="font-size: 1.5rem; font-weight: 900; margin: 0.5rem 0;">${rec.timing_grade}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-2 text-md-end">
+                                <button class="btn btn-outline-primary btn-sm" style="border: 2px solid #2c5530; color: #2c5530; border-radius: 25px;">
+                                    <i class="fas fa-chart-line me-1"></i>Analyze
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">${rec.recommendation}</small>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Get weather forecast
+        async function getWeatherForecast() {
+            if (!selectedCourseId) {
+                showError('Please select a course first');
+                return;
+            }
+
+            showLoading('searchLoading');
+            startLoadingTimer('searchLoading', 'weather forecast', 25);
+            
+            try {
+                const response = await fetch(`${API_BASE}/minigolfstrategy/factor-analysis/courses/${selectedCourseId}/forecast?days=5`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayForecast(data.forecast);
+                document.getElementById('weatherForecast').style.display = 'block';
+                scrollToElement('weatherForecast');
+                
+            } catch (error) {
+                console.error('Forecast error:', error);
+                showError(`Forecast failed: ${error.message}`);
+            } finally {
+                stopLoadingTimer('searchLoading');
+                setTimeout(() => {
+                    hideLoading('searchLoading');
+                }, 500); // Small delay to show completion
+            }
+        }
+
+        // Display weather forecast
+        function displayForecast(forecast) {
+            const container = document.getElementById('forecastContainer');
+            
+            container.innerHTML = forecast.map(day => `
+                <div class="col-md-2">
+                    <div class="forecast-item" style="background: white; border-radius: 10px; padding: 1rem; margin: 0.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.05); transition: all 0.3s ease;">
+                        <div class="text-center">
+                            <div class="fw-bold">${day.date}</div>
+                            <div class="text-muted small">${day.time}</div>
+                            <div class="mt-2">
+                                <i class="fas fa-thermometer-half text-primary"></i>
+                                <div class="fw-bold">${day.temperature}°F</div>
+                            </div>
+                            <div class="mt-1">
+                                <i class="fas fa-wind text-warning"></i>
+                                <div class="small">${day.wind_speed} mph</div>
+                            </div>
+                            <div class="mt-1">
+                                <i class="fas fa-tint text-info"></i>
+                                <div class="small">${day.humidity}%</div>
+                            </div>
+                            <div class="mt-2">
+                                <div class="score-badge ${getScoreClass(day.weather_score)}" style="display: inline-block; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 700; font-size: 1.1rem;">${day.weather_score}</div>
+                            </div>
+                            <div class="mt-1 small text-muted">${day.conditions}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Analyze different date
+        function analyzeDifferentDate() {
+            if (!selectedCourseId) {
+                showError('Please select a course first');
+                return;
+            }
+
+            const newDate = prompt('Enter new date (YYYY-MM-DD):', document.getElementById('targetDate').value);
+            if (newDate) {
+                document.getElementById('targetDate').value = newDate;
+                analyzeCourse(selectedCourseId, newDate);
+            }
+        }
+
+        // Share analysis
+        function shareAnalysis() {
+            if (!currentAnalysis) {
+                showError('No analysis to share');
+                return;
+            }
+
+            const text = `Golf Factor Analysis for ${currentAnalysis.course_name}:
+Overall Score: ${currentAnalysis.scores.overall}/100
+Timing Grade: ${currentAnalysis.timing_grade}
+Weather: ${currentAnalysis.weather_data.temperature}°F, ${currentAnalysis.weather_data.conditions}
+Recommendation: ${currentAnalysis.recommendation}`;
+
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Golf Factor Analysis',
+                    text: text
+                });
+            } else {
+                navigator.clipboard.writeText(text).then(() => {
+                    showSuccess('Analysis copied to clipboard!');
+                });
+            }
+        }
+
+        // Utility functions
+        function showLoading(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.style.display = 'block';
+            }
+        }
+
+        function hideLoading(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.style.display = 'none';
+            }
+        }
+
+        // Loading timer management
+        const loadingTimers = {};
+
+        function startLoadingTimer(elementId, operationType = 'operation', timeoutSeconds = 30) {
+            const startTime = Date.now();
+            const progressBar = document.getElementById(elementId.replace('Loading', 'Progress'));
+            const timerElement = document.getElementById(elementId.replace('Loading', 'Timer'));
+            const loadingText = document.getElementById(elementId.replace('Loading', 'LoadingText'));
+            
+            if (!progressBar || !timerElement) return;
+
+            // Reset progress
+            progressBar.style.width = '0%';
+            progressBar.classList.add('progress-bar-animated');
+            
+            // Update timer every 100ms
+            const timerInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const seconds = Math.floor(elapsed / 1000);
+                const milliseconds = Math.floor((elapsed % 1000) / 100);
+                
+                // Check for timeout
+                if (seconds >= timeoutSeconds) {
+                    timerElement.textContent = `Timeout after ${timeoutSeconds}s - Please try again`;
+                    progressBar.style.background = 'linear-gradient(45deg, #dc3545, #c82333)';
+                    loadingText.textContent = 'Operation timed out';
+                    return;
+                }
+                
+                // Update progress bar (simulate progress)
+                const progress = Math.min(90, (elapsed / 1000) * 15); // 15% per second, max 90%
+                progressBar.style.width = `${progress}%`;
+                
+                // Update timer text with different phases
+                if (seconds < 1) {
+                    timerElement.textContent = 'Initializing...';
+                } else if (seconds < 3) {
+                    timerElement.textContent = `Analyzing data... (${seconds}.${milliseconds}s)`;
+                } else if (seconds < 6) {
+                    timerElement.textContent = `Processing recommendations... (${seconds}.${milliseconds}s)`;
+                } else if (seconds < 10) {
+                    timerElement.textContent = `Finalizing results... (${seconds}.${milliseconds}s)`;
+                } else if (seconds < 20) {
+                    timerElement.textContent = `Taking longer than expected... (${seconds}.${milliseconds}s)`;
+                } else {
+                    timerElement.textContent = `Still processing... (${seconds}.${milliseconds}s) - ${timeoutSeconds - seconds}s remaining`;
+                }
+                
+                // Update loading text based on operation and time
+                if (loadingText) {
+                    if (seconds < 2) {
+                        loadingText.textContent = `Starting ${operationType}...`;
+                    } else if (seconds < 5) {
+                        loadingText.textContent = `Processing ${operationType}...`;
+                    } else if (seconds < 15) {
+                        loadingText.textContent = `Finalizing ${operationType}...`;
+                    } else {
+                        loadingText.textContent = `Complex analysis in progress...`;
+                    }
+                }
+            }, 100);
+            
+            // Store timer for cleanup
+            loadingTimers[elementId] = timerInterval;
+            
+            return timerInterval;
+        }
+
+        function stopLoadingTimer(elementId) {
+            const progressBar = document.getElementById(elementId.replace('Loading', 'Progress'));
+            const timerElement = document.getElementById(elementId.replace('Loading', 'Timer'));
+            
+            // Clear interval
+            if (loadingTimers[elementId]) {
+                clearInterval(loadingTimers[elementId]);
+                delete loadingTimers[elementId];
+            }
+            
+            // Complete progress bar
+            if (progressBar) {
+                progressBar.style.width = '100%';
+                progressBar.classList.remove('progress-bar-animated');
+            }
+            
+            // Update timer text
+            if (timerElement) {
+                timerElement.textContent = 'Complete!';
+            }
+        }
+
+        function resetLoadingTimer(elementId) {
+            const progressBar = document.getElementById(elementId.replace('Loading', 'Progress'));
+            const timerElement = document.getElementById(elementId.replace('Loading', 'Timer'));
+            
+            // Clear any existing timer
+            if (loadingTimers[elementId]) {
+                clearInterval(loadingTimers[elementId]);
+                delete loadingTimers[elementId];
+            }
+            
+            // Reset progress bar
+            if (progressBar) {
+                progressBar.style.width = '0%';
+                progressBar.classList.add('progress-bar-animated');
+            }
+            
+            // Reset timer text
+            if (timerElement) {
+                timerElement.textContent = 'Starting...';
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+                setTimeout(() => errorDiv.style.display = 'none', 5000);
+            }
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMessage');
+            if (successDiv) {
+                successDiv.textContent = message;
+                successDiv.style.display = 'block';
+                setTimeout(() => successDiv.style.display = 'none', 3000);
+            }
+        }
+
+        function hideMessages() {
+            const errorDiv = document.getElementById('errorMessage');
+            const successDiv = document.getElementById('successMessage');
+            if (errorDiv) errorDiv.style.display = 'none';
+            if (successDiv) successDiv.style.display = 'none';
+        }
+
+        function scrollToElement(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
     </script>
 </body>
+</html> 
 </html> 
