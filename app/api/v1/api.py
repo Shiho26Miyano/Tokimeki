@@ -13,8 +13,8 @@ from .endpoints.futureexploratorium import (
 from .endpoints.futureexploratorium.event_analysis import router as event_analysis_router
 from .endpoints.minigolfstrategy import (
     core_router as minigolf_core_router,
-    strategy as minigolf_strategy,
-    courses as minigolf_courses,
+    courses_router as minigolf_courses,
+    strategy_router as minigolf_strategy,
     factor_analysis_router
 )
 from .endpoints import quantitative_analysis, websocket
@@ -48,8 +48,8 @@ api_router.include_router(event_analysis_router, prefix="/futureexploratorium/ev
 
 # Include Mini Golf Strategy endpoints
 api_router.include_router(minigolf_core_router, prefix="/minigolfstrategy/core", tags=["minigolfstrategy_core"])
-api_router.include_router(minigolf_strategy.router, prefix="/minigolfstrategy", tags=["minigolfstrategy_strategy"])
-api_router.include_router(minigolf_courses.router, prefix="/minigolfstrategy", tags=["minigolfstrategy_courses"])
+api_router.include_router(minigolf_strategy, prefix="/minigolfstrategy", tags=["minigolfstrategy_strategy"])
+api_router.include_router(minigolf_courses, prefix="/minigolfstrategy", tags=["minigolfstrategy_courses"])
 api_router.include_router(factor_analysis_router, prefix="/minigolfstrategy/factor-analysis", tags=["minigolfstrategy_factor_analysis"])
 
 # Include Quantitative Analysis endpoints

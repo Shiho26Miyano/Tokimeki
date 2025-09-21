@@ -4,7 +4,6 @@ External API integration for golf course data
 """
 import httpx
 import logging
-import asyncio
 import time
 import hashlib
 from typing import Dict, List, Optional, Any
@@ -13,50 +12,15 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 class GolfCourseAPIClient:
-    """Client for external golf course API with rate limiting and retry logic"""
+    """Client for external golf course API"""
     
     def __init__(self):
         self.base_url = settings.golfcourse_api_base
         self.api_key = settings.golfcourse_api_key or ''
-        self.timeout = 20.0
-        self.rate_limit_delay = 2.0  # 2 seconds between requests (conservative)
-        self.max_retries = 5  # More retries for rate limits
-        self.retry_delay = 10.0  # 10 seconds between retries
-        self.last_request_time = 0
+        self.timeout = 30.0  # Increased timeout for better reliability
         self.cache = {}  # Simple in-memory cache
         self.cache_ttl = 3600  # 1 hour cache TTL
-        self.request_count = 0  # Track requests made
-        self.daily_reset_time = time.time()  # Track when to reset daily count
     
-    async def _rate_limit(self):
-        """Ensure we don't exceed rate limits"""
-        current_time = time.time()
-        
-        # Reset daily counter if it's been more than 24 hours
-        if current_time - self.daily_reset_time > 86400:  # 24 hours
-            self.request_count = 0
-            self.daily_reset_time = current_time
-            logger.info("Daily request counter reset")
-        
-        # Check if we're approaching daily limit (conservative: 8000 out of 10000)
-        if self.request_count >= 8000:
-            logger.warning(f"Approaching daily limit: {self.request_count}/10000 requests used")
-            # Wait until next day
-            wait_time = 86400 - (current_time - self.daily_reset_time)
-            if wait_time > 0:
-                logger.warning(f"Daily limit reached. Waiting {wait_time/3600:.1f} hours until reset")
-                await asyncio.sleep(min(wait_time, 3600))  # Max 1 hour wait
-                return
-        
-        # Standard rate limiting between requests
-        time_since_last = current_time - self.last_request_time
-        if time_since_last < self.rate_limit_delay:
-            sleep_time = self.rate_limit_delay - time_since_last
-            logger.info(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
-            await asyncio.sleep(sleep_time)
-        
-        self.last_request_time = time.time()
-        self.request_count += 1
     
     def _get_cache_key(self, endpoint: str, params: Dict[str, Any]) -> str:
         """Generate cache key for request"""
@@ -82,55 +46,45 @@ class GolfCourseAPIClient:
         self.cache[cache_key] = (data, time.time())
         logger.info(f"Cached data for key: {cache_key[:8]}...")
     
-    async def _make_request_with_retry(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
+    async def _make_request(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
         """Make API request with retry logic for rate limiting"""
-        for attempt in range(self.max_retries + 1):
+        import asyncio
+        
+        max_retries = 3
+        base_delay = 1.0
+        
+        for attempt in range(max_retries):
             try:
-                # Apply rate limiting
-                await self._rate_limit()
-                
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
                     if method.upper() == "GET":
                         response = await client.get(url, **kwargs)
                     else:
                         response = await client.request(method, url, **kwargs)
                     
-                    # Handle rate limiting specifically
-                    if response.status_code == 429:
-                        if attempt < self.max_retries:
-                            # Progressive backoff: 10s, 30s, 60s, 120s, 300s
-                            wait_time = min(self.retry_delay * (3 ** attempt), 300)
-                            logger.warning(f"Rate limited (429). Retrying in {wait_time} seconds... (attempt {attempt + 1}/{self.max_retries + 1})")
-                            logger.warning(f"Daily usage: {self.request_count}/10000 requests")
-                            await asyncio.sleep(wait_time)
-                            continue
-                        else:
-                            return {"error": "Rate limit exceeded after multiple retries. Please wait before making more requests."}
-                    
                     response.raise_for_status()
                     return response.json()
                     
             except httpx.HTTPError as e:
                 if e.response and e.response.status_code == 429:
-                    if attempt < self.max_retries:
-                        wait_time = min(self.retry_delay * (3 ** attempt), 300)
-                        logger.warning(f"Rate limited (429). Retrying in {wait_time} seconds... (attempt {attempt + 1}/{self.max_retries + 1})")
-                        logger.warning(f"Daily usage: {self.request_count}/10000 requests")
-                        await asyncio.sleep(wait_time)
+                    if attempt < max_retries - 1:
+                        # Exponential backoff for rate limiting
+                        delay = base_delay * (2 ** attempt)
+                        logger.warning(f"Rate limited, retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(delay)
                         continue
                     else:
-                        return {"error": "Rate limit exceeded after multiple retries. Please wait before making more requests."}
+                        logger.error(f"Rate limit exceeded after {max_retries} attempts")
+                        return {
+                            "error": "GolfCourse API rate limit exceeded. Please try again in a few minutes.",
+                            "retry_after": 300,  # 5 minutes
+                            "status_code": 429
+                        }
                 else:
                     logger.error(f"HTTP error: {str(e)}")
-                    if attempt == self.max_retries:
-                        return {"error": f"API request failed after {self.max_retries + 1} attempts: {str(e)}"}
-                    await asyncio.sleep(self.retry_delay)
-                    
+                    return {"error": f"API request failed: {str(e)}"}
             except Exception as e:
                 logger.error(f"Unexpected error: {str(e)}")
-                if attempt == self.max_retries:
-                    return {"error": f"Unexpected error after {self.max_retries + 1} attempts: {str(e)}"}
-                await asyncio.sleep(self.retry_delay)
+                return {"error": f"Unexpected error: {str(e)}"}
         
         return {"error": "Max retries exceeded"}
     
@@ -157,7 +111,7 @@ class GolfCourseAPIClient:
             if self.api_key:
                 headers["Authorization"] = f"Key {self.api_key}"
             
-            result = await self._make_request_with_retry(
+            result = await self._make_request(
                 "GET",
                 f"{self.base_url}/v1/search",
                 headers=headers,
@@ -165,7 +119,7 @@ class GolfCourseAPIClient:
             )
             
             # Handle authentication errors specifically
-            if "error" in result and "Rate limit exceeded" not in result["error"]:
+            if "error" in result:
                 if "401" in result["error"] or "authentication" in result["error"].lower():
                     return {"error": "GolfCourseAPI authentication failed. Please check your API key or register at https://www.golfcourseapi.com/sign-in"}
             
@@ -190,7 +144,7 @@ class GolfCourseAPIClient:
             if self.api_key:
                 headers["Authorization"] = f"Key {self.api_key}"
             
-            result = await self._make_request_with_retry(
+            result = await self._make_request(
                 "GET",
                 f"{self.base_url}/v1/courses/{course_id}",
                 headers=headers,
@@ -198,7 +152,7 @@ class GolfCourseAPIClient:
             )
             
             # Handle authentication errors specifically
-            if "error" in result and "Rate limit exceeded" not in result["error"]:
+            if "error" in result:
                 if "401" in result["error"] or "authentication" in result["error"].lower():
                     return {"error": "GolfCourseAPI authentication failed. Please check your API key or register at https://www.golfcourseapi.com/sign-in"}
             
@@ -223,7 +177,7 @@ class GolfCourseAPIClient:
                 "radius": radius
             }
             
-            result = await self._make_request_with_retry(
+            result = await self._make_request(
                 "GET",
                 f"{self.base_url}/v1/courses/nearby",
                 headers=headers,
@@ -231,7 +185,7 @@ class GolfCourseAPIClient:
             )
             
             # Handle authentication errors specifically
-            if "error" in result and "Rate limit exceeded" not in result["error"]:
+            if "error" in result:
                 if "401" in result["error"] or "authentication" in result["error"].lower():
                     return {"error": "GolfCourseAPI authentication failed. Please check your API key or register at https://www.golfcourseapi.com/sign-in"}
             
@@ -241,27 +195,12 @@ class GolfCourseAPIClient:
             logger.error(f"Error getting nearby courses: {str(e)}")
             return {"error": f"Unexpected error: {str(e)}"}
     
-    def get_usage_stats(self) -> Dict[str, Any]:
-        """Get current usage statistics"""
-        current_time = time.time()
-        time_since_reset = current_time - self.daily_reset_time
-        hours_until_reset = max(0, (86400 - time_since_reset) / 3600)
-        
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get current cache statistics"""
         return {
-            "requests_made": self.request_count,
-            "daily_limit": 10000,
-            "usage_percentage": (self.request_count / 10000) * 100,
-            "hours_until_reset": hours_until_reset,
-            "last_request_time": self.last_request_time,
-            "cache_size": len(self.cache)
+            "cache_size": len(self.cache),
+            "cache_ttl": self.cache_ttl
         }
-    
-    async def wait_for_rate_limit_reset(self) -> None:
-        """Wait for rate limit to reset (useful for testing)"""
-        logger.info("Waiting for rate limit to reset...")
-        # Wait 1 hour to be safe
-        await asyncio.sleep(3600)
-        logger.info("Rate limit reset wait completed")
 
 # Global client instance
 golf_course_client = GolfCourseAPIClient()
