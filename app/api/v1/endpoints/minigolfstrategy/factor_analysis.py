@@ -138,33 +138,83 @@ async def get_top_recommendations(
         if not courses:
             return {"recommendations": [], "message": "No courses found"}
         
-        # Analyze each course
-        recommendations = []
-        for course in courses[:10]:  # Limit to first 10 for analysis
+        # Process courses in parallel with timeout handling
+        import asyncio
+        from concurrent.futures import as_completed
+        
+        async def analyze_single_course(course):
+            """Analyze a single course with timeout and error handling"""
             try:
-                logger.info(f"Analyzing course {course['id']}: {course.get('name', 'Unknown')}")
-                course_data = await golf_course_client.get_course_details(course["id"])
-                if "error" not in course_data:
-                    logger.info(f"Course data retrieved for {course['id']}")
-                    analysis = await golf_factor_analyzer.analyze_course_timing(course_data)
-                    logger.info(f"Analysis completed for {course['id']}, overall score: {analysis.get('scores', {}).get('overall', 'N/A')}")
-                    recommendations.append({
-                        "course_id": course["id"],
-                        "course_name": course.get("course_name"),
-                        "club_name": course.get("club_name"),
-                        "location": course.get("location", {}),
-                        "overall_score": analysis["scores"]["overall"],
-                        "timing_grade": analysis["timing_grade"],
-                        "recommendation": analysis["recommendation"],
-                        "scores": analysis["scores"],
-                        "weather_data": analysis["weather_data"],
-                        "factors": analysis.get("factors", {})
-                    })
-                else:
-                    logger.warning(f"Error in course data for {course['id']}: {course_data.get('error')}")
+                course_id = course["id"]
+                course_name = course.get("name", "Unknown")
+                
+                logger.info(f"Analyzing course {course_id}: {course_name}")
+                
+                # Get course details with timeout
+                course_data = await asyncio.wait_for(
+                    golf_course_client.get_course_details(course_id),
+                    timeout=15.0  # 15 second timeout for course details
+                )
+                
+                if "error" in course_data:
+                    logger.warning(f"Error in course data for {course_id}: {course_data.get('error')}")
+                    return None
+                
+                logger.info(f"Course data retrieved for {course_id}")
+                
+                # Analyze course timing with timeout
+                analysis = await asyncio.wait_for(
+                    golf_factor_analyzer.analyze_course_timing(course_data),
+                    timeout=30.0  # 30 second timeout for analysis
+                )
+                
+                logger.info(f"Analysis completed for {course_id}, overall score: {analysis.get('scores', {}).get('overall', 'N/A')}")
+                
+                return {
+                    "course_id": course_id,
+                    "course_name": course.get("course_name"),
+                    "club_name": course.get("club_name"),
+                    "location": course.get("location", {}),
+                    "overall_score": analysis["scores"]["overall"],
+                    "timing_grade": analysis["timing_grade"],
+                    "recommendation": analysis["recommendation"],
+                    "scores": analysis["scores"],
+                    "weather_data": analysis["weather_data"],
+                    "factors": analysis.get("factors", {})
+                }
+                
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout analyzing course {course.get('id', 'unknown')}")
+                return None
             except Exception as e:
-                logger.error(f"Error analyzing course {course['id']}: {e}", exc_info=True)
-                continue
+                logger.error(f"Error analyzing course {course.get('id', 'unknown')}: {e}", exc_info=True)
+                return None
+        
+        # Process courses in parallel (limit to 5 concurrent to avoid overwhelming APIs)
+        semaphore = asyncio.Semaphore(5)
+        
+        async def analyze_with_semaphore(course):
+            async with semaphore:
+                return await analyze_single_course(course)
+        
+        # Create tasks for parallel processing
+        tasks = [analyze_with_semaphore(course) for course in courses[:10]]  # Limit to first 10 for analysis
+        
+        # Wait for all tasks to complete with overall timeout
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=120.0  # 2 minute overall timeout
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Overall timeout reached for recommendations analysis")
+            results = []
+        
+        # Filter out None results and exceptions
+        recommendations = []
+        for result in results:
+            if result is not None and not isinstance(result, Exception):
+                recommendations.append(result)
         
         # Sort by overall score
         recommendations.sort(key=lambda x: x["overall_score"], reverse=True)
@@ -172,7 +222,8 @@ async def get_top_recommendations(
         return {
             "recommendations": recommendations[:limit],
             "analysis_date": datetime.now().isoformat(),
-            "state_filter": state
+            "state_filter": state,
+            "total_analyzed": len(recommendations)
         }
         
     except HTTPException:

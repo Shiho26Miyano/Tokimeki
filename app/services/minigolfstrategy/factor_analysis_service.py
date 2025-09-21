@@ -19,12 +19,11 @@ class WeatherService:
         self.openweather_api_key = settings.openweather_api_key
         self.current_weather_url = "https://api.openweathermap.org/data/2.5/weather"
         self.forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
-        self.onecall_url = "https://api.openweathermap.org/data/3.0/onecall"
     
     async def get_current_weather(self, lat: float, lon: float) -> Dict[str, Any]:
         """Get current weather conditions using Current Weather API"""
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(
                     self.current_weather_url,
                     params={
@@ -45,7 +44,7 @@ class WeatherService:
     async def get_forecast(self, lat: float, lon: float, days: int = 5) -> Dict[str, Any]:
         """Get weather forecast using 5-day forecast API"""
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(
                     self.forecast_url,
                     params={
@@ -64,28 +63,6 @@ class WeatherService:
             logger.error(f"Weather forecast error: {e}")
             return {}
     
-    async def get_onecall_weather(self, lat: float, lon: float) -> Dict[str, Any]:
-        """Get comprehensive weather data using One Call API 3.0"""
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    self.onecall_url,
-                    params={
-                        "lat": lat,
-                        "lon": lon,
-                        "appid": self.openweather_api_key,
-                        "units": "imperial",
-                        "exclude": "minutely"  # Exclude minutely data to save API calls
-                    }
-                )
-                response.raise_for_status()
-                onecall_data = response.json()
-                logger.info(f"OpenWeatherMap One Call API Response: {json.dumps(onecall_data, indent=2)}")
-                return onecall_data
-        except Exception as e:
-            logger.error(f"One Call Weather API error: {e}")
-            # Fallback to basic weather API
-            return await self.get_current_weather(lat, lon)
 
 class GolfCourseFactorAnalyzer:
     """AI-powered factor analysis for golf course timing decisions"""
@@ -382,6 +359,16 @@ class GolfCourseFactorAnalyzer:
             current_conditions = weather_data.get("weather", [{}])[0].get("description", "Unknown")
             uv_index = 0  # Not available in basic API
             visibility = weather_data.get("visibility", 0)
+            
+            # Create current data structure for consistency
+            current = {
+                "temp": current_temp,
+                "weather": [{"description": current_conditions}],
+                "humidity": current_humidity,
+                "wind_speed": current_wind_speed,
+                "uvi": uv_index,
+                "visibility": visibility
+            }
             
             # Set empty arrays for One Call API specific data
             hourly = []
@@ -778,6 +765,10 @@ class GolfCourseFactorAnalyzer:
     ) -> str:
         """Get AI-powered recommendation using OpenRouter"""
         try:
+            # Get clothing recommendations
+            weather_data = factors.get('weather_data', {})
+            clothing_rec = self._generate_clothing_recommendation(weather_data)
+            
             prompt = f"""
             You are a friendly golf course advisor. Give a warm, conversational recommendation for {course_name} based on these conditions:
             
@@ -792,9 +783,11 @@ class GolfCourseFactorAnalyzer:
             
             Write a friendly, encouraging recommendation in 2-3 sentences. Use conversational language like "you'll love", "perfect timing", "great conditions". 
             Be positive and helpful. Don't use technical jargon or scores in the response - just give practical advice about whether to play today.
+            
+            Then add a brief clothing/equipment tip based on the weather conditions. Keep it concise and practical, like "Don't forget your rain jacket" or "Perfect weather for shorts and a polo".
             """
             
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=20.0) as client:
                 response = await client.post(
                     self.openrouter_url,
                     headers={
@@ -819,8 +812,97 @@ class GolfCourseFactorAnalyzer:
                 
         except Exception as e:
             logger.error(f"AI recommendation error: {e}")
-            return self._generate_fallback_recommendation(factors)
+            # Get clothing recommendations for fallback
+            weather_data = factors.get('weather_data', {})
+            clothing_rec = self._generate_clothing_recommendation(weather_data)
+            fallback_rec = self._generate_fallback_recommendation(factors)
+            return f"{fallback_rec}\n\n{clothing_rec}"
     
+    def _generate_clothing_recommendation(self, weather_data: Dict[str, Any]) -> str:
+        """Generate specific clothing and equipment recommendations based on weather conditions"""
+        if not weather_data:
+            return "🌤️ Weather data unavailable - dress in layers and bring rain gear just in case!"
+        
+        # Extract weather data (handle both One Call API and basic API formats)
+        if "current" in weather_data:
+            current = weather_data.get("current", {})
+            temp = current.get("temp", 70)
+            conditions = current.get("weather", [{}])[0].get("main", "Clear")
+            wind_speed = current.get("wind_speed", 5)
+            humidity = current.get("humidity", 50)
+            uv_index = current.get("uvi", 0)
+        else:
+            temp = weather_data.get("main", {}).get("temp", 70)
+            conditions = weather_data.get("weather", [{}])[0].get("main", "Clear")
+            wind_speed = weather_data.get("wind", {}).get("speed", 5)
+            humidity = weather_data.get("main", {}).get("humidity", 50)
+            uv_index = 0
+        
+        # Convert temperature to more readable format
+        temp_f = round(temp)
+        
+        recommendations = []
+        
+        # Temperature-based specific clothing recommendations
+        if temp < 50:
+            recommendations.append(f"🥶 COLD WEATHER ({temp_f}°F): Thermal base layer + fleece + windproof jacket")
+            recommendations.append("👖 Wear thermal pants or golf pants with long underwear")
+            recommendations.append("🧤 Warm hat and golf gloves essential")
+            recommendations.append("👟 Waterproof, insulated golf shoes")
+        elif temp < 65:
+            recommendations.append(f"🧥 COOL WEATHER ({temp_f}°F): Light jacket or sweater over polo")
+            recommendations.append("👖 Long pants recommended over shorts")
+            recommendations.append("🧢 Light hat for warmth")
+            recommendations.append("👟 Regular golf shoes with good grip")
+        elif temp < 80:
+            recommendations.append(f"🌤️ PERFECT WEATHER ({temp_f}°F): Polo shirt + golf shorts/pants")
+            recommendations.append("👕 Light layers for temperature changes")
+            recommendations.append("🧢 Comfortable golf cap")
+            recommendations.append("👟 Standard golf shoes")
+        else:
+            recommendations.append(f"☀️ HOT WEATHER ({temp_f}°F): Moisture-wicking polo + shorts")
+            recommendations.append("👕 Light, breathable fabrics essential")
+            recommendations.append("🧢 Wide-brimmed hat for sun protection")
+            recommendations.append("👟 Breathable golf shoes")
+        
+        # Weather condition specific recommendations
+        if "Rain" in conditions or "Drizzle" in conditions:
+            recommendations.append("🌧️ RAIN GEAR: Waterproof jacket and pants mandatory")
+            recommendations.append("👟 Waterproof golf shoes or shoe covers")
+            recommendations.append("🎒 Waterproof golf bag cover")
+            recommendations.append("🧻 Extra towels and dry clothes in bag")
+        elif "Snow" in conditions:
+            recommendations.append("❄️ WINTER GEAR: Heavy winter jacket + snow pants")
+            recommendations.append("👟 Waterproof, insulated golf shoes")
+            recommendations.append("🧤 Warm gloves and thermal hat")
+            recommendations.append("🧥 Thermal base layers essential")
+        elif "Clear" in conditions and uv_index > 6:
+            recommendations.append("☀️ SUN PROTECTION: SPF 30+ sunscreen (reapply every 2 hours)")
+            recommendations.append("🧢 Wide-brimmed hat with good coverage")
+            recommendations.append("🕶️ UV-protective sunglasses")
+            recommendations.append("👕 Light, long-sleeved shirt for sun protection")
+        
+        # Wind specific recommendations
+        if wind_speed > 15:
+            recommendations.append(f"💨 WINDY ({wind_speed} mph): Windproof jacket to maintain swing")
+            recommendations.append("🧢 Secure hat with chin strap")
+            recommendations.append("⚪ Consider heavier golf ball for wind resistance")
+            recommendations.append("👕 Avoid loose-fitting clothes")
+        
+        # Humidity specific recommendations
+        if humidity > 70:
+            recommendations.append("💧 HUMID CONDITIONS: Moisture-wicking fabrics essential")
+            recommendations.append("🧦 Extra socks and underwear for comfort")
+            recommendations.append("🧻 Towel for wiping hands and clubs")
+            recommendations.append("👕 Light, breathable materials only")
+        
+        if not recommendations:
+            recommendations.append("👔 Standard golf attire should work well today")
+            recommendations.append("👕 Bring light layers for temperature changes")
+        
+        # Return formatted recommendations (limit to 5 most important)
+        return "\n".join(recommendations[:5])
+
     def _generate_fallback_recommendation(self, factors: Dict[str, Any]) -> str:
         """Generate a human-friendly fallback recommendation when AI is unavailable"""
         overall_score = factors.get('overall_score', 0)
@@ -866,11 +948,7 @@ class GolfCourseFactorAnalyzer:
         lat = location.get("latitude", 0)
         lon = location.get("longitude", 0)
         
-        # Get weather data using One Call API for comprehensive data
-        # Fallback to basic weather API if One Call fails
-        weather_data = await self.weather_service.get_onecall_weather(lat, lon)
-        if not weather_data or "error" in weather_data:
-            logger.warning(f"One Call API failed, falling back to basic weather API for lat={lat}, lon={lon}")
+        # Get weather data using basic weather API only
         weather_data = await self.weather_service.get_current_weather(lat, lon)
         
         # Calculate factor scores
@@ -895,11 +973,15 @@ class GolfCourseFactorAnalyzer:
             "course_condition_score": course_condition_score,
             "overall_score": round(overall_score, 1),
             "date": target_date.strftime("%Y-%m-%d"),
-            "location": f"{location.get('city', 'Unknown')}, {location.get('state', 'Unknown')}"
+            "location": f"{location.get('city', 'Unknown')}, {location.get('state', 'Unknown')}",
+            "weather_data": weather_data  # Include weather data for clothing recommendations
         }
         
         # Get AI recommendation
         ai_recommendation = await self.get_ai_recommendation(course_name, factors)
+        
+        # Get clothing recommendation
+        clothing_recommendation = self._generate_clothing_recommendation(weather_data)
         
         return {
             "course_name": course_name,
@@ -914,6 +996,7 @@ class GolfCourseFactorAnalyzer:
             },
             "weather_data": self._extract_detailed_weather_insights(weather_data),
             "recommendation": ai_recommendation,
+            "clothing_recommendation": clothing_recommendation,
             "timing_grade": self._get_timing_grade(overall_score)
         }
     

@@ -1337,6 +1337,18 @@
                                                             </p>
                                                         </div>
                                                     </div>
+                                                    
+                                                    <!-- Clothing & Equipment Recommendation -->
+                                                    <div class="card mt-3" style="background: linear-gradient(135deg, #fff3cd, #ffeaa7); border: 2px solid #f39c12;">
+                                                        <div class="card-body">
+                                                            <h5 class="card-title">
+                                                                <i class="fas fa-tshirt me-2"></i>What to Wear
+                                                            </h5>
+                                                            <div id="clothingRecommendation" style="white-space: pre-line; font-size: 0.9rem;">
+                                                                <!-- Clothing recommendation will be populated here -->
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -3918,7 +3930,7 @@
         };
 
         // Mini Golf Strategy functions
-        const API_BASE = 'http://localhost:8000/api/v1';
+        const API_BASE = 'http://localhost:8080/api/v1';
 
         async function generateGolfStrategy() {
             const resultDiv = document.getElementById('golfStrategyResult');
@@ -4277,29 +4289,33 @@
                 <div class="row">
                     <div class="col-md-3 text-center">
                         <i class="fas fa-thermometer-half" style="font-size: 2rem; margin-right: 1rem; color: #007bff;"></i>
-                        <div><strong>${weather.temperature}°F</strong></div>
-                        <small class="text-muted">Temperature</small>
+                        <div style="text-decoration: none !important;"><strong>${weather.current?.temperature || 'N/A'}°F</strong></div>
+                        <small class="text-muted" style="text-decoration: none !important;">Temperature</small>
                     </div>
                     <div class="col-md-3 text-center">
                         <i class="fas fa-tint" style="font-size: 2rem; margin-right: 1rem; color: #17a2b8;"></i>
-                        <div><strong>${weather.humidity}%</strong></div>
-                        <small class="text-muted">Humidity</small>
+                        <div style="text-decoration: none !important;"><strong>${weather.current?.humidity || 'N/A'}%</strong></div>
+                        <small class="text-muted" style="text-decoration: none !important;">Humidity</small>
                     </div>
                     <div class="col-md-3 text-center">
                         <i class="fas fa-wind" style="font-size: 2rem; margin-right: 1rem; color: #ffc107;"></i>
-                        <div><strong>${weather.wind_speed} mph</strong></div>
-                        <small class="text-muted">Wind Speed</small>
+                        <div style="text-decoration: none !important;"><strong>${weather.current?.wind_speed || 'N/A'} mph</strong></div>
+                        <small class="text-muted" style="text-decoration: none !important;">Wind Speed</small>
                     </div>
                     <div class="col-md-3 text-center">
                         <i class="fas fa-cloud" style="font-size: 2rem; margin-right: 1rem; color: #6c757d;"></i>
-                        <div><strong>${weather.conditions}</strong></div>
-                        <small class="text-muted">Conditions</small>
+                        <div style="text-decoration: none !important;"><strong>${weather.current?.conditions || 'N/A'}</strong></div>
+                        <small class="text-muted" style="text-decoration: none !important;">Conditions</small>
                     </div>
                 </div>
             `;
 
             // Display AI recommendation
             document.getElementById('aiRecommendation').textContent = analysis.recommendation;
+            
+            // Display clothing recommendation
+            const clothingRec = analysis.clothing_recommendation || "👔 Standard golf attire recommended\n👕 Bring light layers for temperature changes";
+            document.getElementById('clothingRecommendation').textContent = clothingRec;
 
             // Display timing grade and overall score
             const overallScore = scores.overall;
