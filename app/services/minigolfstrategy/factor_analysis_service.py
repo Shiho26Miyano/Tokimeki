@@ -808,7 +808,13 @@ class GolfCourseFactorAnalyzer:
                 )
                 response.raise_for_status()
                 result = response.json()
-                return result["choices"][0]["message"]["content"].strip()
+                content = result["choices"][0]["message"]["content"].strip()
+                
+                # Clean up any formatting tags that might be in the AI response
+                content = content.replace("[OUT]", "").replace("[/OUT]", "")
+                content = content.replace("[IN]", "").replace("[/IN]", "")
+                
+                return content
                 
         except Exception as e:
             logger.error(f"AI recommendation error: {e}")
