@@ -12,10 +12,17 @@ Tokimeki/
 │   ├── __init__.py
 │   ├── main.py                   # FastAPI app configuration
 │   ├── core/                     # Core system components
+│   │   ├── __init__.py
 │   │   ├── config.py            # Application settings
 │   │   ├── dependencies.py      # Dependency injection
 │   │   └── middleware.py        # Request/response middleware
+│   ├── models/                   # Database models
+│   │   ├── __init__.py
+│   │   ├── database.py          # Database configuration
+│   │   ├── golf_models.py       # Mini golf strategy models
+│   │   └── trading_models.py    # Trading system models
 │   ├── services/                 # Business logic services
+│   │   ├── __init__.py
 │   │   ├── ai_service.py        # AI integration (OpenRouter)
 │   │   ├── brpc_service.py      # High-performance BRPC service
 │   │   ├── cache_service.py     # Redis caching layer
@@ -23,23 +30,47 @@ Tokimeki/
 │   │   ├── stock_service.py     # Market data service
 │   │   ├── usage_service.py     # Usage tracking and analytics
 │   │   ├── futureexploratorium/ # Futures Exploratorium services
+│   │   │   ├── __init__.py
 │   │   │   ├── analytics_service.py
 │   │   │   ├── core_service.py
 │   │   │   ├── dashboard_service.py
 │   │   │   ├── event_analysis_service.py
 │   │   │   ├── market_intelligence_service.py
 │   │   │   └── strategy_service.py
-│   │   └── futurequant/         # FutureQuant trading services
-│   │       ├── backtest_service.py
-│   │       ├── data_service.py
-│   │       ├── feature_service.py
-│   │       ├── model_service.py
-│   │       ├── signal_service.py
-│   │       └── unified_quant_service.py
+│   │   ├── futurequant/         # FutureQuant trading services
+│   │   │   ├── __init__.py
+│   │   │   ├── backtest_service.py
+│   │   │   ├── dashboard_service.py
+│   │   │   ├── data_service.py
+│   │   │   ├── feature_service.py
+│   │   │   ├── futureexploratorium_service.py
+│   │   │   ├── lean_service.py
+│   │   │   ├── market_data_service.py
+│   │   │   ├── market_intelligence_service.py
+│   │   │   ├── mlflow_service.py
+│   │   │   ├── model_cleanup_service.py
+│   │   │   ├── model_service.py
+│   │   │   ├── paper_broker_service.py
+│   │   │   ├── qflib_service.py
+│   │   │   ├── signal_service.py
+│   │   │   ├── unified_quant_service.py
+│   │   │   └── vectorbt_service.py
+│   │   └── minigolfstrategy/    # Mini Golf Strategy services
+│   │       ├── __init__.py
+│   │       ├── clients/         # External API clients
+│   │       │   ├── __init__.py
+│   │       │   └── golfcourse_api.py
+│   │       ├── core_service.py
+│   │       ├── factor_analysis_service.py
+│   │       └── strategy_service.py
 │   └── api/                     # REST API endpoints
+│       ├── __init__.py
+│       ├── deps.py              # API dependencies
 │       └── v1/                  # API version 1
+│           ├── __init__.py
 │           ├── api.py           # Main router configuration
 │           └── endpoints/       # Feature-specific endpoints
+│               ├── __init__.py
 │               ├── chat.py      # AI chat interface
 │               ├── stocks.py    # Market data endpoints
 │               ├── rag.py       # RAG system endpoints
@@ -49,28 +80,98 @@ Tokimeki/
 │               ├── websocket.py # WebSocket endpoints
 │               ├── quantitative_analysis.py # Quantitative analysis
 │               ├── futureexploratorium/ # Futures Exploratorium API
+│               │   ├── __init__.py
 │               │   ├── analytics.py
 │               │   ├── core.py
 │               │   ├── dashboard.py
 │               │   ├── event_analysis.py
 │               │   └── strategy.py
-│               └── futurequant/ # FutureQuant trading API
-│                   ├── backtests.py
-│                   ├── data.py
-│                   ├── features.py
-│                   ├── models.py
-│                   ├── paper_trading.py
-│                   └── signals.py
-├── static/                       # Frontend assets
+│               ├── futurequant/ # FutureQuant trading API
+│               │   ├── __init__.py
+│               │   ├── backtests.py
+│               │   ├── data.py
+│               │   ├── features.py
+│               │   ├── models.py
+│               │   ├── paper_trading.py
+│               │   └── signals.py
+│               └── minigolfstrategy/ # Mini Golf Strategy API
+│                   ├── __init__.py
+│                   ├── core.py
+│                   ├── courses.py
+│                   ├── factor_analysis.py
+│                   └── strategy.py
+├── data/                        # Data storage
+│   ├── __init__.py
+│   └── databases/               # Database files
+│       ├── futurequant_trader.db
+│       └── README.md
+├── deployment/                  # Deployment configuration
+│   ├── __init__.py
+│   ├── docker-compose.yml       # Docker Compose setup
+│   ├── Dockerfile              # Docker configuration
+│   └── railway.json            # Railway deployment config
+├── docs/                        # Documentation
+│   ├── DEPLOYMENT_GUIDE.md
+│   ├── DEPLOYMENT_SUMMARY.md
+│   ├── FUTUREEXPLORATORIUM_README.md
+│   ├── FUTUREQUANT_README.md
+│   ├── LOCAL_DEVELOPMENT.md
+│   ├── MINI_GOLF_STRATEGY_DESIGN.md
+│   ├── QUANTITATIVE_ANALYSIS_README.md
+│   ├── RAILWAY_DEPLOYMENT.md
+│   ├── RANGE_ERROR_FIX.md
+│   ├── README.md
+│   ├── SEPARATED_SERVICES_ARCHITECTURE.md
+│   └── todo.md
+├── scripts/                     # Utility scripts
+│   ├── __init__.py
+│   ├── cleanup_old_models.py
+│   ├── demo_paper_trading.py
+│   ├── init_database.py
+│   └── init_golf_database.py
+├── static/                      # Frontend assets
+│   ├── favicon.ico
 │   ├── index.html               # Main application interface
 │   ├── main.js                  # Core JavaScript functionality
 │   ├── futurequant-dashboard.js # FutureQuant trading dashboard
 │   ├── style.css                # Application styling
+│   ├── futures-exploratorium-react/ # React frontend components
+│   │   └── package.json
 │   └── img/                     # Images and icons
-├── main.py                      # Application entry point
+│       ├── cute.png
+│       ├── demo.png
+│       ├── handsome.png
+│       └── lionPixel.png
+├── tests/                       # Test suite
+│   ├── __init__.py
+│   ├── core/                    # Core functionality tests
+│   │   ├── __init__.py
+│   │   ├── test_app.py
+│   │   ├── test_database_fix.py
+│   │   ├── test_minimal_deployment.py
+│   │   └── test_startup_cleanup.py
+│   ├── features/                # Feature tests
+│   │   ├── __init__.py
+│   │   ├── test_feature_creation.py
+│   │   └── test_feature_fix.py
+│   ├── futurequant/             # FutureQuant tests
+│   │   ├── __init__.py
+│   │   ├── test_futureexploratorium.py
+│   │   └── test_futures_trading.py
+│   ├── market_data/             # Market data tests
+│   │   └── test_market_data.py
+│   ├── strategies/              # Strategy tests
+│   │   ├── __init__.py
+│   │   └── test_strategy_application.py
+│   └── test_quantitative_analysis.py
+├── venv/                        # Virtual environment
 ├── config.py                    # Configuration settings
+├── main.py                      # Application entry point
+├── railway.toml                 # Railway configuration
 ├── requirements.txt             # Python dependencies
-└── README.md                    # This file
+├── setup_env.sh                 # Environment setup script
+├── test_date_fix.py             # Date fix utility
+└── futurequant_trader.db        # Main database file
 ```
 
 ## 🚀 BRPC Integration
@@ -148,6 +249,7 @@ PORT=8080
 8. **Quantitative Analysis**: `/api/v1/quantitative-analysis` - Advanced analytics
 9. **Futures Exploratorium**: `/api/v1/futureexploratorium/*` - Futures trading platform
 10. **FutureQuant Trading**: `/api/v1/futurequant/*` - Quantitative trading system
+11. **Mini Golf Strategy**: `/api/v1/minigolfstrategy/*` - Mini golf strategy analysis
 
 ## 🔬 Technical Details
 
