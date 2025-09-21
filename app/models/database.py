@@ -8,6 +8,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
+from app.core.config import settings
+
 # FutureQuant Trader Database URL from environment or default to SQLite for development
 FUTUREQUANT_DATABASE_URL = os.getenv(
     "FUTUREQUANT_DATABASE_URL", 
@@ -20,12 +22,12 @@ if FUTUREQUANT_DATABASE_URL.startswith("sqlite"):
         FUTUREQUANT_DATABASE_URL,
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
-        echo=True
+        echo=bool(settings.debug)
     )
 else:
     engine = create_engine(
         FUTUREQUANT_DATABASE_URL,
-        echo=True,
+        echo=bool(settings.debug),
         pool_pre_ping=True
     )
 
