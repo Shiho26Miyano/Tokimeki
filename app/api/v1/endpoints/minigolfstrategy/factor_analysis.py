@@ -14,6 +14,72 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+@router.get("/courses/all")
+async def get_all_courses(
+    state: Optional[str] = Query(None, description="Filter by US state"),
+    limit: int = Query(100, description="Maximum number of results")
+):
+    """
+    Get all available golf courses for dropdown selection
+    """
+    try:
+        # Search for courses with a broad query to get many results
+        search_query = "golf course"
+        if state:
+            search_query += f" {state}"
+        
+        results = await golf_course_client.search_courses(
+            query=search_query,
+            country="United States",
+            limit=limit
+        )
+        
+        if "error" in results:
+            raise HTTPException(status_code=400, detail=results["error"])
+        
+        # Format results for dropdown
+        courses = results.get("courses", [])
+        formatted_courses = []
+        
+        for course in courses:
+            course_name = course.get("course_name", "Unknown Course")
+            club_name = course.get("club_name", "")
+            city = course.get("location", {}).get("city", "")
+            state_code = course.get("location", {}).get("state", "")
+            
+            # Create display name
+            if club_name and club_name != course_name:
+                display_name = f"{course_name} at {club_name}"
+            else:
+                display_name = course_name
+            
+            if city and state_code:
+                display_name += f" ({city}, {state_code})"
+            elif state_code:
+                display_name += f" ({state_code})"
+            
+            formatted_courses.append({
+                "id": course.get("id"),
+                "name": display_name,
+                "course_name": course_name,
+                "club_name": club_name,
+                "location": {
+                    "city": city,
+                    "state": state_code,
+                    "country": course.get("location", {}).get("country", "US")
+                }
+            })
+        
+        return {
+            "courses": formatted_courses,
+            "total": len(formatted_courses),
+            "state_filter": state
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting all courses: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 @router.get("/courses/search")
 async def search_courses(
     query: str = Query(..., description="Search term for golf courses"),
@@ -124,10 +190,19 @@ async def get_top_recommendations(
         if state:
             search_query += f" {state}"
         
+        # Determine country based on state name
+        country = "United States"  # Default
+        if state in ["Scotland", "England", "Ireland"]:
+            country = "United Kingdom"
+        elif state == "Australia":
+            country = "Australia"
+        elif state == "Japan":
+            country = "Japan"
+        
         # Get course search results
         search_results = await golf_course_client.search_courses(
             query=search_query,
-            country="United States",
+            country=country,
             limit=20  # Get more to analyze
         )
         
@@ -146,7 +221,7 @@ async def get_top_recommendations(
             """Analyze a single course with timeout and error handling"""
             try:
                 course_id = course["id"]
-                course_name = course.get("name", "Unknown")
+                course_name = course.get("course_name", course.get("name", "Unknown"))
                 
                 logger.info(f"Analyzing course {course_id}: {course_name}")
                 
@@ -172,7 +247,7 @@ async def get_top_recommendations(
                 
                 return {
                     "course_id": course_id,
-                    "course_name": course.get("course_name"),
+                    "course_name": course_name,
                     "club_name": course.get("club_name"),
                     "location": course.get("location", {}),
                     "overall_score": analysis["scores"]["overall"],
