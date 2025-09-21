@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     BRPC_TIMEOUT: int = 5000  # milliseconds
     BRPC_MAX_RETRIES: int = 3
     
+    # Mini Golf Strategy settings
+    golfcourse_api_key: Optional[str] = os.getenv("GOLFCOURSE_API_KEY")
+    golfcourse_api_base: str = "https://api.golfcourseapi.com"
+    
+    # Weather API settings
+    openweather_api_key: Optional[str] = os.getenv("OPENWEATHER_API_KEY")
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": False,

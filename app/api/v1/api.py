@@ -11,6 +11,12 @@ from .endpoints.futureexploratorium import (
     core_router, dashboard_router, analytics_router, strategy_router
 )
 from .endpoints.futureexploratorium.event_analysis import router as event_analysis_router
+from .endpoints.minigolfstrategy import (
+    core_router as minigolf_core_router,
+    strategy as minigolf_strategy,
+    courses as minigolf_courses,
+    factor_analysis_router
+)
 from .endpoints import quantitative_analysis, websocket
 
 # Create main API router
@@ -39,6 +45,12 @@ api_router.include_router(dashboard_router, prefix="/futureexploratorium/dashboa
 api_router.include_router(analytics_router, prefix="/futureexploratorium/analytics", tags=["futureexploratorium_analytics"])
 api_router.include_router(strategy_router, prefix="/futureexploratorium/strategy", tags=["futureexploratorium_strategy"])
 api_router.include_router(event_analysis_router, prefix="/futureexploratorium/events", tags=["futureexploratorium_events"])
+
+# Include Mini Golf Strategy endpoints
+api_router.include_router(minigolf_core_router, prefix="/minigolfstrategy/core", tags=["minigolfstrategy_core"])
+api_router.include_router(minigolf_strategy.router, prefix="/minigolfstrategy", tags=["minigolfstrategy_strategy"])
+api_router.include_router(minigolf_courses.router, prefix="/minigolfstrategy", tags=["minigolfstrategy_courses"])
+api_router.include_router(factor_analysis_router, prefix="/minigolfstrategy/factor-analysis", tags=["minigolfstrategy_factor_analysis"])
 
 # Include Quantitative Analysis endpoints
 api_router.include_router(quantitative_analysis.router, prefix="/quantitative-analysis", tags=["quantitative_analysis"])
@@ -75,6 +87,11 @@ async def api_info():
                 "analytics": "/futureexploratorium/analytics",
                 "strategy": "/futureexploratorium/strategy",
                 "events": "/futureexploratorium/events"
+            },
+            "minigolfstrategy": {
+                "core": "/minigolfstrategy/core",
+                "strategy": "/minigolfstrategy/strategy",
+                "courses": "/minigolfstrategy/courses"
             },
             "quantitative_analysis": "/quantitative-analysis",
             "websocket": "/ws"
@@ -140,6 +157,7 @@ async def test_api():
             "rag": "/api/v1/rag",
             "monitoring": "/api/v1/monitoring",
             "futurequant": "/api/v1/futurequant",
-            "futureexploratorium": "/api/v1/futureexploratorium"
+            "futureexploratorium": "/api/v1/futureexploratorium",
+            "minigolfstrategy": "/api/v1/minigolfstrategy"
         }
     } 

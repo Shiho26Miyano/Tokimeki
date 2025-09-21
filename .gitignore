@@ -47,6 +47,14 @@ htmlcov/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*
+*.env
+
+# API Keys and Secrets
+*api*key*
+*secret*
+*password*
+*credential*
 
 # IDE
 .vscode/
