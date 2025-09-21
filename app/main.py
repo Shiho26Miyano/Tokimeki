@@ -245,9 +245,12 @@ async def root():
         index_path = os.path.join(STATIC_DIR, "index.html")
         logger.info(f"Serving index.html from: {index_path}")
         response = FileResponse(index_path)
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        # Aggressive cache busting to ensure updated JavaScript loads
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+        response.headers["Last-Modified"] = "Thu, 01 Jan 1970 00:00:00 GMT"
+        response.headers["ETag"] = f'"{int(time.time())}"'
         return response
     except Exception as e:
         logger.error(f"Error serving index.html: {e}")
