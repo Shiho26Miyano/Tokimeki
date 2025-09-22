@@ -100,6 +100,56 @@
         .score-fair { background: #f4a261; color: white; }
         .score-poor { background: #e76f51; color: white; }
         
+        /* Fix for golf course recommendation text selection issue */
+        .card[onclick] {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        
+        .card[onclick] .text-muted {
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            text-decoration: none !important;
+            background: none !important;
+            color: #6c757d !important;
+        }
+        
+        /* Additional fix for recommendation text highlighting */
+        .card[onclick] small.text-muted {
+            background: transparent !important;
+            text-decoration: none !important;
+            color: #6c757d !important;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+        }
+        
+        /* Prevent text selection highlighting on clickable cards */
+        .card[onclick] * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        /* Allow text selection only on recommendation text */
+        .card[onclick] .text-muted,
+        .card[onclick] small.text-muted {
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+            user-select: text !important;
+            background: transparent !important;
+            text-decoration: none !important;
+        }
+        
         /* Loading Timer Styles */
         .loading-timer-container {
             padding: 1.5rem;
@@ -4122,12 +4172,12 @@
                 container.innerHTML = '<p class="text-muted">No courses found. Try a different search term.</p>';
             } else {
                 container.innerHTML = courses.map(course => `
-                    <div class="card mb-2" onclick="selectCourse('${course.id}', '${course.name}', '${course.club_name}')" style="border-left: 5px solid #7fb069; transition: all 0.3s ease; cursor: pointer;">
+                    <div class="card mb-2" onclick="selectCourse('${course.id}', '${course.name}', '${course.club_name}')" style="border-left: 5px solid #7fb069; transition: all 0.3s ease; cursor: pointer; user-select: none;">
                         <div class="card-body">
                             <div class="row align-items-center">
                                 <div class="col-md-8">
                                     <h6 class="card-title mb-1">${course.name}</h6>
-                                    <p class="card-text text-muted mb-0">
+                                    <p class="card-text text-muted mb-0" style="background: transparent !important; text-decoration: none !important; color: #6c757d !important; user-select: text !important;">
                                         <i class="fas fa-building me-1"></i>${course.club_name}
                                         <br>
                                         <i class="fas fa-map-marker-alt me-1"></i>${course.location.city}, ${course.location.state}
@@ -4473,7 +4523,7 @@
                             </div>
                         </div>
                         <div class="mt-2">
-                            <small class="text-muted">${cleanRecommendationText(rec.recommendation)}</small>
+                            <small class="text-muted" style="background: transparent !important; text-decoration: none !important; color: #6c757d !important; user-select: text !important;">${cleanRecommendationText(rec.recommendation)}</small>
                         </div>
                     </div>
                 </div>
