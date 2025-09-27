@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="version" content="20250117-1704067200">
+    <meta name="last-modified" content="2025-01-17">
+    <title>Tokimeki - AI-Powered Investment Analysis Platform | CaddieAlpha™ Golf Strategy</title>
+    
+    <!-- External CSS Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+    
+    <!-- Modular CSS -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/animations.css">
+    <link rel="stylesheet" href="css/sliders.css">
+    
+    <!-- External JavaScript Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Navigation Sidebar -->
+            <div class="col-md-2" id="left-nav-container">
+                <div class="letsplay-row d-flex align-items-center justify-content-between gap-2 mb-4">
+                    <img src="static/img/cute.png" alt="Cute" style="width: 40px; height: 40px; border-radius: 10px;">
+                    <h4 class="mb-0" style="font-weight: 700;">Tokimeki</h4>
+                    <img src="static/img/handsome.png" alt="Handsome" style="width: 40px; height: 40px; border-radius: 10px;">
+                </div>
+
+                <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link active" id="minigolf-strategy-tab" data-bs-toggle="pill" data-bs-target="#minigolf-strategy-content" role="tab" aria-controls="minigolf-strategy-content" aria-selected="true">🏌️ Golf Factor Analysis</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="futures-exploratorium-tab" data-bs-toggle="pill" data-bs-target="#futures-exploratorium-content" role="tab" aria-controls="futures-exploratorium-content" aria-selected="false">🚀 Futures Exploratorium</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="futurequant-dashboard-tab" data-bs-toggle="pill" data-bs-target="#futurequant-dashboard-content" role="tab" aria-controls="futurequant-dashboard-content" aria-selected="false">📊 FutureQuant Simulator</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="rag-bi-tab" data-bs-toggle="pill" data-bs-target="#rag-bi-content" role="tab" aria-controls="rag-bi-content" aria-selected="false">📚 RAG Business Intelligence</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="deepseek-chatbot-tab" data-bs-toggle="pill" data-bs-target="#deepseek-chatbot-content" role="tab" aria-controls="deepseek-chatbot-content" aria-selected="false">🤖 Chatbot</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="ai-platform-comparables-tab" data-bs-toggle="pill" data-bs-target="#ai-platform-comparables-content" role="tab" aria-controls="ai-platform-comparables-content" aria-selected="false">🤖 AI Platform Comparables</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="market-overtime-tab" data-bs-toggle="pill" data-bs-target="#market-overtime-content" role="tab" aria-controls="market-overtime-content" aria-selected="false">📈 Market Overtime</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="volatility-explorer-tab" data-bs-toggle="pill" data-bs-target="#volatility-explorer-content" role="tab" aria-controls="volatility-explorer-content" aria-selected="false">📊 Volatility Explorer</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="hf-signal-tool-tab" data-bs-toggle="pill" data-bs-target="#hf-signal-tool-content" role="tab" aria-controls="hf-signal-tool-content" aria-selected="false">⚡ Trading Strategy Analyzer</a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="col-md-10 py-4">
+                <div class="tab-content" id="main-tab-content">
+                    <!-- Futures Exploratorium Tab -->
+                    <div class="tab-pane fade" id="futures-exploratorium-content" role="tabpanel" aria-labelledby="futures-exploratorium-tab">
+                        <div id="futures-exploratorium-root"></div>
+                    </div>
+                    
+                    <!-- FutureQuant Dashboard Tab -->
+                    <div class="tab-pane fade" id="futurequant-dashboard-content" role="tabpanel" aria-labelledby="futurequant-dashboard-tab">
+                        <div id="futurequant-dashboard-root">
+                            <!-- Content will be loaded dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- Mini Golf Strategy Tab -->
+                    <div class="tab-pane fade show active" id="minigolf-strategy-content" role="tabpanel" aria-labelledby="minigolf-strategy-tab">
+                        <div id="minigolf-strategy-root">
+                            <!-- Content will be loaded dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- RAG BI Tab -->
+                    <div class="tab-pane fade" id="rag-bi-content" role="tabpanel" aria-labelledby="rag-bi-tab">
+                        <div id="rag-bi-root">
+                            <!-- Content will be loaded dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- Chatbot Tab -->
+                    <div class="tab-pane fade" id="deepseek-chatbot-content" role="tabpanel" aria-labelledby="deepseek-chatbot-tab">
+                        <div id="chatbot-root">
+                            <!-- Content will be loaded dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- AI Platform Comparables Tab -->
+                    <div class="tab-pane fade" id="ai-platform-comparables-content" role="tabpanel" aria-labelledby="ai-platform-comparables-tab">
+                        <div id="ai-platform-comparables-root">
+                            <!-- Content will be loaded dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- Market Overtime Tab -->
+                    <div class="tab-pane fade" id="market-overtime-content" role="tabpanel" aria-labelledby="market-overtime-tab">
+                        <div id="market-overtime-root">
+                            <!-- Content will be loaded dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- Volatility Explorer Tab -->
+                    <div class="tab-pane fade" id="volatility-explorer-content" role="tabpanel" aria-labelledby="volatility-explorer-tab">
+                        <div id="volatility-explorer-root">
+                            <!-- Content will be loaded dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- HF Signal Tool Tab -->
+                    <div class="tab-pane fade" id="hf-signal-tool-content" role="tabpanel" aria-labelledby="hf-signal-tool-tab">
+                        <div id="hf-signal-tool-root">
+                            <!-- Content will be loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error and Success Messages -->
+    <div id="errorMessage" class="alert alert-danger" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+    <div id="successMessage" class="alert alert-success" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+
+    <!-- Modular JavaScript -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
