@@ -1,0 +1,206 @@
+/* Component-specific Styles */
+
+/* Golf Factor Analysis Styles */
+.score-excellent { background: #2a9d8f; color: white; }
+.score-good { background: #7fb069; color: white; }
+.score-fair { background: #f4a261; color: white; }
+.score-poor { background: #e76f51; color: white; }
+
+.grade-a { color: #2a9d8f; }
+.grade-b { color: #7fb069; }
+.grade-c { color: #f4a261; }
+.grade-d { color: #e76f51; }
+
+/* Fix for golf course recommendation text selection issue */
+.card[onclick] {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.card[onclick] .text-muted {
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    text-decoration: none !important;
+    background: none !important;
+    color: #6c757d !important;
+}
+
+/* Additional fix for recommendation text highlighting */
+.card[onclick] small.text-muted {
+    background: transparent !important;
+    text-decoration: none !important;
+    color: #6c757d !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
+/* Prevent text selection highlighting on clickable cards */
+.card[onclick] * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Allow text selection only on recommendation text */
+.card[onclick] .text-muted,
+.card[onclick] small.text-muted {
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    user-select: text !important;
+    background: transparent !important;
+    text-decoration: none !important;
+}
+
+/* Loading Timer Styles */
+.loading-timer-container {
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border: 1px solid #dee2e6;
+}
+
+.loading-progress {
+    margin: 0 auto;
+    max-width: 300px;
+}
+
+.progress {
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+    border-radius: 10px;
+}
+
+.loading-text {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.loading-timer-container small {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.loading-timer-container .spinner-border {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-width: 0.3em;
+}
+
+/* Tech Stack Card Styles */
+.tech-badge {
+    text-align: center;
+}
+
+.tech-badge .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    width: 100%;
+    display: block;
+}
+
+.card.border-primary {
+    box-shadow: 0 2px 8px rgba(0,123,255,0.1);
+    transition: all 0.3s ease;
+}
+
+.card.border-primary:hover {
+    box-shadow: 0 4px 16px rgba(0,123,255,0.2);
+    transform: translateY(-2px);
+}
+
+/* Navigation Styles */
+#main-nav .nav-link {
+    color: #183153;
+    font-weight: 500;
+    margin-bottom: 5px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+#main-nav .nav-link.active,
+#main-nav .nav-link:hover {
+    background-color: #183153;
+    color: #fff;
+}
+
+#left-nav-container {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-right: 1px solid #dee2e6;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+}
+
+.tab-content > .tab-pane {
+    display: none;
+}
+
+.tab-content > .active {
+    display: block;
+}
+
+/* Tooltip Styles */
+.tooltip-container {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+    border-bottom: 1px dotted #000;
+}
+
+.tooltip-text {
+    visibility: hidden;
+    width: 280px;
+    background-color: #183153;
+    color: #fff;
+    text-align: left;
+    border-radius: 6px;
+    padding: 8px 12px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -140px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.tooltip-container:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Logo and Header Styles */
+.letsplay-row img { 
+    width: 60px; 
+    height: 60px; 
+    object-fit: cover; 
+    border-radius: 14px; 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.13); 
+    margin-bottom: 4px; 
+}
+
+.letsplay-row h1 { 
+    font-size: 1.5rem; 
+    color: #183153; 
+    letter-spacing: 0.5px; 
+    margin: 0; 
+    font-weight: 700; 
+}

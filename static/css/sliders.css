@@ -1,0 +1,33 @@
+/* Slider Styles (noUiSlider) */
+
+.noUi-target { 
+    background: #e0e0e0; 
+    border-radius: 8px; 
+    border: none; 
+    height: 8px; 
+    margin-top: 18px; 
+}
+
+.noUi-connect { 
+    background: #183153; 
+    border-radius: 8px; 
+}
+
+.noUi-horizontal .noUi-handle { 
+    width: 18px; 
+    height: 18px; 
+    border-radius: 50%; 
+    background: #183153; 
+    border: 2px solid #fff; 
+    top: -5px; 
+    cursor: pointer; 
+}
+
+.noUi-tooltip { 
+    background: #fff; 
+    color: #183153; 
+    border-radius: 6px; 
+    border: 1px solid #183153; 
+    font-size: 0.95em; 
+    padding: 2px 8px; 
+}
