@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAPL Dashboard Comparison - Static vs React</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        .comparison-panel {
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .static-panel {
+            border-color: #28a745;
+            background-color: #f8fff9;
+        }
+        .react-panel {
+            border-color: #007bff;
+            background-color: #f8f9ff;
+        }
+        .log-output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-loading { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <h1 class="mb-4">🔬 AAPL Dashboard Loading Comparison</h1>
+        
+        <!-- Test Controls -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>🧪 Test Controls</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-success me-2" onclick="testStaticVersion()">Test Static Version</button>
+                <button class="btn btn-primary me-2" onclick="testReactVersion()">Test React Version</button>
+                <button class="btn btn-secondary me-2" onclick="clearLogs()">Clear Logs</button>
+                <button class="btn btn-warning" onclick="runFullComparison()">Run Full Comparison</button>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Static Version Panel -->
+            <div class="col-md-6">
+                <div class="comparison-panel static-panel">
+                    <h4>🟢 Static JavaScript Version</h4>
+                    <div class="mb-3">
+                        <span class="status-badge" id="staticStatus">Not Tested</span>
+                    </div>
+                    <div id="staticResult">
+                        <p>Click "Test Static Version" to test vanilla JavaScript implementation.</p>
+                    </div>
+                    <div class="mt-3">
+                        <h6>Console Log:</h6>
+                        <div class="log-output" id="staticLog">No logs yet...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- React Version Panel -->
+            <div class="col-md-6">
+                <div class="comparison-panel react-panel">
+                    <h4>🔵 React Component Version</h4>
+                    <div class="mb-3">
+                        <span class="status-badge" id="reactStatus">Not Tested</span>
+                    </div>
+                    <div id="reactResult">
+                        <p>Click "Test React Version" to test React component implementation.</p>
+                    </div>
+                    <div class="mt-3">
+                        <h6>Console Log:</h6>
+                        <div class="log-output" id="reactLog">No logs yet...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- React Component Container -->
+        <div id="react-test-container" style="display: none;"></div>
+        
+        <!-- Detailed Analysis -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>📊 Detailed Analysis</h5>
+            </div>
+            <div class="card-body">
+                <div id="analysisResult">
+                    <p>Run tests to see detailed analysis...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load React Components -->
+    <script type="text/babel" src="static/js/components/aapl-weekly-tracker.js"></script>
+    <script type="text/babel" src="static/js/components/aapl-analysis-dashboard.js"></script>
+
+    <script>
+        let staticLog = [];
+        let reactLog = [];
+        
+        // Override console.log to capture logs
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+            staticLog.push(`[LOG] ${new Date().toLocaleTimeString()}: ${message}`);
+            updateStaticLog();
+        };
+        
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+            reactLog.push(`[ERROR] ${new Date().toLocaleTimeString()}: ${message}`);
+            updateReactLog();
+        };
+        
+        function updateStaticLog() {
+            document.getElementById('staticLog').textContent = staticLog.slice(-10).join('\n');
+        }
+        
+        function updateReactLog() {
+            document.getElementById('reactLog').textContent = reactLog.slice(-10).join('\n');
+        }
+        
+        function clearLogs() {
+            staticLog = [];
+            reactLog = [];
+            updateStaticLog();
+            updateReactLog();
+        }
+        
+        function setStatus(type, status, className) {
+            const element = document.getElementById(`${type}Status`);
+            element.textContent = status;
+            element.className = `status-badge status-${className}`;
+        }
+        
+        async function testStaticVersion() {
+            setStatus('static', 'Testing...', 'loading');
+            staticLog.push(`[TEST] Starting static version test at ${new Date().toLocaleTimeString()}`);
+            updateStaticLog();
+            
+            try {
+                // Test API call
+                const response = await fetch('/api/v1/aapl-analysis/prices/AAPL?start_date=2024-09-27&end_date=2024-09-28');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                staticLog.push(`[SUCCESS] API call successful, received ${data.count} data points`);
+                
+                // Test data processing
+                const price = data.data[0]?.close || 0;
+                const investment = 1000;
+                const shares = investment / price;
+                
+                staticLog.push(`[CALC] Price: $${price}, Investment: $${investment}, Shares: ${shares.toFixed(2)}`);
+                
+                document.getElementById('staticResult').innerHTML = `
+                    <div class="alert alert-success">
+                        <h6>✅ Static Version Working!</h6>
+                        <p><strong>Ticker:</strong> ${data.ticker}</p>
+                        <p><strong>Data Points:</strong> ${data.count}</p>
+                        <p><strong>Latest Price:</strong> $${price}</p>
+                        <p><strong>Calculated Shares:</strong> ${shares.toFixed(2)}</p>
+                    </div>
+                `;
+                
+                setStatus('static', 'Success', 'success');
+                
+            } catch (error) {
+                staticLog.push(`[ERROR] ${error.message}`);
+                document.getElementById('staticResult').innerHTML = `
+                    <div class="alert alert-danger">
+                        <h6>❌ Static Version Failed</h6>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+                setStatus('static', 'Failed', 'error');
+            }
+            
+            updateStaticLog();
+        }
+        
+        async function testReactVersion() {
+            setStatus('react', 'Testing...', 'loading');
+            reactLog.push(`[TEST] Starting React version test at ${new Date().toLocaleTimeString()}`);
+            updateReactLog();
+            
+            try {
+                // Check if React components are loaded
+                reactLog.push(`[CHECK] React available: ${typeof React !== 'undefined'}`);
+                reactLog.push(`[CHECK] ReactDOM available: ${typeof ReactDOM !== 'undefined'}`);
+                reactLog.push(`[CHECK] AAPLWeeklyTracker available: ${!!window.AAPLWeeklyTracker}`);
+                reactLog.push(`[CHECK] AAPLAnalysisDashboard available: ${!!window.AAPLAnalysisDashboard}`);
+                
+                if (!window.AAPLWeeklyTracker && !window.AAPLAnalysisDashboard) {
+                    throw new Error('React components not found on window object');
+                }
+                
+                // Try to render component
+                const container = document.getElementById('react-test-container');
+                container.style.display = 'block';
+                container.innerHTML = '<div id="react-mount-point"></div>';
+                
+                const ComponentToRender = window.AAPLWeeklyTracker || window.AAPLAnalysisDashboard;
+                reactLog.push(`[RENDER] Attempting to render ${ComponentToRender.name}`);
+                
+                if (ReactDOM.createRoot) {
+                    // React 18
+                    const root = ReactDOM.createRoot(document.getElementById('react-mount-point'));
+                    root.render(React.createElement(ComponentToRender));
+                    reactLog.push(`[SUCCESS] React 18 render successful`);
+                } else {
+                    // React 17
+                    ReactDOM.render(React.createElement(ComponentToRender), document.getElementById('react-mount-point'));
+                    reactLog.push(`[SUCCESS] React 17 render successful`);
+                }
+                
+                document.getElementById('reactResult').innerHTML = `
+                    <div class="alert alert-success">
+                        <h6>✅ React Version Working!</h6>
+                        <p><strong>Component:</strong> ${ComponentToRender.name}</p>
+                        <p><strong>React Version:</strong> ${ReactDOM.createRoot ? '18' : '17'}</p>
+                        <p>Component rendered successfully below.</p>
+                    </div>
+                `;
+                
+                setStatus('react', 'Success', 'success');
+                
+            } catch (error) {
+                reactLog.push(`[ERROR] ${error.message}`);
+                reactLog.push(`[STACK] ${error.stack}`);
+                
+                document.getElementById('reactResult').innerHTML = `
+                    <div class="alert alert-danger">
+                        <h6>❌ React Version Failed</h6>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <details>
+                            <summary>Stack Trace</summary>
+                            <pre style="font-size: 0.7rem;">${error.stack}</pre>
+                        </details>
+                    </div>
+                `;
+                setStatus('react', 'Failed', 'error');
+            }
+            
+            updateReactLog();
+        }
+        
+        async function runFullComparison() {
+            clearLogs();
+            await testStaticVersion();
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            await testReactVersion();
+            
+            // Generate analysis
+            const staticSuccess = document.getElementById('staticStatus').textContent === 'Success';
+            const reactSuccess = document.getElementById('reactStatus').textContent === 'Success';
+            
+            let analysis = '<h6>🔍 Comparison Results:</h6>';
+            
+            if (staticSuccess && reactSuccess) {
+                analysis += '<div class="alert alert-success">Both versions are working! The issue might be in the main application integration.</div>';
+            } else if (staticSuccess && !reactSuccess) {
+                analysis += '<div class="alert alert-warning">Static version works but React version fails. This suggests issues with React component loading, Babel transpilation, or component lifecycle.</div>';
+            } else if (!staticSuccess && reactSuccess) {
+                analysis += '<div class="alert alert-warning">React version works but static version fails. This suggests API or network issues.</div>';
+            } else {
+                analysis += '<div class="alert alert-danger">Both versions failed. This suggests fundamental API or server issues.</div>';
+            }
+            
+            analysis += '<h6 class="mt-3">📋 Troubleshooting Steps:</h6><ul>';
+            
+            if (!staticSuccess) {
+                analysis += '<li>Check server is running and API endpoints are accessible</li>';
+                analysis += '<li>Verify POLYGON_API_KEY is set (though API seems to work without it)</li>';
+                analysis += '<li>Check network connectivity</li>';
+            }
+            
+            if (!reactSuccess) {
+                analysis += '<li>Check React and ReactDOM are loaded from CDN</li>';
+                analysis += '<li>Verify Babel is transpiling JSX correctly</li>';
+                analysis += '<li>Check for JavaScript syntax errors in components</li>';
+                analysis += '<li>Verify component files are accessible via HTTP</li>';
+            }
+            
+            analysis += '</ul>';
+            
+            document.getElementById('analysisResult').innerHTML = analysis;
+        }
+        
+        // Auto-run comparison on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(runFullComparison, 1000);
+        });
+    </script>
+</body>
+</html>

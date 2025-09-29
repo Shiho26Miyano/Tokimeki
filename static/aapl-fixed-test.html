@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAPL Fixed Component Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>🔧 AAPL Fixed Component Test</h1>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Loading Progress</h5>
+            </div>
+            <div class="card-body">
+                <ol id="progress">
+                    <li>Page loaded</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div id="component-root">
+            <div class="alert alert-info">Component will render here...</div>
+        </div>
+    </div>
+
+    <!-- Load React first -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script>
+        document.getElementById('progress').innerHTML += '<li style="color: green;">✅ React loaded</li>';
+    </script>
+
+    <!-- Load ReactDOM -->
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script>
+        document.getElementById('progress').innerHTML += '<li style="color: green;">✅ ReactDOM loaded</li>';
+    </script>
+
+    <!-- Load the fixed component -->
+    <script src="static/js/components/aapl-weekly-tracker-fixed.js"></script>
+    
+    <script>
+        // Wait a moment for the component to be defined
+        setTimeout(() => {
+            if (typeof window.AAPLWeeklyTracker !== 'undefined') {
+                document.getElementById('progress').innerHTML += '<li style="color: green;">✅ Fixed component loaded successfully!</li>';
+                
+                try {
+                    const container = document.getElementById('component-root');
+                    
+                    if (ReactDOM.createRoot) {
+                        const root = ReactDOM.createRoot(container);
+                        root.render(React.createElement(window.AAPLWeeklyTracker));
+                    } else {
+                        ReactDOM.render(React.createElement(window.AAPLWeeklyTracker), container);
+                    }
+                    
+                    document.getElementById('progress').innerHTML += '<li style="color: green;">🎉 Component rendered successfully!</li>';
+                } catch (error) {
+                    document.getElementById('progress').innerHTML += '<li style="color: red;">❌ Render error: ' + error.message + '</li>';
+                }
+            } else {
+                document.getElementById('progress').innerHTML += '<li style="color: red;">❌ Fixed component still not found</li>';
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

@@ -6,12 +6,14 @@ import os
 from typing import Dict, Any, List, Optional
 from ..core.config import settings
 
-# Define FREE_MODELS locally to avoid circular import issues
-FREE_MODELS = {
-    "mistral-small": "mistralai/mistral-small-3.2-24b-instruct:free",
-    "deepseek-r1": "deepseek/deepseek-r1-0528:free",
-    "deepseek-chat": "deepseek/deepseek-chat-v3-0324:free",
-    "llama-3.1-405b": "meta-llama/llama-3.1-405b-instruct:free"
+# Define OPENROUTER_MODELS - using paid models to avoid rate limits
+OPENROUTER_MODELS = {
+    "mistral-small": "mistralai/mistral-small-3.2-24b-instruct",
+    "deepseek-chat": "deepseek/deepseek-chat-v3-0324", 
+    "claude-haiku": "anthropic/claude-3-haiku-20240307",
+    "gpt-4o-mini": "openai/gpt-4o-mini-2024-07-18",
+    "llama-3.1-8b": "meta-llama/llama-3.1-8b-instruct",
+    "qwen-2.5-7b": "qwen/qwen-2.5-7b-instruct"
 }
 from .cache_service import AsyncCacheService
 from .stock_service import AsyncStockService
@@ -41,7 +43,7 @@ class AsyncAIService:
     async def call_api(
         self, 
         messages: List[Dict[str, str]], 
-        model: str = "mistral-small", 
+        model: str = "claude-haiku", 
         temperature: float = 0.7, 
         max_tokens: int = 1000
     ) -> Dict[str, Any]:
@@ -52,7 +54,7 @@ class AsyncAIService:
         if not self.api_key:
             raise ValueError("OpenRouter API key not configured")
         
-        if model not in FREE_MODELS:
+        if model not in OPENROUTER_MODELS:
             raise ValueError(f"Invalid model: {model}")
         
         # Generate cache key
@@ -66,7 +68,7 @@ class AsyncAIService:
         
         # Prepare request
         payload = {
-            "model": FREE_MODELS[model],
+            "model": OPENROUTER_MODELS[model],
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens
@@ -127,7 +129,7 @@ class AsyncAIService:
             
             # Validate models
             for model in models:
-                if model not in FREE_MODELS:
+                if model not in OPENROUTER_MODELS:
                     logger.warning(f"Invalid model requested: {model}, using default")
                     models = ["mistral-small", "deepseek-chat"]
                     break
@@ -209,7 +211,7 @@ class AsyncAIService:
     async def _call_api_optimized(
         self, 
         messages: List[Dict[str, str]], 
-        model: str = "mistral-small", 
+        model: str = "claude-haiku", 
         temperature: float = 0.7, 
         max_tokens: int = 1000,
         timeout: float = 45.0  # Increased from 15.0 to 45.0 seconds
@@ -219,7 +221,7 @@ class AsyncAIService:
         if not self.api_key:
             raise ValueError("OpenRouter API key not configured")
         
-        if model not in FREE_MODELS:
+        if model not in OPENROUTER_MODELS:
             raise ValueError(f"Invalid model: {model}")
         
         # Generate cache key
@@ -233,7 +235,7 @@ class AsyncAIService:
         
         # Prepare request
         payload = {
-            "model": FREE_MODELS[model],
+            "model": OPENROUTER_MODELS[model],
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens
@@ -275,7 +277,7 @@ class AsyncAIService:
         self, 
         message: str, 
         conversation_history: List[Dict[str, str]] = None,
-        model: str = "mistral-small",
+        model: str = "claude-haiku",
         temperature: float = 0.7,
         max_tokens: int = 1000
     ) -> Dict[str, Any]:
@@ -312,7 +314,7 @@ class AsyncAIService:
         """Get list of available models"""
         return [
             {"id": model_id, "name": model_name} 
-            for model_id, model_name in FREE_MODELS.items()
+            for model_id, model_name in OPENROUTER_MODELS.items()
         ]
     
     def _extract_stock_symbol(self, message: str) -> Optional[str]:
@@ -483,7 +485,7 @@ class AsyncAIService:
     async def chat_with_stock_analysis(
         self, 
         message: str, 
-        model: str = "mistral-small",
+        model: str = "claude-haiku",
         temperature: float = 0.7,
         max_tokens: int = 1500
     ) -> Dict[str, Any]:

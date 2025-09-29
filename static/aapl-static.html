@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAPL Analysis Dashboard - Static Version</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .data-table {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .success-message {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="mb-4">📈 AAPL Analysis Dashboard - Static Version</h1>
+                
+                <!-- Status Panel -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>🔍 System Status & Debug Info</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="status-info">
+                            <div class="loading-spinner"></div> Checking system status...
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Controls Panel -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>⚙️ Test Controls</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="startDate" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="startDate" value="2024-09-01">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="endDate" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="endDate" value="2024-09-28">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="weeklyAmount" class="form-label">Weekly Investment ($)</label>
+                                <input type="number" class="form-control" id="weeklyAmount" value="1000">
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button class="btn btn-primary w-100" onclick="loadAAPLData()">
+                                    <span id="loadBtn">🔄 Load Data</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Metrics Panel -->
+                <div class="row mb-4" id="metricsPanel" style="display: none;">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value" id="totalInvested">$0</div>
+                            <div class="metric-label">Total Invested</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value" id="currentValue">$0</div>
+                            <div class="metric-label">Current Value</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value" id="totalPnL">$0</div>
+                            <div class="metric-label">Total P&L</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value" id="totalShares">0</div>
+                            <div class="metric-label">Total Shares</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Chart Panel -->
+                <div class="card mb-4" id="chartPanel" style="display: none;">
+                    <div class="card-header">
+                        <h5>📊 AAPL Price Chart</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="priceChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Data Table Panel -->
+                <div class="card mb-4" id="dataPanel" style="display: none;">
+                    <div class="card-header">
+                        <h5>📋 Weekly Investment Data</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="data-table">
+                            <table class="table table-striped table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Price</th>
+                                        <th>Investment</th>
+                                        <th>Shares</th>
+                                        <th>Total Shares</th>
+                                        <th>Total Value</th>
+                                        <th>P&L</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dataTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Raw API Response Panel -->
+                <div class="card mb-4" id="apiPanel" style="display: none;">
+                    <div class="card-header">
+                        <h5>🔧 Raw API Response</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre id="apiResponse" style="max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 15px; border-radius: 5px;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let aaplData = null;
+        let priceChart = null;
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            checkSystemStatus();
+        });
+        
+        async function checkSystemStatus() {
+            const statusDiv = document.getElementById('status-info');
+            let statusHtml = '<h6>System Checks:</h6><ul>';
+            
+            // Check if we're running locally
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            statusHtml += `<li>Running locally: <span class="badge ${isLocal ? 'bg-success' : 'bg-warning'}">${isLocal ? 'Yes' : 'No'}</span></li>`;
+            
+            // Check API health
+            try {
+                const healthResponse = await fetch('/api/v1/aapl-analysis/health');
+                const healthData = await healthResponse.json();
+                statusHtml += `<li>API Health: <span class="badge bg-success">✅ Healthy</span></li>`;
+                statusHtml += `<li>API Version: <span class="badge bg-info">${healthData.version || 'Unknown'}</span></li>`;
+            } catch (error) {
+                statusHtml += `<li>API Health: <span class="badge bg-danger">❌ Error: ${error.message}</span></li>`;
+            }
+            
+            // Check browser capabilities
+            statusHtml += `<li>Fetch API: <span class="badge ${typeof fetch !== 'undefined' ? 'bg-success' : 'bg-danger'}">${typeof fetch !== 'undefined' ? 'Available' : 'Not Available'}</span></li>`;
+            statusHtml += `<li>Chart.js: <span class="badge ${typeof Chart !== 'undefined' ? 'bg-success' : 'bg-danger'}">${typeof Chart !== 'undefined' ? 'Loaded' : 'Not Loaded'}</span></li>`;
+            
+            statusHtml += '</ul>';
+            
+            // Add quick test button
+            statusHtml += '<button class="btn btn-sm btn-outline-primary mt-2" onclick="testAPIEndpoint()">🧪 Test API Endpoint</button>';
+            
+            statusDiv.innerHTML = statusHtml;
+        }
+        
+        async function testAPIEndpoint() {
+            const statusDiv = document.getElementById('status-info');
+            const originalContent = statusDiv.innerHTML;
+            
+            statusDiv.innerHTML = originalContent + '<div class="mt-2"><div class="loading-spinner"></div> Testing API endpoint...</div>';
+            
+            try {
+                const testUrl = '/api/v1/aapl-analysis/prices/AAPL?start_date=2024-09-27&end_date=2024-09-28';
+                console.log('Testing URL:', testUrl);
+                
+                const response = await fetch(testUrl);
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                statusDiv.innerHTML = originalContent + 
+                    '<div class="success-message mt-2">' +
+                    '<strong>✅ API Test Successful!</strong><br>' +
+                    `Ticker: ${data.ticker}<br>` +
+                    `Data points: ${data.count}<br>` +
+                    `Source: ${data.source}<br>` +
+                    `Sample price: $${data.data && data.data[0] ? data.data[0].close : 'N/A'}` +
+                    '</div>';
+                    
+            } catch (error) {
+                console.error('API test failed:', error);
+                statusDiv.innerHTML = originalContent + 
+                    '<div class="error-message mt-2">' +
+                    '<strong>❌ API Test Failed!</strong><br>' +
+                    `Error: ${error.message}` +
+                    '</div>';
+            }
+        }
+        
+        async function loadAAPLData() {
+            const loadBtn = document.getElementById('loadBtn');
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const weeklyAmount = parseFloat(document.getElementById('weeklyAmount').value);
+            
+            // Show loading state
+            loadBtn.innerHTML = '<div class="loading-spinner"></div> Loading...';
+            
+            // Hide panels
+            document.getElementById('metricsPanel').style.display = 'none';
+            document.getElementById('chartPanel').style.display = 'none';
+            document.getElementById('dataPanel').style.display = 'none';
+            document.getElementById('apiPanel').style.display = 'none';
+            
+            try {
+                console.log('Fetching AAPL data...');
+                const url = `/api/v1/aapl-analysis/prices/AAPL?start_date=${startDate}&end_date=${endDate}`;
+                console.log('URL:', url);
+                
+                const response = await fetch(url);
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Received data:', data);
+                
+                aaplData = data;
+                
+                // Show raw API response
+                document.getElementById('apiResponse').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('apiPanel').style.display = 'block';
+                
+                // Process the data for weekly investments
+                const weeklyData = calculateWeeklyInvestments(data.data, weeklyAmount);
+                
+                // Update metrics
+                updateMetrics(weeklyData);
+                
+                // Create chart
+                createChart(data.data);
+                
+                // Update table
+                updateTable(weeklyData);
+                
+                // Show panels
+                document.getElementById('metricsPanel').style.display = 'flex';
+                document.getElementById('chartPanel').style.display = 'block';
+                document.getElementById('dataPanel').style.display = 'block';
+                
+                loadBtn.innerHTML = '✅ Data Loaded';
+                setTimeout(() => {
+                    loadBtn.innerHTML = '🔄 Reload Data';
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Error loading AAPL data:', error);
+                loadBtn.innerHTML = '❌ Error';
+                
+                // Show error in API panel
+                document.getElementById('apiResponse').textContent = `Error: ${error.message}\n\nStack: ${error.stack}`;
+                document.getElementById('apiPanel').style.display = 'block';
+                
+                setTimeout(() => {
+                    loadBtn.innerHTML = '🔄 Retry';
+                }, 2000);
+            }
+        }
+        
+        function calculateWeeklyInvestments(priceData, weeklyAmount) {
+            const weeklyData = [];
+            let totalShares = 0;
+            let totalInvested = 0;
+            
+            // Group data by week (assuming we invest every Monday or first available day)
+            const sortedData = priceData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            for (let i = 0; i < sortedData.length; i += 7) { // Weekly intervals
+                const dayData = sortedData[i];
+                if (!dayData) continue;
+                
+                const price = dayData.close;
+                const shares = weeklyAmount / price;
+                totalShares += shares;
+                totalInvested += weeklyAmount;
+                
+                const currentValue = totalShares * price;
+                const pnl = currentValue - totalInvested;
+                
+                weeklyData.push({
+                    date: new Date(dayData.timestamp).toLocaleDateString(),
+                    price: price,
+                    investment: weeklyAmount,
+                    shares: shares,
+                    totalShares: totalShares,
+                    currentValue: currentValue,
+                    pnl: pnl
+                });
+            }
+            
+            return weeklyData;
+        }
+        
+        function updateMetrics(weeklyData) {
+            if (weeklyData.length === 0) return;
+            
+            const lastEntry = weeklyData[weeklyData.length - 1];
+            
+            document.getElementById('totalInvested').textContent = `$${lastEntry.currentValue - lastEntry.pnl}`;
+            document.getElementById('currentValue').textContent = `$${lastEntry.currentValue.toFixed(2)}`;
+            document.getElementById('totalPnL').textContent = `$${lastEntry.pnl.toFixed(2)}`;
+            document.getElementById('totalShares').textContent = lastEntry.totalShares.toFixed(2);
+        }
+        
+        function createChart(priceData) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            if (priceChart) {
+                priceChart.destroy();
+            }
+            
+            const sortedData = priceData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedData.map(d => new Date(d.timestamp).toLocaleDateString()),
+                    datasets: [{
+                        label: 'AAPL Close Price',
+                        data: sortedData.map(d => d.close),
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Price ($)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateTable(weeklyData) {
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = '';
+            
+            weeklyData.forEach(entry => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${entry.date}</td>
+                    <td>$${entry.price.toFixed(2)}</td>
+                    <td>$${entry.investment.toFixed(2)}</td>
+                    <td>${entry.shares.toFixed(2)}</td>
+                    <td>${entry.totalShares.toFixed(2)}</td>
+                    <td>$${entry.currentValue.toFixed(2)}</td>
+                    <td class="${entry.pnl >= 0 ? 'text-success' : 'text-danger'}">$${entry.pnl.toFixed(2)}</td>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>

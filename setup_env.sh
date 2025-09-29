@@ -47,6 +47,8 @@ check_api_key "OPENWEATHER_API_KEY" "$OPENWEATHER_API_KEY" "Required for weather
 
 check_api_key "GOLFCOURSE_API_KEY" "$GOLFCOURSE_API_KEY" "Required for golf course data in Mini Golf Strategy" "https://golfcourseapi.com/"
 
+check_api_key "POLYGON_API_KEY" "$POLYGON_API_KEY" "Required for AAPL Analysis Dashboard stock and options data" "https://polygon.io/"
+
 # Optional API keys
 echo ""
 echo "=============================================="
@@ -65,7 +67,7 @@ echo "=============================================="
 echo "SETUP SUMMARY:"
 echo "=============================================="
 
-required_keys=("OPENROUTER_API_KEY" "OPENWEATHER_API_KEY" "GOLFCOURSE_API_KEY")
+required_keys=("OPENROUTER_API_KEY" "OPENWEATHER_API_KEY" "GOLFCOURSE_API_KEY" "POLYGON_API_KEY")
 all_required_set=true
 
 for key in "${required_keys[@]}"; do
