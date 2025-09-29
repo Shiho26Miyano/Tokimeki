@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAPL Minimal Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>🧪 AAPL Component Minimal Test</h1>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Loading Steps</h5>
+            </div>
+            <div class="card-body">
+                <ol id="loadingSteps">
+                    <li>Page loaded</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div id="component-container">
+            <div class="alert alert-info">Component will load here...</div>
+        </div>
+    </div>
+
+    <!-- Step 1: Load React -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script>
+        document.getElementById('loadingSteps').innerHTML += '<li>React loaded: ' + (typeof React !== 'undefined') + '</li>';
+    </script>
+
+    <!-- Step 2: Load ReactDOM -->
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script>
+        document.getElementById('loadingSteps').innerHTML += '<li>ReactDOM loaded: ' + (typeof ReactDOM !== 'undefined') + '</li>';
+    </script>
+
+    <!-- Step 3: Load Babel (not needed since component uses createElement) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+        document.getElementById('loadingSteps').innerHTML += '<li>Babel loaded: ' + (typeof Babel !== 'undefined') + '</li>';
+    </script>
+
+    <!-- Step 4: Load AAPL Component with detailed error handling -->
+    <script>
+        // Override console.error to capture any loading errors
+        const originalError = console.error;
+        const loadingErrors = [];
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            loadingErrors.push(args.join(' '));
+            document.getElementById('loadingSteps').innerHTML += '<li style="color: red;">🚨 Console Error: ' + args.join(' ') + '</li>';
+        };
+        
+        // Override window.onerror to catch syntax errors
+        window.onerror = function(message, source, lineno, colno, error) {
+            document.getElementById('loadingSteps').innerHTML += '<li style="color: red;">🚨 Script Error: ' + message + ' at line ' + lineno + '</li>';
+            return false;
+        };
+        
+        // Check window object before loading
+        document.getElementById('loadingSteps').innerHTML += '<li>Window keys before loading: ' + Object.keys(window).filter(key => key.includes('AAPL')).length + '</li>';
+    </script>
+    
+    <script src="/static/js/components/aapl-weekly-tracker.js" onerror="document.getElementById('loadingSteps').innerHTML += '<li style=\'color: red;\'>❌ Script failed to load</li>';" onload="document.getElementById('loadingSteps').innerHTML += '<li style=\'color: green;\'>✅ Script loaded successfully</li>';"></script>
+    
+    <script>
+        setTimeout(() => {
+            // Check what's on the window object
+            const aaplKeys = Object.keys(window).filter(key => key.includes('AAPL') || key.includes('aapl'));
+            document.getElementById('loadingSteps').innerHTML += '<li>AAPL-related keys found: [' + aaplKeys.join(', ') + ']</li>';
+            
+            // Check if React is available
+            document.getElementById('loadingSteps').innerHTML += '<li>React.Component available: ' + (typeof React !== 'undefined' && typeof React.Component !== 'undefined') + '</li>';
+            
+            // Try to access the component
+            document.getElementById('loadingSteps').innerHTML += '<li>window.AAPLWeeklyTracker type: ' + typeof window.AAPLWeeklyTracker + '</li>';
+            
+            if (typeof window.AAPLWeeklyTracker !== 'undefined') {
+                document.getElementById('loadingSteps').innerHTML += '<li style="color: green;">✅ Component found!</li>';
+                document.getElementById('loadingSteps').innerHTML += '<li>Component constructor: ' + (typeof window.AAPLWeeklyTracker === 'function') + '</li>';
+                document.getElementById('loadingSteps').innerHTML += '<li>Component prototype: ' + (window.AAPLWeeklyTracker.prototype ? 'exists' : 'missing') + '</li>';
+                
+                try {
+                    // Try to create an instance
+                    const testInstance = new window.AAPLWeeklyTracker();
+                    document.getElementById('loadingSteps').innerHTML += '<li style="color: green;">✅ Component instance created</li>';
+                    
+                    // Try to render the component
+                    const container = document.getElementById('component-container');
+                    
+                    if (ReactDOM.createRoot) {
+                        // React 18
+                        const root = ReactDOM.createRoot(container);
+                        root.render(React.createElement(window.AAPLWeeklyTracker));
+                        document.getElementById('loadingSteps').innerHTML += '<li style="color: green;">✅ Component rendered successfully with React 18!</li>';
+                    } else {
+                        // React 17
+                        ReactDOM.render(React.createElement(window.AAPLWeeklyTracker), container);
+                        document.getElementById('loadingSteps').innerHTML += '<li style="color: green;">✅ Component rendered successfully with React 17!</li>';
+                    }
+                } catch (error) {
+                    document.getElementById('loadingSteps').innerHTML += '<li style="color: red;">❌ Component error: ' + error.message + '</li>';
+                    document.getElementById('loadingSteps').innerHTML += '<li style="color: red;">Stack: ' + (error.stack || 'No stack trace') + '</li>';
+                    console.error('Component error:', error);
+                }
+            } else {
+                document.getElementById('loadingSteps').innerHTML += '<li style="color: red;">❌ Component not found on window object</li>';
+                
+                // Show all loading errors
+                if (loadingErrors.length > 0) {
+                    document.getElementById('loadingSteps').innerHTML += '<li style="color: red;">Loading errors: ' + loadingErrors.join('; ') + '</li>';
+                }
+                
+                // Try to load the script content directly and eval it
+                document.getElementById('loadingSteps').innerHTML += '<li>🔧 Attempting direct script evaluation...</li>';
+                
+                fetch('/static/js/components/aapl-weekly-tracker.js')
+                    .then(response => response.text())
+                    .then(scriptContent => {
+                        try {
+                            eval(scriptContent);
+                            document.getElementById('loadingSteps').innerHTML += '<li style="color: green;">✅ Script evaluated directly - Component now available: ' + (typeof window.AAPLWeeklyTracker !== 'undefined') + '</li>';
+                            
+                            if (typeof window.AAPLWeeklyTracker !== 'undefined') {
+                                const container = document.getElementById('component-container');
+                                if (ReactDOM.createRoot) {
+                                    const root = ReactDOM.createRoot(container);
+                                    root.render(React.createElement(window.AAPLWeeklyTracker));
+                                } else {
+                                    ReactDOM.render(React.createElement(window.AAPLWeeklyTracker), container);
+                                }
+                                document.getElementById('loadingSteps').innerHTML += '<li style="color: green;">✅ Component rendered after direct evaluation!</li>';
+                            }
+                        } catch (evalError) {
+                            document.getElementById('loadingSteps').innerHTML += '<li style="color: red;">❌ Direct evaluation failed: ' + evalError.message + '</li>';
+                            console.error('Eval error:', evalError);
+                        }
+                    })
+                    .catch(fetchError => {
+                        document.getElementById('loadingSteps').innerHTML += '<li style="color: red;">❌ Failed to fetch script: ' + fetchError.message + '</li>';
+                    });
+            }
+        }, 500); // Increased timeout to ensure script has time to load
+    </script>
+</body>
+</html>

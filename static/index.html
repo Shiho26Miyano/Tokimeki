@@ -532,7 +532,10 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="minigolf-strategy-tab" data-bs-toggle="pill" data-bs-target="#minigolf-strategy-content" role="tab" aria-controls="minigolf-strategy-content" aria-selected="true">🏌️ Golf Factor Analysis</a>
+                        <a class="nav-link" id="rag-bi-tab" data-bs-toggle="pill" data-bs-target="#rag-bi-content" role="tab" aria-controls="rag-bi-content" aria-selected="false">📚 RAG Business Intelligence</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="minigolf-strategy-tab" data-bs-toggle="pill" data-bs-target="#minigolf-strategy-content" role="tab" aria-controls="minigolf-strategy-content" aria-selected="false">🏌️ Golf Factor Analysis</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="futures-exploratorium-tab" data-bs-toggle="pill" data-bs-target="#futures-exploratorium-content" role="tab" aria-controls="futures-exploratorium-content" aria-selected="false">🚀 Futures Exploratorium</a>
@@ -540,9 +543,8 @@
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="futurequant-dashboard-tab" data-bs-toggle="pill" data-bs-target="#futurequant-dashboard-content" role="tab" aria-controls="futurequant-dashboard-content" aria-selected="false">📊 FutureQuant Simulator</a>
                     </li>
-
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link" id="rag-bi-tab" data-bs-toggle="pill" data-bs-target="#rag-bi-content" role="tab" aria-controls="rag-bi-content" aria-selected="false">📚 RAG Business Intelligence</a>
+                        <a class="nav-link active" id="aapl-analysis-tab" data-bs-toggle="pill" data-bs-target="#aapl-analysis-content" role="tab" aria-controls="aapl-analysis-content" aria-selected="true">🍎 AAPL Analysis Dashboard</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="deepseek-chatbot-tab" data-bs-toggle="pill" data-bs-target="#deepseek-chatbot-content" role="tab" aria-controls="deepseek-chatbot-content" aria-selected="false">🤖 Chatbot</a>
@@ -843,7 +845,18 @@
                         </div>
                     </div>
 
-                    
+                    <!-- AAPL Analysis Dashboard Content -->
+                    <div class="tab-pane fade show active" id="aapl-analysis-content" role="tabpanel" aria-labelledby="aapl-analysis-tab">
+                        <div id="aapl-dashboard-root" style="min-height: 500px; padding: 20px;">
+                            <!-- React component will render here -->
+                            <div class="text-center p-5">
+                                <div class="spinner-border text-secondary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-3 text-muted">Loading AAPL Analysis Dashboard...</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="tab-pane fade" id="rag-bi-content" role="tabpanel" aria-labelledby="rag-bi-tab">
                         <div id="rag-bi-root"></div>
@@ -1259,7 +1272,7 @@
                         <div id="react-deepseek-chatbot"></div>
                     </div>
 
-                    <div class="tab-pane fade show active" id="minigolf-strategy-content" role="tabpanel" aria-labelledby="minigolf-strategy-tab">
+                    <div class="tab-pane fade" id="minigolf-strategy-content" role="tabpanel" aria-labelledby="minigolf-strategy-tab">
                         <div class="card shadow-sm flex-fill d-flex flex-column" style="max-width: 1400px; margin: 0 auto; border-radius: 16px;">
                             <div class="card-body d-flex flex-column" style="padding: 32px;">
                                 <div class="text-center mb-4" style="position: sticky; top: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 20px 0; z-index: 100; border-bottom: 1px solid rgba(0, 0, 0, 0.1); margin: -32px -32px 30px -32px; padding-left: 32px; padding-right: 32px;">
@@ -1852,8 +1865,12 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
     <script src="https://unpkg.com/date-fns@2.30.0/index.js"></script>
-            <script src="static/main.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
-                        <script src="static/futurequant-dashboard.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
+            <script src="/static/main.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
+    
+    <!-- AAPL Analysis Dashboard Component -->
+    <!-- Load AAPL Dashboard components -->
+    <script type="text/babel" src="/static/js/components/aapl-weekly-tracker.js"></script>
+    <script type="text/babel" src="/static/js/components/aapl-analysis-dashboard.js"></script>
     
     <!-- Futures Exploratorium React App -->
     <script type="text/babel">
@@ -4794,6 +4811,141 @@ Recommendation: ${currentAnalysis.recommendation}`;
         }
 
     </script>
+    
+    <!-- AAPL Dashboard Initialization -->
+    <script>
+        // Initialize AAPL Dashboard with improved error handling and fallbacks
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing AAPL dashboard...');
+            let renderAttempts = 0;
+            const maxAttempts = 10;
+            
+            // Function to render AAPL dashboard
+            function renderAAPLDashboard() {
+                renderAttempts++;
+                console.log('React available:', typeof React !== 'undefined');
+                console.log('ReactDOM available:', typeof ReactDOM !== 'undefined');
+                console.log('Babel available:', typeof Babel !== 'undefined');
+                console.log('AAPLAnalysisDashboard available:', !!window.AAPLAnalysisDashboard);
+                console.log('AAPLWeeklyTracker available:', !!window.AAPLWeeklyTracker);
+                
+                const rootElement = document.getElementById('aapl-dashboard-root');
+                console.log('Dashboard root element found:', !!rootElement);
+                
+                // Check if we should retry
+                if (renderAttempts < maxAttempts && (!window.AAPLWeeklyTracker && !window.AAPLAnalysisDashboard)) {
+                    console.log(`Components not ready yet, will retry in ${500 * renderAttempts}ms...`);
+                    setTimeout(renderAAPLDashboard, 500 * renderAttempts);
+                    return;
+                }
+                
+                if (!window.AAPLWeeklyTracker && !window.AAPLAnalysisDashboard) {
+                    console.error('No AAPL components found on window object after all attempts');
+                    if (rootElement) {
+                        rootElement.innerHTML = `
+                            <div class="alert alert-warning m-4">
+                                <h4>Component Loading Issue</h4>
+                                <p>AAPL components are still loading. This might be due to:</p>
+                                <ul>
+                                    <li>Slow network connection</li>
+                                    <li>JavaScript transpilation issues</li>
+                                    <li>Browser compatibility problems</li>
+                                </ul>
+                                <div class="mt-3">
+                                    <button class="btn btn-primary me-2" onclick="location.reload()">Reload Page</button>
+                                    <a href="/static/aapl-debug.html" class="btn btn-secondary" target="_blank">Debug Page</a>
+                                </div>
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        Debug info: React=${typeof React !== 'undefined'}, 
+                                        ReactDOM=${typeof ReactDOM !== 'undefined'}, 
+                                        Babel=${typeof Babel !== 'undefined'}
+                                    </small>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    return;
+                }
+                
+                if (!rootElement) {
+                    console.error('Root element not found');
+                    return;
+                }
+                
+                if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+                    console.error('React or ReactDOM not available');
+                    rootElement.innerHTML = `
+                        <div class="alert alert-danger m-4">
+                            <h4>React Loading Error</h4>
+                            <p>React libraries not loaded properly.</p>
+                            <button class="btn btn-primary" onclick="location.reload()">Reload Page</button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                try {
+                    console.log('Attempting to render React component...');
+                    
+                    // Clear any existing content first
+                    rootElement.innerHTML = '';
+                    
+                    // Try React 18 style first, then fallback to React 17
+                    const ComponentToRender = window.AAPLWeeklyTracker || window.AAPLAnalysisDashboard;
+                    
+                    if (ReactDOM.createRoot) {
+                        // React 18 style
+                        console.log('Using React 18 rendering');
+                        const root = ReactDOM.createRoot(rootElement);
+                        root.render(React.createElement(ComponentToRender));
+                    } else {
+                        // React 17 style fallback
+                        console.log('Using React 17 rendering');
+                        ReactDOM.render(React.createElement(ComponentToRender), rootElement);
+                    }
+                    
+                    console.log('✅ AAPL dashboard rendered successfully');
+                } catch (error) {
+                    console.error('❌ Error rendering AAPL dashboard:', error);
+                    console.error('Error stack:', error.stack);
+                    
+                    // Show detailed error message
+                    rootElement.innerHTML = `
+                        <div class="alert alert-danger m-4">
+                            <h4>Render Error</h4>
+                            <p>Failed to render AAPL Analysis Dashboard: <code>${error.message}</code></p>
+                            <details class="mt-2">
+                                <summary>Error Details</summary>
+                                <pre class="mt-2 p-2 bg-light border rounded" style="font-size: 0.8em; max-height: 200px; overflow-y: auto;">${error.stack}</pre>
+                            </details>
+                            <div class="mt-3">
+                                <button class="btn btn-primary me-2" onclick="location.reload()">Reload Page</button>
+                                <a href="/static/aapl-debug.html" class="btn btn-secondary" target="_blank">Debug Page</a>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Start rendering attempts with progressive delays to allow Babel transpilation
+            setTimeout(renderAAPLDashboard, 1000);  // First attempt after Babel
+            setTimeout(renderAAPLDashboard, 2000);  // Second attempt
+            setTimeout(renderAAPLDashboard, 3000);  // Third attempt
+            setTimeout(renderAAPLDashboard, 5000);  // Final attempt
+            
+            // Also render when tab is shown
+            const aaplTab = document.getElementById('aapl-analysis-tab');
+            if (aaplTab) {
+                aaplTab.addEventListener('shown.bs.tab', function() {
+                    console.log('AAPL tab shown, attempting to render...');
+                    renderAAPLDashboard();
+                });
+            }
+            
+            // Make renderAAPLDashboard globally accessible for manual retry
+            window.renderAAPLDashboard = renderAAPLDashboard;
+        });
+    </script>
 </body>
-</html> 
-</html> 
+</html>

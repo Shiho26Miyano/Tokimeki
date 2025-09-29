@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # Weather API settings
     openweather_api_key: Optional[str] = os.getenv("OPENWEATHER_API_KEY")
     
+    # Polygon API settings (for AAPL Analysis Dashboard)
+    polygon_api_key: Optional[str] = os.getenv("POLYGON_API_KEY")
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": False,
@@ -64,10 +67,12 @@ api_key = os.getenv("OPENROUTER_API_KEY")
 print(f"Environment API key: {'Set' if api_key else 'Not set'}")
 print(f"Settings API key: {'Set' if settings.openrouter_api_key else 'Not set'}")
 
-# Free model configuration
-FREE_MODELS = {
-    "mistral-small": "mistralai/mistral-small-3.2-24b-instruct:free",
-    "deepseek-r1": "deepseek/deepseek-r1-0528:free",
-    "deepseek-chat": "deepseek/deepseek-chat-v3-0324:free",
-    "llama-3.1-405b": "meta-llama/llama-3.1-405b-instruct:free"
+# OpenRouter model configuration - using paid models to avoid rate limits
+OPENROUTER_MODELS = {
+    "mistral-small": "mistralai/mistral-small-3.2-24b-instruct",
+    "deepseek-chat": "deepseek/deepseek-chat-v3-0324", 
+    "claude-haiku": "anthropic/claude-3-haiku-20240307",
+    "gpt-4o-mini": "openai/gpt-4o-mini-2024-07-18",
+    "llama-3.1-8b": "meta-llama/llama-3.1-8b-instruct",
+    "qwen-2.5-7b": "qwen/qwen-2.5-7b-instruct"
 } 

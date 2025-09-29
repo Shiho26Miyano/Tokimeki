@@ -14,7 +14,7 @@ requests==2.31.0
 redis==5.0.1
 psutil==5.9.8
 
-# HTTP client (used by AI service)
+# HTTP client (used by AI service and Polygon API)
 httpx[http2]==0.25.2
 
 # Essential data processing

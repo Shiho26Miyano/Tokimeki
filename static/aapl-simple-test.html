@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAPL Simple Component Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>🧪 AAPL Simple Component Test</h1>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Loading Progress</h5>
+            </div>
+            <div class="card-body">
+                <ol id="progress">
+                    <li>Page loaded</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div id="component-root">
+            <div class="alert alert-info">Component will render here...</div>
+        </div>
+    </div>
+
+    <!-- Load React first -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script>
+        document.getElementById('progress').innerHTML += '<li style="color: green;">✅ React loaded</li>';
+    </script>
+
+    <!-- Load ReactDOM -->
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script>
+        document.getElementById('progress').innerHTML += '<li style="color: green;">✅ ReactDOM loaded</li>';
+    </script>
+
+    <!-- Load the simple component (no template literals) -->
+    <script src="/static/js/components/aapl-weekly-tracker-simple.js" 
+            onerror="document.getElementById('progress').innerHTML += '<li style=\'color: red;\'>❌ Simple script failed to load</li>';" 
+            onload="document.getElementById('progress').innerHTML += '<li style=\'color: green;\'>✅ Simple script loaded successfully</li>';"></script>
+    
+    <script>
+        // Wait a moment for the component to be defined
+        setTimeout(() => {
+            if (typeof window.AAPLWeeklyTracker !== 'undefined') {
+                document.getElementById('progress').innerHTML += '<li style="color: green;">✅ Simple component found on window object!</li>';
+                
+                try {
+                    const container = document.getElementById('component-root');
+                    
+                    if (ReactDOM.createRoot) {
+                        const root = ReactDOM.createRoot(container);
+                        root.render(React.createElement(window.AAPLWeeklyTracker));
+                    } else {
+                        ReactDOM.render(React.createElement(window.AAPLWeeklyTracker), container);
+                    }
+                    
+                    document.getElementById('progress').innerHTML += '<li style="color: green;">🎉 Simple component rendered successfully!</li>';
+                } catch (error) {
+                    document.getElementById('progress').innerHTML += '<li style="color: red;">❌ Simple render error: ' + error.message + '</li>';
+                    console.error('Render error:', error);
+                }
+            } else {
+                document.getElementById('progress').innerHTML += '<li style="color: red;">❌ Simple component still not found</li>';
+                console.log('Available window keys:', Object.keys(window).filter(key => key.includes('AAPL')));
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
