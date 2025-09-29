@@ -1,12 +1,13 @@
-# 🚀 Tokimeki - AI-Powered Investment Analysis Platform
-
+# 🚀 Tokimeki 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## Overview
 
-**Tokimeki** is a comprehensive experimental and learning platform that combines multiple specialized services for trading, AI, and analytics. The platform features a modular architecture with three main domains plus core AI/analytics capabilities.
+**Tokimeki** is an educational platform for learning quantitative finance and market analysis through interactive simulations and research tools.
+
+**Educational Purpose Only**: All tools are designed for learning financial concepts, not for actual investment decisions.
 
 ## 🏗️ Architecture
 
@@ -27,7 +28,8 @@ Tokimeki/
 │   ├── models/                     # Database models
 │   │   ├── database.py             # Database configuration
 │   │   ├── golf_models.py          # Mini golf strategy models
-│   │   └── trading_models.py       # Trading system models
+│   │   ├── trading_models.py       # Trading system models
+│   │   └── aapl_analysis_models.py # AAPL analysis data models
 │   ├── services/                   # Business logic services
 │   │   ├── ai_service.py           # AI integration (OpenRouter)
 │   │   ├── brpc_service.py         # High-performance BRPC service
@@ -35,6 +37,11 @@ Tokimeki/
 │   │   ├── rag_service.py          # RAG system service
 │   │   ├── stock_service.py        # Market data service
 │   │   ├── usage_service.py        # Usage tracking and analytics
+│   │   ├── aaplanalysis/           # AAPL Analysis services
+│   │   │   ├── analysis_service.py # Core AAPL analysis logic
+│   │   │   ├── backtest_service.py # AAPL strategy backtesting
+│   │   │   ├── data_pipeline_service.py # Data processing pipeline
+│   │   │   └── polygon_service.py  # Polygon.io market data integration
 │   │   ├── futureexploratorium/    # Futures Exploratorium services
 │   │   │   ├── analytics_service.py
 │   │   │   ├── core_service.py
@@ -72,6 +79,7 @@ Tokimeki/
 │               ├── rag.py          # Document analysis endpoints
 │               ├── websocket.py    # Real-time data streaming
 │               ├── quantitative_analysis.py
+│               ├── aapl_analysis.py # AAPL stock vs options analysis API
 │               ├── futurequant/    # FutureQuant trading API
 │               │   ├── data.py
 │               │   ├── features.py
@@ -115,11 +123,9 @@ Tokimeki/
 ```
 static/
 ├── index.html                      # Main application interface
-├── test-refactored.html            # Testing interface
 ├── main.js                         # Core JavaScript functionality
-├── style.css                       # Application styling
-├── futurequant-dashboard.js        # FutureQuant trading dashboard
 ├── favicon.ico                     # Site icon
+├── validate_js.py                  # JavaScript validation utility
 ├── css/                           # Modular CSS files
 │   ├── main.css                   # Base styles and typography
 │   ├── components.css             # Component-specific styles
@@ -156,36 +162,25 @@ static/
     └── package.json
 ```
 
-## 🚀 Core Features
+## 📚 Learning Modules
 
-### 1. **FutureQuant Trading System**
-- **Quantitative trading platform** for futures markets
-- **Data ingestion** from MNQ futures data
-- **Feature engineering** and **machine learning model training**
-- **Backtesting** and **paper trading** capabilities
-- **Signal generation** and **risk analysis**
-- **MLflow integration** for model tracking
-- **VectorBT** and **QF-Lib** for quantitative analysis
+### 1. **AAPL Stock vs Options Analysis**
+- Interactive comparison tool with strategy selector dropdown
+- Backtesting simulations with historical data
+- Visual P&L tracking and educational metrics
 
-### 2. **FutureExploratorium**
-- **Market intelligence** and **strategy analysis** platform
-- **Event analysis** for market movements
-- **Dashboard** for real-time monitoring
-- **Analytics service** for comprehensive market analysis
-- **Strategy development** tools
+### 2. **Quantitative Finance (FutureQuant)**
+- Paper trading simulator and backtesting framework
+- Machine learning experiments and risk analysis tools
+- Performance dashboards and feature engineering
 
-### 3. **Mini Golf Strategy**
-- **Golf course analysis** and **strategy optimization**
-- **Factor analysis** for course conditions
-- **Weather integration** for playing conditions
-- **Course search** and **recommendation system**
+### 3. **Market Intelligence (FutureExploratorium)**
+- Event analysis and strategy development tools
+- Market data visualization and analytics dashboard
 
-### 4. **AI & Analytics Services**
-- **AI Service**: OpenRouter API integration with multiple models
-- **RAG System**: Document analysis with LangChain/FAISS
-- **Stock Service**: Market data analysis using yfinance
-- **Cache Service**: Redis caching for performance
-- **Usage Service**: Analytics and tracking
+### 4. **Academic Research Tools**
+- AI-powered research assistant with RAG system
+- Market data APIs and statistical analysis tools
 
 ## 🔧 Technical Stack
 
