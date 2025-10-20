@@ -34,6 +34,10 @@ class ConsumerOptionsReactDashboard {
     async checkAPIHealth() {
         try {
             console.log('Checking API health...');
+            console.log('Current hostname:', window.location.hostname);
+            console.log('Current protocol:', window.location.protocol);
+            console.log('Current port:', window.location.port);
+            
             const response = await fetch('/api/v1/', {
                 method: 'GET',
                 headers: { 'Accept': 'application/json' }
@@ -45,26 +49,46 @@ class ConsumerOptionsReactDashboard {
                 
                 // Check if consumeroptions endpoints are available
                 if (data.endpoints?.consumeroptions) {
-                    console.log('Consumer options endpoints available:', data.endpoints.consumeroptions);
+                    console.log('✅ Consumer options endpoints available:', data.endpoints.consumeroptions);
                 } else {
-                    console.warn('Consumer options endpoints not found in API info');
+                    console.warn('⚠️ Consumer options endpoints not found in API info');
+                    console.log('Available endpoints:', Object.keys(data.endpoints || {}));
                 }
             } else {
-                console.warn(`API health check failed: ${response.status}`);
+                console.warn(`❌ API health check failed: ${response.status}`);
+                const errorText = await response.text();
+                console.warn('Error details:', errorText);
             }
+            
+            // Additional check specifically for consumeroptions endpoint
+            try {
+                const testResponse = await fetch('/api/v1/consumeroptions/dashboard/data/COST?days=1', {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                console.log(`Consumer Options endpoint test: ${testResponse.status}`);
+                if (!testResponse.ok) {
+                    const errorText = await testResponse.text();
+                    console.warn('Consumer Options endpoint error:', errorText);
+                }
+            } catch (testError) {
+                console.error('Consumer Options endpoint test failed:', testError);
+            }
+            
         } catch (error) {
             console.error('API health check error:', error);
-            console.error('This suggests the FastAPI server may not be running');
+            console.error('This suggests the FastAPI server may not be running or accessible');
         }
     }
 
     async loadRealData() {
         try {
             console.log(`Loading real data for ${this.currentTicker}...`);
+            console.log(`Environment: ${window.location.hostname}`);
             this.showLoading(true);
 
-            // Call the consumeroptions dashboard API
-            const apiUrl = `/api/v1/consumeroptions/dashboard/data/${this.currentTicker}?days=60`;
+            // Call the consumeroptions dashboard API with retry logic
+            const apiUrl = `/api/v1/consumeroptions/dashboard/data/${this.currentTicker}?days=60&_t=${Date.now()}`;
             console.log(`Making API call to: ${apiUrl}`);
             
             const response = await fetch(apiUrl, {
@@ -73,18 +97,21 @@ class ConsumerOptionsReactDashboard {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
                 },
+                // Add timeout for Railway
+                signal: AbortSignal.timeout(30000) // 30 second timeout
             });
             
             console.log(`API response status: ${response.status}`);
-            console.log(`API response headers:`, response.headers);
+            console.log(`API response headers:`, Object.fromEntries(response.headers.entries()));
             
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error(`API error response:`, errorText);
                 
                 if (response.status === 404) {
-                    throw new Error(`API endpoint not found: ${apiUrl}`);
+                    throw new Error(`API endpoint not found: ${apiUrl}. Check if consumeroptions endpoints are properly registered.`);
                 } else if (response.status === 500) {
+                    console.error(`Server error details:`, errorText);
                     throw new Error(`Server error: ${errorText}`);
                 } else {
                     throw new Error(`HTTP ${response.status}: ${errorText}`);
@@ -94,7 +121,13 @@ class ConsumerOptionsReactDashboard {
             const data = await response.json();
             console.log('Real data loaded successfully:', data);
             
-            // Debug: Log the structure of received data
+            // Enhanced debugging for Railway
+            console.log('=== API Response Debug Info ===');
+            console.log('Chain data length:', data.chain_data?.contracts?.length || 0);
+            console.log('Call/Put ratios present:', !!data.call_put_ratios);
+            console.log('IV term structure length:', data.iv_term_structure?.length || 0);
+            console.log('Unusual activity length:', data.unusual_activity?.length || 0);
+            
             if (data.chain_data?.contracts?.length > 0) {
                 console.log('Sample contract data:', data.chain_data.contracts[0]);
             }
@@ -105,18 +138,34 @@ class ConsumerOptionsReactDashboard {
                 console.log('Sample IV term data:', data.iv_term_structure[0]);
             }
 
+            // Validate data before processing
+            if (!data || typeof data !== 'object') {
+                throw new Error('Invalid API response format');
+            }
+
             // Process the API response
             this.processAPIData(data);
 
         } catch (error) {
             console.error('Error loading real data:', error);
+            console.error('Error stack:', error.stack);
             
-            // Check if it's a network error
-            if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                this.showError(`Network error: Cannot connect to server. Please ensure the FastAPI server is running on the correct port.`);
+            // Enhanced error handling for Railway deployment
+            let errorMessage = 'Unknown error occurred';
+            
+            if (error.name === 'AbortError') {
+                errorMessage = 'Request timeout - API took too long to respond';
+            } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = 'Network error: Cannot connect to server';
+            } else if (error.message.includes('404')) {
+                errorMessage = 'Consumer Options API endpoints not found. Check deployment.';
+            } else if (error.message.includes('500')) {
+                errorMessage = `Server error: ${error.message}`;
             } else {
-                this.showError(`API Error: ${error.message}`);
+                errorMessage = `API Error: ${error.message}`;
             }
+            
+            this.showError(errorMessage);
             
             // Initialize empty data structures when API fails
             this.initializeEmptyData();
@@ -200,6 +249,8 @@ class ConsumerOptionsReactDashboard {
     }
 
     initializeEmptyData() {
+        console.warn('Initializing empty data structures due to API failure');
+        
         // Initialize empty data structures when API fails
         this.chain = [];
         this.ivTerm = [];
@@ -219,6 +270,9 @@ class ConsumerOptionsReactDashboard {
         };
 
         this.unusual = [];
+        
+        // For Railway deployment, try to show a helpful message
+        console.log('Data initialization complete. Dashboard will show empty state.');
     }
 
     setupEventListeners() {
