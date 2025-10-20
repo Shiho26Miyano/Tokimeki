@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consumer Options Dashboard</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Recharts via CDN (React + Recharts) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
+    
+    <!-- Lucide React Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    
+    <!-- Custom Tailwind config for shadcn/ui-like styling -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        border: "hsl(214.3 31.8% 91.4%)",
+                        input: "hsl(214.3 31.8% 91.4%)",
+                        ring: "hsl(222.2 84% 4.9%)",
+                        background: "hsl(0 0% 100%)",
+                        foreground: "hsl(222.2 84% 4.9%)",
+                        primary: {
+                            DEFAULT: "hsl(222.2 47.4% 11.2%)",
+                            foreground: "hsl(210 40% 98%)",
+                        },
+                        secondary: {
+                            DEFAULT: "hsl(210 40% 96%)",
+                            foreground: "hsl(222.2 84% 4.9%)",
+                        },
+                        destructive: {
+                            DEFAULT: "hsl(0 84.2% 60.2%)",
+                            foreground: "hsl(210 40% 98%)",
+                        },
+                        muted: {
+                            DEFAULT: "hsl(210 40% 96%)",
+                            foreground: "hsl(215.4 16.3% 46.9%)",
+                        },
+                        accent: {
+                            DEFAULT: "hsl(210 40% 96%)",
+                            foreground: "hsl(222.2 84% 4.9%)",
+                        },
+                        popover: {
+                            DEFAULT: "hsl(0 0% 100%)",
+                            foreground: "hsl(222.2 84% 4.9%)",
+                        },
+                        card: {
+                            DEFAULT: "hsl(0 0% 100%)",
+                            foreground: "hsl(222.2 84% 4.9%)",
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        .text-muted-foreground {
+            color: hsl(215.4 16.3% 46.9%);
+        }
+        
+        .shadow-sm {
+            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        }
+        
+        .border {
+            border-color: hsl(214.3 31.8% 91.4%);
+        }
+        
+        /* Custom scrollbar for table */
+        .overflow-x-auto::-webkit-scrollbar {
+            height: 6px;
+        }
+        
+        .overflow-x-auto::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .overflow-x-auto::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        /* Button styles */
+        .btn-primary {
+            background-color: hsl(222.2 47.4% 11.2%);
+            color: hsl(210 40% 98%);
+            border: 1px solid hsl(222.2 47.4% 11.2%);
+        }
+        
+        .btn-primary:hover {
+            background-color: hsl(222.2 47.4% 9%);
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            color: hsl(222.2 84% 4.9%);
+            border: 1px solid hsl(214.3 31.8% 91.4%);
+        }
+        
+        .btn-outline:hover {
+            background-color: hsl(210 40% 96%);
+        }
+        
+        /* Select styles */
+        .select-trigger {
+            background-color: white;
+            border: 1px solid hsl(214.3 31.8% 91.4%);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .select-trigger:hover {
+            border-color: hsl(215.4 16.3% 46.9%);
+        }
+        
+        /* Badge styles */
+        .badge-default {
+            background-color: hsl(222.2 47.4% 11.2%);
+            color: hsl(210 40% 98%);
+        }
+        
+        .badge-secondary {
+            background-color: hsl(210 40% 96%);
+            color: hsl(222.2 84% 4.9%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Main Dashboard Container -->
+    <div id="consumeroptions-dashboard">
+        <!-- Dashboard content will be rendered here by JavaScript -->
+        <div class="min-h-screen flex items-center justify-center">
+            <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                <h2 class="text-xl font-semibold text-gray-700">Loading Consumer Options Dashboard...</h2>
+                <p class="text-gray-500 mt-2">Initializing static demo with mock data</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard JavaScript -->
+    <script src="/static/js/components/consumeroptions.js"></script>
+</body>
+</html>
