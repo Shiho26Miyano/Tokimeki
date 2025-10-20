@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     app_name: str = "Tokimeki FastAPI"
     debug: bool = False
     host: str = "0.0.0.0"
-    port: int = 8080
+    port: int = 8000
     
     # API settings
     openrouter_api_key: Optional[str] = os.getenv("OPENROUTER_API_KEY")

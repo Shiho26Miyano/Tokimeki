@@ -532,6 +532,9 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
+                        <a class="nav-link active" id="consumeroptions-tab" data-bs-toggle="pill" data-bs-target="#consumeroptions-content" role="tab" aria-controls="consumeroptions-content" aria-selected="true">📊 Consumer Options</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
                         <a class="nav-link" id="rag-bi-tab" data-bs-toggle="pill" data-bs-target="#rag-bi-content" role="tab" aria-controls="rag-bi-content" aria-selected="false">📚 RAG Business Intelligence</a>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -544,7 +547,7 @@
                         <a class="nav-link" id="futurequant-dashboard-tab" data-bs-toggle="pill" data-bs-target="#futurequant-dashboard-content" role="tab" aria-controls="futurequant-dashboard-content" aria-selected="false">📊 FutureQuant Simulator</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="aapl-analysis-tab" data-bs-toggle="pill" data-bs-target="#aapl-analysis-content" role="tab" aria-controls="aapl-analysis-content" aria-selected="true">🍎 AAPL Analysis Dashboard</a>
+                        <a class="nav-link" id="aapl-analysis-tab" data-bs-toggle="pill" data-bs-target="#aapl-analysis-content" role="tab" aria-controls="aapl-analysis-content" aria-selected="false">🍎 AAPL Analysis Dashboard</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="deepseek-chatbot-tab" data-bs-toggle="pill" data-bs-target="#deepseek-chatbot-content" role="tab" aria-controls="deepseek-chatbot-content" aria-selected="false">🤖 Chatbot</a>
@@ -846,7 +849,7 @@
                     </div>
 
                     <!-- AAPL Analysis Dashboard Content -->
-                    <div class="tab-pane fade show active" id="aapl-analysis-content" role="tabpanel" aria-labelledby="aapl-analysis-tab">
+                    <div class="tab-pane fade" id="aapl-analysis-content" role="tabpanel" aria-labelledby="aapl-analysis-tab">
                         <div id="aapl-dashboard-root" style="min-height: 500px; padding: 20px;">
                             <!-- React component will render here -->
                             <div class="text-center p-5">
@@ -855,6 +858,13 @@
                                 </div>
                                 <p class="mt-3 text-muted">Loading AAPL Analysis Dashboard...</p>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Consumer Options Content -->
+                    <div class="tab-pane fade show active" id="consumeroptions-content" role="tabpanel" aria-labelledby="consumeroptions-tab">
+                        <div id="consumeroptions-dashboard" style="min-height: 500px;">
+                            <!-- Consumer Options Dashboard will render here -->
                         </div>
                     </div>
 
@@ -1864,13 +1874,17 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-    <script src="https://unpkg.com/date-fns@2.30.0/index.js"></script>
+    <!-- date-fns removed - was causing require() error -->
             <script src="/static/main.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
+    
+    <!-- Consumer Options Dashboard Component -->
+    <script src="/static/js/components/consumeroptions.js"></script>
     
     <!-- AAPL Analysis Dashboard Component -->
     <!-- Load AAPL Dashboard components -->
     <script type="text/babel" src="/static/js/components/aapl-weekly-tracker.js"></script>
     <script type="text/babel" src="/static/js/components/aapl-analysis-dashboard.js"></script>
+    
     
     <!-- Futures Exploratorium React App -->
     <script type="text/babel">
@@ -4947,5 +4961,20 @@ Recommendation: ${currentAnalysis.recommendation}`;
             window.renderAAPLDashboard = renderAAPLDashboard;
         });
     </script>
+
+    <!-- Consumer Options Dashboard Initialization -->
+    <script>
+        // Initialize Consumer Options Dashboard when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📊 Consumer Options Dashboard Loading...');
+            if (typeof ConsumerOptionsReactDashboard !== 'undefined') {
+                // Initialize the dashboard
+                window.consumerOptionsDashboard = new ConsumerOptionsReactDashboard();
+            } else {
+                console.error('ConsumerOptionsReactDashboard class not found. Make sure the JS file is loaded.');
+            }
+        });
+    </script>
+
 </body>
 </html>

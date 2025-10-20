@@ -1,0 +1,162 @@
+{
+  "project_name": "consumer-options-sentiment-dashboard",
+  "goal": "Build a lightweight dashboard that monitors options sentiment for consumer tickers (e.g., COST, WMT, TGT, AMZN, AAPL). Show IV, OI, volume, call/put ratio, unusual activity flags, and simple technicals for the underlying using Polygon.io (Options Starter plan).",
+  "stack": {
+    "language": "python",
+    "runtime": "3.11",
+    "libs": [
+      "requests>=2.32",
+      "pandas>=2.2",
+      "plotly>=5.23",
+      "python-dotenv>=1.0",
+      "fastapi>=0.115",
+      "uvicorn[standard]>=0.30"
+    ]
+  },
+  "env": {
+    "POLYGON_API_KEY": "read from .env; do not hardcode",
+    "TICKERS": ["COST", "WMT", "TGT", "AMZN", "AAPL"]
+  },
+  "data_sources": {
+    "base_url": "https://api.polygon.io",
+    "endpoints": {
+      "option_chain_snapshot": "/v3/snapshot/options/{underlying}",
+      "option_contract_1m_bars": "/v2/aggs/t/{contract}/range/1/minute/{from}/{to}",
+      "underlying_daily_bars": "/v2/aggs/ticker/{underlying}/range/1/day/{from}/{to}",
+      "underlying_rsi": "/v1/indicators/rsi/{underlying}?timespan=day&window=14",
+      "open_interest_timeseries": "/v1/open-close/options/{contract}/{date}"
+    },
+    "notes": [
+      "Starter plan: 15-min delayed, 2 years history, minute/second aggregates, Greeks/IV/OI, snapshots, indicators.",
+      "Prefer snapshots for chain-wide fields (IV, Greeks, OI, last quote).",
+      "Use aggregates for time-series (volume/price/IV) at minute/day granularity."
+    ]
+  },
+  "features": [
+    {
+      "name": "Chain overview",
+      "description": "For each ticker, fetch option-chain snapshot; compute top strikes by OI and by volume for near expiries.",
+      "acceptance_criteria": [
+        "Table with columns: contract, expiry, strike, type, IV, OI, volume, last_price, delta, gamma, theta, vega",
+        "Sortable by OI and volume"
+      ]
+    },
+    {
+      "name": "Call/Put ratio",
+      "description": "Compute daily call/put volume and open-interest ratios per ticker.",
+      "acceptance_criteria": [
+        "KPIs: call_volume / put_volume, call_OI / put_OI",
+        "Colored badges: >1 bullish, <1 bearish, ~1 neutral"
+      ]
+    },
+    {
+      "name": "Unusual activity",
+      "description": "Flag contracts with volume > 3x 20-day average or OI change > 2x 20-day average.",
+      "acceptance_criteria": [
+        "List of flagged contracts with trigger reason and z-score",
+        "Toggle to filter to only unusual"
+      ]
+    },
+    {
+      "name": "IV term structure",
+      "description": "Plot median IV by expiry for the next 8 expirations.",
+      "acceptance_criteria": [
+        "Line chart per ticker",
+        "Hover shows expiry and median IV"
+      ]
+    },
+    {
+      "name": "Underlyings technicals",
+      "description": "Show underlying daily bars + RSI(14).",
+      "acceptance_criteria": [
+        "Candlestick + overlay of 20/50 SMA",
+        "RSI subpanel with overbought/oversold bands (70/30)"
+      ]
+    },
+    {
+      "name": "Contract drilldown",
+      "description": "For a selected contract, show 1-minute price/volume series with IV and Greeks snapshots (best-effort).",
+      "acceptance_criteria": [
+        "Dual-axis chart: price vs volume",
+        "Table of latest Greeks/IV"
+      ]
+    }
+  ],
+  "api_contracts": [
+    {
+      "name": "get_chain_snapshot",
+      "method": "GET",
+      "path": "/v3/snapshot/options/{underlying}",
+      "query": { "apiKey": "(env POLYGON_API_KEY)" },
+      "returns": "JSON with contracts[] including strikePrice, expirationDate, contractType, day: { volume, openInterest }, lastQuote, impliedVolatility, greeks"
+    },
+    {
+      "name": "get_contract_bars_1m",
+      "method": "GET",
+      "path": "/v2/aggs/t/{contract}/range/1/minute/{from}/{to}",
+      "query": { "adjusted": "true", "sort": "asc", "limit": 50000, "apiKey": "(env POLYGON_API_KEY)" },
+      "returns": "JSON aggregates results"
+    },
+    {
+      "name": "get_underlying_daily_bars",
+      "method": "GET",
+      "path": "/v2/aggs/ticker/{underlying}/range/1/day/{from}/{to}",
+      "query": { "adjusted": "true", "sort": "asc", "limit": 5000, "apiKey": "(env POLYGON_API_KEY)" },
+      "returns": "JSON aggregates results"
+    },
+    {
+      "name": "get_underlying_rsi",
+      "method": "GET",
+      "path": "/v1/indicators/rsi/{underlying}",
+      "query": { "timespan": "day", "window": 14, "apiKey": "(env POLYGON_API_KEY)" },
+      "returns": "JSON indicator values"
+    }
+  ],
+  "ui": {
+    "framework": "FastAPI + Plotly (server-rendered) or Streamlit (optional)",
+    "pages": [
+      {
+        "route": "/",
+        "widgets": [
+          "ticker-multi-select",
+          "date-range-picker (default: last 60 trading days)",
+          "tables: chain-overview, unusual-activity",
+          "charts: iv-term-structure, underlying-candles+SMA, rsi, contract-1m-price-volume"
+        ]
+      }
+    ]
+  },
+  "logic": {
+    "call_put_split": "Aggregate chain rows by contractType; sum volume and openInterest for ratios.",
+    "iv_term_structure": "Group contracts by expirationDate; compute median impliedVolatility per expiry.",
+    "unusual_logic": "Compute rolling 20-day avg volume/OI per contract; flag if current > thresholds.",
+    "throttling": "Cache snapshot per ticker for 60s; cache aggregates for 10m to respect rate limits and speed.",
+    "error_handling": "Gracefully handle empty results; show banner with guidance if data missing."
+  },
+  "files": {
+    "layout": [
+      "app/",
+      "app/main.py",
+      "app/polygon_client.py",
+      "app/analytics.py",
+      "app/charts.py",
+      ".env.example",
+      "requirements.txt",
+      "README.md"
+    ],
+    "requirements_txt": "requests\\npandas\\nplotly\\npython-dotenv\\nfastapi\\nuvicorn[standard]\\n",
+    "env_example": "POLYGON_API_KEY=your_key_here\\nTICKERS=COST,WMT,TGT,AMZN,AAPL\\n"
+  },
+  "testing": {
+    "unit": [
+      "analytics.call_put_ratio(ticker_data) returns floats and handles divide-by-zero",
+      "analytics.iv_term_structure(chain) returns sorted expiries with medians",
+      "analytics.flag_unusual(contract_ts) returns list of flags with reasons"
+    ]
+  },
+  "deliverables": [
+    "Running FastAPI server with JSON + simple HTML endpoints",
+    "CSV export buttons for tables",
+    "Configurable tickers via .env"
+  ]
+}
