@@ -29,8 +29,10 @@
                     
                     // Data
                     weeklyData: [],
+                    optionsData: [],
                     loading: false,
                     error: null,
+                    selectedStrategy: 'options', // 'stock' or 'options'
                     
                     // Summary
                     totalInvested: 0,
@@ -46,6 +48,7 @@
             componentDidMount() {
                 console.log('AAPL Weekly Tracker mounted');
                 this.loadWeeklyData();
+                this.loadOptionsData(); // Load both datasets
             }
             
             async loadWeeklyData() {
@@ -81,6 +84,92 @@
                         error: error.message
                     });
                 }
+            }
+            
+            async loadOptionsData() {
+                this.setState({ loading: true, error: null });
+                
+                try {
+                    // Mock options data for demonstration
+                    const mockOptionsData = this.generateMockOptionsData();
+                    
+                    const optionsSummary = this.calculateOptionsSummary(mockOptionsData);
+                    
+                    this.setState({
+                        optionsData: mockOptionsData,
+                        totalOptionTrades: optionsSummary.totalTrades,
+                        totalOptionPnL: optionsSummary.totalPnL,
+                        optionWinRate: optionsSummary.winRate,
+                        loading: false
+                    });
+                } catch (error) {
+                    console.error('Error loading options data:', error);
+                    this.setState({ 
+                        error: 'Failed to load options data. Please try again.',
+                        loading: false
+                    });
+                }
+            }
+            
+            generateMockOptionsData() {
+                // Generate mock weekly options trading data
+                const optionsData = [];
+                const startDate = new Date(this.state.startDate);
+                const endDate = new Date(this.state.endDate);
+                
+                let currentDate = new Date(startDate);
+                let week = 1;
+                
+                while (currentDate <= endDate) {
+                    // Find Tuesday for this week
+                    while (currentDate.getDay() !== 2) {
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+                    
+                    if (currentDate <= endDate) {
+                        const targetDate = currentDate.toISOString().split('T')[0];
+                        
+                        // Mock options trade
+                        const strikePrice = 150 + (Math.random() - 0.5) * 20; // Around $150
+                        const optionPrice = Math.random() * 5 + 1; // $1-6
+                        const contracts = 1;
+                        const totalCost = optionPrice * contracts * 100;
+                        
+                        // Mock P&L (simplified)
+                        const pnl = (Math.random() - 0.4) * totalCost * 2; // Slight positive bias
+                        
+                        optionsData.push({
+                            week: week,
+                            date: targetDate,
+                            strike: strikePrice.toFixed(2),
+                            optionPrice: optionPrice.toFixed(2),
+                            contracts: contracts,
+                            totalCost: totalCost.toFixed(2),
+                            pnl: pnl.toFixed(2),
+                            pnlPercent: ((pnl / totalCost) * 100).toFixed(1),
+                            status: pnl > 0 ? 'Win' : 'Loss'
+                        });
+                    }
+                    
+                    // Move to next week
+                    currentDate.setDate(currentDate.getDate() + 7);
+                    week++;
+                }
+                
+                return optionsData;
+            }
+            
+            calculateOptionsSummary(optionsData) {
+                const totalTrades = optionsData.length;
+                const totalPnL = optionsData.reduce((sum, trade) => sum + parseFloat(trade.pnl), 0);
+                const winningTrades = optionsData.filter(trade => parseFloat(trade.pnl) > 0).length;
+                const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+                
+                return {
+                    totalTrades,
+                    totalPnL,
+                    winRate
+                };
             }
             
             generateWeeklyInvestments(priceData) {

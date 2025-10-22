@@ -155,6 +155,10 @@ class DashboardResponse(BaseModel):
     iv_term_structure: List[IVTermPoint] = Field(..., description="IV term structure")
     unusual_activity: List[UnusualActivity] = Field(..., description="Unusual activity")
     
+    # Chart data
+    oi_heatmap_data: Optional[Dict[str, Any]] = Field(None, description="Open Interest Change heatmap data")
+    delta_distribution_data: Optional[Dict[str, Any]] = Field(None, description="Delta Distribution histogram data")
+    
     # Underlying data
     underlying_data: List[UnderlyingData] = Field(..., description="Historical underlying data")
     

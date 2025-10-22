@@ -63,7 +63,7 @@ class ConsumerOptionsDashboardService:
                 self._get_analytics_data(focus_ticker)
             ]
             
-            chain_data, underlying_data, (call_put_ratios, iv_term, unusual_activity) = await asyncio.gather(*tasks)
+            chain_data, underlying_data, (call_put_ratios, iv_term, unusual_activity, oi_heatmap_data, delta_distribution_data) = await asyncio.gather(*tasks)
             
             return DashboardResponse(
                 focus_ticker=focus_ticker,
@@ -72,6 +72,8 @@ class ConsumerOptionsDashboardService:
                 call_put_ratios=call_put_ratios,
                 iv_term_structure=iv_term,
                 unusual_activity=unusual_activity,
+                oi_heatmap_data=oi_heatmap_data,
+                delta_distribution_data=delta_distribution_data,
                 underlying_data=underlying_data
             )
             
@@ -103,11 +105,13 @@ class ConsumerOptionsDashboardService:
                     logger.error(f"Error getting analytics for {ticker}: {str(result)}")
                     continue
                 
-                call_put_ratios, iv_term, unusual_activity = result
+                call_put_ratios, iv_term, unusual_activity, oi_heatmap_data, delta_distribution_data = result
                 analytics_data[ticker] = {
                     "call_put_ratios": call_put_ratios,
                     "iv_term_structure": iv_term,
-                    "unusual_activity": unusual_activity
+                    "unusual_activity": unusual_activity,
+                    "oi_heatmap_data": oi_heatmap_data,
+                    "delta_distribution_data": delta_distribution_data
                 }
             
             # Generate market summary
@@ -200,7 +204,11 @@ class ConsumerOptionsDashboardService:
         iv_term = self.analytics_service.calculate_iv_term_structure(contracts)
         unusual_activity = self.analytics_service.detect_unusual_activity(contracts, ticker)
         
-        return call_put_ratios, iv_term, unusual_activity
+        # Calculate new chart data
+        oi_heatmap_data = self.analytics_service.calculate_oi_change_heatmap_data(contracts)
+        delta_distribution_data = self.analytics_service.calculate_delta_distribution_data(contracts)
+        
+        return call_put_ratios, iv_term, unusual_activity, oi_heatmap_data, delta_distribution_data
     
     def _extract_underlying_from_contract(self, contract: str) -> Optional[str]:
         """
