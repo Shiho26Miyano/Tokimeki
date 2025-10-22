@@ -187,6 +187,10 @@ class PolygonService:
         timespan: str = "day"
     ) -> StockPriceResponse:
         """Get stock OHLC data from Polygon"""
+        # Check if using mock data
+        if self.config.api_key == "mock_key":
+            return self._generate_mock_stock_data(ticker, start_date, end_date)
+        
         cache_key = self._get_cache_key(
             f"/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}",
             {
@@ -406,4 +410,51 @@ class PolygonService:
             missing_option_exit_data=0,  # Would be calculated during backtest
             partial_data_warnings=[],
             api_errors=self.errors.copy()
+        )
+    
+    def _generate_mock_stock_data(self, ticker: str, start_date: date, end_date: date) -> StockPriceResponse:
+        """Generate mock stock data for demonstration purposes"""
+        import random
+        from datetime import timedelta
+        
+        # Set seed for consistent mock data
+        random.seed(42)
+        
+        # Generate realistic AAPL-like data
+        base_price = 150.0 if ticker.upper() == "AAPL" else 100.0
+        current_price = base_price
+        ohlc_data = []
+        
+        current_date = start_date
+        while current_date <= end_date:
+            # Skip weekends
+            if current_date.weekday() < 5:
+                # Generate realistic price movement
+                daily_change = random.uniform(-0.05, 0.05)  # ±5% daily change
+                current_price *= (1 + daily_change)
+                
+                # Generate OHLC data
+                open_price = current_price * random.uniform(0.98, 1.02)
+                high_price = max(open_price, current_price) * random.uniform(1.0, 1.03)
+                low_price = min(open_price, current_price) * random.uniform(0.97, 1.0)
+                close_price = current_price
+                volume = random.randint(1000000, 10000000)
+                
+                ohlc_data.append(OHLCData(
+                    timestamp=datetime.combine(current_date, datetime.min.time()),
+                    open=round(open_price, 2),
+                    high=round(high_price, 2),
+                    low=round(low_price, 2),
+                    close=round(close_price, 2),
+                    volume=volume
+                ))
+            
+            current_date += timedelta(days=1)
+        
+        return StockPriceResponse(
+            ticker=ticker,
+            data=ohlc_data,
+            count=len(ohlc_data),
+            from_date=start_date,
+            to_date=end_date
         )

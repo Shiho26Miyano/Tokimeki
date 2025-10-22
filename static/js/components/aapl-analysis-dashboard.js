@@ -48,7 +48,7 @@ class AAPLAnalysisDashboard extends React.Component {
             loading: false,
             error: null,
             activeTab: 'controls',
-            selectedStrategy: 'stock', // 'stock' or 'options'
+            selectedStrategy: 'options', // 'stock' or 'options'
             
             // Chart data
             stockEquityCurve: [],

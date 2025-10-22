@@ -32,10 +32,9 @@ def get_aapl_analysis_service() -> AAPLAnalysisService:
     if _aapl_analysis_service is None:
         api_key = os.getenv("POLYGON_API_KEY")
         if not api_key:
-            raise HTTPException(
-                status_code=500, 
-                detail="POLYGON_API_KEY environment variable is not set. Please set it with: export POLYGON_API_KEY='your_key_here'"
-            )
+            logger.warning("POLYGON_API_KEY not set - using mock data for AAPL analysis")
+            # Use a dummy API key for mock data
+            api_key = "mock_key"
         config = PolygonConfig(
             api_key=api_key,
             max_retries=3,

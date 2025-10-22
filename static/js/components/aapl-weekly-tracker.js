@@ -31,7 +31,7 @@ class AAPLWeeklyTracker extends React.Component {
             optionsData: [],
             loading: false,
             error: null,
-            selectedStrategy: 'stock', // 'stock' or 'options'
+            selectedStrategy: 'options', // 'stock' or 'options'
             
             // Summary
             totalInvested: 0,

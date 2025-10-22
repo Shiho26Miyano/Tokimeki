@@ -7,6 +7,8 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
 from app.services.consumeroptions.dashboard_service import ConsumerOptionsDashboardService
+from app.services.consumeroptions.analytics_service import ConsumerOptionsAnalyticsService
+from app.services.consumeroptions.polygon_service import ConsumerOptionsPolygonService
 from app.services.usage_service import AsyncUsageService
 from app.core.dependencies import get_usage_service
 from app.models.options_models import (
@@ -302,3 +304,4 @@ async def health_check(
             error=str(e)
         )
         raise HTTPException(status_code=500, detail=str(e))
+

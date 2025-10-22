@@ -13,6 +13,7 @@ class ConsumerOptionsReactDashboard {
         this.currentTicker = 'COST';
         this.sampleTickers = ['COST', 'WMT', 'TGT', 'AMZN', 'AAPL'];
         this.onlyUnusual = false;
+        this.tooltipsSetup = false;
         
         // Initialize formatPct utility
         this.formatPct = (x) => (x == null ? "—" : `${(x * 100).toFixed(1)}%`);
@@ -187,12 +188,18 @@ class ConsumerOptionsReactDashboard {
         // Process unusual activity
         this.unusual = data.unusual_activity || [];
 
+        // Process new chart data
+        this.oiHeatmapData = data.oi_heatmap_data || {};
+        this.deltaDistributionData = data.delta_distribution_data || {};
+
         console.log('Processed API data:', {
             chainLength: this.chain.length,
             unusualCount: this.unusual.length,
             callPutRatios: this.callPut,
             sampleContract: this.chain[0],
-            sampleIVTerm: this.ivTerm[0]
+            sampleIVTerm: this.ivTerm[0],
+            oiHeatmapData: this.oiHeatmapData,
+            deltaDistributionData: this.deltaDistributionData
         });
 
         // Render the dashboard with the processed data
@@ -219,6 +226,8 @@ class ConsumerOptionsReactDashboard {
         };
 
         this.unusual = [];
+        this.oiHeatmapData = {};
+        this.deltaDistributionData = {};
     }
 
     setupEventListeners() {
@@ -261,7 +270,8 @@ class ConsumerOptionsReactDashboard {
             if (this.chain.length > 0 || this.ivTerm.length > 0 || this.underlying.length > 0) {
                 this.renderCharts();
             }
-        }, 100);
+            this.setupTooltips();
+        }, 200);
     }
 
     getReactUIHTML() {
@@ -449,8 +459,44 @@ class ConsumerOptionsReactDashboard {
                     </div>
                 </div>
 
-                <!-- Right Column: IV Term Structure + Underlying -->
+                <!-- Right Column: Charts -->
                 <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- How to Read Charts Together Guide -->
+                    <div style="
+                        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+                        border-radius: 12px;
+                        border: 1px solid #cbd5e1;
+                        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                        padding: 1rem;
+                        margin-bottom: 0.5rem;
+                    ">
+                        <h4 style="font-size: 0.875rem; font-weight: 600; color: #1e293b; margin: 0 0 0.5rem 0; display: flex; align-items: center;">
+                            📊 How to Read Them Together
+                            <span style="
+                                margin-left: 0.5rem;
+                                background: #3b82f6;
+                                color: white;
+                                padding: 2px 6px;
+                                border-radius: 4px;
+                                font-size: 0.625rem;
+                                font-weight: 500;
+                            ">Hover over chart titles for details</span>
+                        </h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.75rem; color: #475569;">
+                            <div>
+                                <strong style="color: #1e293b;">Bullish Scenario:</strong><br>
+                                • Stock trending up<br>
+                                • Green OI clusters at higher strikes<br>
+                                • Right-side delta peak (calls)
+                            </div>
+                            <div>
+                                <strong style="color: #1e293b;">Bearish Scenario:</strong><br>
+                                • Stock trending down<br>
+                                • Green OI clusters at lower strikes<br>
+                                • Left-side delta peak (puts)
+                            </div>
+                        </div>
+                    </div>
                     <!-- IV Term Structure -->
                     <div style="
                         background: white;
@@ -459,7 +505,30 @@ class ConsumerOptionsReactDashboard {
                         box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
                     ">
                         <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0;">
-                            <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0;">IV Term Structure</h3>
+                            <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0; position: relative; display: inline-block; cursor: help;" 
+                                id="iv-term-tooltip-trigger">
+                                IV Term Structure
+                                <span id="iv-term-tooltip" style="
+                                    position: absolute;
+                                    background: #1e293b;
+                                    color: white;
+                                    padding: 8px 12px;
+                                    border-radius: 6px;
+                                    font-size: 0.75rem;
+                                    font-weight: 400;
+                                    white-space: normal;
+                                    max-width: 300px;
+                                    z-index: 1000;
+                                    opacity: 0;
+                                    pointer-events: none;
+                                    transition: opacity 0.2s;
+                                    top: -60px;
+                                    left: 0;
+                                    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                                ">
+                                    Shows how implied volatility changes across different expiration dates. Higher IV = more expensive options. Look for normal upward curves (healthy) or inverted curves (near-term fear).
+                                </span>
+                            </h3>
                         </div>
                         <div style="padding: 1rem;">
                             <div id="iv-term-chart" style="height: 180px;"></div>
@@ -475,11 +544,111 @@ class ConsumerOptionsReactDashboard {
                         box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
                     ">
                         <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0;">
-                            <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0;">Underlying (Daily)</h3>
+                            <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0; position: relative; display: inline-block; cursor: help;" 
+                                id="underlying-tooltip-trigger">
+                                Underlying (Daily)
+                                <span id="underlying-tooltip" style="
+                                    position: absolute;
+                                    background: #1e293b;
+                                    color: white;
+                                    padding: 8px 12px;
+                                    border-radius: 6px;
+                                    font-size: 0.75rem;
+                                    font-weight: 400;
+                                    white-space: normal;
+                                    max-width: 300px;
+                                    z-index: 1000;
+                                    opacity: 0;
+                                    pointer-events: none;
+                                    transition: opacity 0.2s;
+                                    top: -60px;
+                                    left: 0;
+                                    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                                ">
+                                    Shows the actual stock price movement over time. Look for trends, support/resistance levels, and volatility patterns. This provides context for all your options decisions.
+                                </span>
+                            </h3>
                         </div>
                         <div style="padding: 1rem;">
                             <div id="underlying-chart" style="height: 180px;"></div>
                             <p style="margin-top: 0.5rem; font-size: 0.625rem; color: #64748b;">Candles/RSI can replace this area chart.</p>
+                        </div>
+                    </div>
+
+                    <!-- Open Interest Change Heatmap -->
+                    <div style="
+                        background: white;
+                        border-radius: 12px;
+                        border: 1px solid #e2e8f0;
+                        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                    ">
+                        <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0;">
+                            <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0; position: relative; display: inline-block; cursor: help;" 
+                                id="oi-change-tooltip-trigger">
+                                Open Interest Change
+                                <span id="oi-change-tooltip" style="
+                                    position: absolute;
+                                    background: #1e293b;
+                                    color: white;
+                                    padding: 8px 12px;
+                                    border-radius: 6px;
+                                    font-size: 0.75rem;
+                                    font-weight: 400;
+                                    white-space: normal;
+                                    max-width: 300px;
+                                    z-index: 1000;
+                                    opacity: 0;
+                                    pointer-events: none;
+                                    transition: opacity 0.2s;
+                                    top: -60px;
+                                    left: 0;
+                                    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                                ">
+                                    Heatmap showing how much open interest changed from yesterday. Green/Yellow = more contracts opened, Purple/Blue = contracts closed. Shows where "smart money" is positioning.
+                                </span>
+                            </h3>
+                        </div>
+                        <div style="padding: 1rem;">
+                            <div id="oi-heatmap-chart" style="height: 350px; width: 100%; overflow: visible;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Delta Distribution -->
+                    <div style="
+                        background: white;
+                        border-radius: 12px;
+                        border: 1px solid #e2e8f0;
+                        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                    ">
+                        <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0;">
+                            <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0; position: relative; display: inline-block; cursor: help;" 
+                                id="delta-dist-tooltip-trigger">
+                                Delta Distribution
+                                <span id="delta-dist-tooltip" style="
+                                    position: absolute;
+                                    background: #1e293b;
+                                    color: white;
+                                    padding: 8px 12px;
+                                    border-radius: 6px;
+                                    font-size: 0.75rem;
+                                    font-weight: 400;
+                                    white-space: normal;
+                                    max-width: 300px;
+                                    z-index: 1000;
+                                    opacity: 0;
+                                    pointer-events: none;
+                                    transition: opacity 0.2s;
+                                    top: -60px;
+                                    left: 0;
+                                    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                                ">
+                                    Shows how many contracts exist at different delta levels. Left side = put options (bearish), right side = call options (bullish). Peaks show where most trading activity is concentrated.
+                                </span>
+                            </h3>
+                        </div>
+                        <div style="padding: 1rem;">
+                            <div id="delta-distribution-chart" style="height: 350px; width: 100%; overflow: visible;"></div>
+                            <p style="margin-top: 0.5rem; font-size: 0.625rem; color: #64748b;">Contracts (weighted) by delta value.</p>
                         </div>
                     </div>
                 </div>
@@ -586,6 +755,8 @@ class ConsumerOptionsReactDashboard {
         console.log('Rendering charts...');
         this.renderIVTermChart();
         this.renderUnderlyingChart();
+        this.renderOIChangeHeatmap();
+        this.renderDeltaDistribution();
         
         // Initialize Lucide icons
         if (typeof lucide !== 'undefined') {
@@ -735,6 +906,25 @@ class ConsumerOptionsReactDashboard {
                     `;
                 }).join('')}
                 
+                <!-- X-axis labels -->
+                ${recent.map((d, i) => {
+                    if (i % Math.ceil(recent.length / 5) === 0) { // Show every 5th label
+                        const x = margin.left + (i / (recent.length - 1)) * chartWidth;
+                        // Generate date based on index (recent data is last 30 days)
+                        const daysAgo = recent.length - 1 - i;
+                        const date = new Date();
+                        date.setDate(date.getDate() - daysAgo);
+                        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        return `
+                            <text x="${x}" y="${height - 10}" 
+                                  text-anchor="middle" font-size="10" fill="#64748b">
+                                ${dateStr}
+                            </text>
+                        `;
+                    }
+                    return '';
+                }).join('')}
+                
                 <!-- Area chart -->
                 <g transform="translate(${margin.left}, ${margin.top})">
                     <path d="${areaPath}" fill="url(#areaGradient)"/>
@@ -744,6 +934,262 @@ class ConsumerOptionsReactDashboard {
         `;
     }
 
+    renderOIChangeHeatmap() {
+        const container = document.getElementById('oi-heatmap-chart');
+        if (!container) {
+            console.log('OI Heatmap chart container not available');
+            return;
+        }
+
+        const data = this.oiHeatmapData;
+        if (!data || !data.expiries || !data.strikes || !data.delta_oi) {
+            container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #64748b;">No OI change data available</div>';
+            return;
+        }
+
+        const { expiries, strikes, delta_oi, min_delta, max_delta } = data;
+        
+        // Create SVG heatmap
+        const containerWidth = container.clientWidth || 400;
+        const width = Math.min(containerWidth, 450);
+        const height = 350;
+        const margin = { top: 30, right: 80, bottom: 80, left: 50 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        const cellWidth = chartWidth / strikes.length;
+        const cellHeight = chartHeight / expiries.length;
+
+        // Color scale function (viridis-like: dark purple/blue to bright yellow/green)
+        const getColor = (value) => {
+            const normalized = (value - min_delta) / (max_delta - min_delta);
+            
+            // Viridis color scheme approximation
+            if (normalized < 0.1) return '#440154'; // Dark purple
+            if (normalized < 0.2) return '#482777'; // Purple
+            if (normalized < 0.3) return '#3f4a8a'; // Blue-purple
+            if (normalized < 0.4) return '#31688e'; // Blue
+            if (normalized < 0.5) return '#26828e'; // Blue-green
+            if (normalized < 0.6) return '#1f9e89'; // Teal
+            if (normalized < 0.7) return '#35b779'; // Green
+            if (normalized < 0.8) return '#6ece58'; // Light green
+            if (normalized < 0.9) return '#b5de2b'; // Yellow-green
+            return '#fde725'; // Bright yellow
+        };
+
+        // Create heatmap cells
+        const cells = [];
+        for (let i = 0; i < expiries.length; i++) {
+            for (let j = 0; j < strikes.length; j++) {
+                const value = delta_oi[i][j];
+                const x = margin.left + j * cellWidth;
+                const y = margin.top + i * cellHeight;
+                
+                cells.push(`
+                    <rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" 
+                          fill="${getColor(value)}" stroke="#e2e8f0" stroke-width="0.5">
+                        <title>${expiries[i]} | ${strikes[j]} | Δ OI: ${value}</title>
+                    </rect>
+                `);
+            }
+        }
+
+        // Create axis labels with better spacing and wrapping
+        const strikeLabels = strikes.map((strike, i) => {
+            const x = margin.left + i * cellWidth + cellWidth/2;
+            const y = height - 25;
+            return `
+                <text x="${x}" 
+                      y="${y}" 
+                      text-anchor="middle" 
+                      font-size="11" 
+                      fill="#374151" 
+                      font-weight="500"
+                      transform="rotate(-45, ${x}, ${y})">
+                    ${strike}
+                </text>
+            `;
+        }).join('');
+
+        const expiryLabels = expiries.map((expiry, i) => {
+            const x = margin.left - 10;
+            const y = margin.top + i * cellHeight + cellHeight/2;
+            return `
+                <text x="${x}" 
+                      y="${y}" 
+                      text-anchor="end" 
+                      font-size="10" 
+                      fill="#64748b" 
+                      dominant-baseline="middle">
+                    ${expiry}
+                </text>
+            `;
+        }).join('');
+
+        // Create color legend
+        const legendWidth = Math.min(140, chartWidth * 0.35);
+        const legendHeight = 20;
+        const legendX = margin.left + chartWidth - legendWidth - 5;
+        const legendY = margin.top;
+
+        const legendGradient = Array.from({length: 20}, (_, i) => {
+            const value = min_delta + (i / 19) * (max_delta - min_delta);
+            const color = getColor(value);
+            return `<stop offset="${i/19}" stop-color="${color}"/>`;
+        }).join('');
+
+        container.innerHTML = `
+            <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" style="overflow: visible; max-width: 100%;">
+                <defs>
+                    <linearGradient id="heatmapGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        ${legendGradient}
+                    </linearGradient>
+                </defs>
+                
+                <!-- Heatmap cells -->
+                ${cells.join('')}
+                
+                <!-- Axis labels -->
+                ${strikeLabels}
+                ${expiryLabels}
+                
+                <!-- Axis titles -->
+                <text x="${margin.left + chartWidth/2}" 
+                      y="${height - 10}" 
+                      text-anchor="middle" 
+                      font-size="11" 
+                      font-weight="600" 
+                      fill="#374151">Strike</text>
+                <text x="${margin.left + chartWidth + 15}" 
+                      y="${margin.top + chartHeight/2}" 
+                      text-anchor="middle" 
+                      font-size="11" 
+                      font-weight="600" 
+                      fill="#374151" 
+                      transform="rotate(-90, ${margin.left + chartWidth + 15}, ${margin.top + chartHeight/2})">Expiry</text>
+                
+                <!-- Color legend -->
+                <rect x="${legendX}" y="${legendY}" width="${legendWidth}" height="${legendHeight}" 
+                      fill="url(#heatmapGradient)" stroke="#e2e8f0"/>
+                <text x="${legendX}" y="${legendY - 5}" font-size="10" font-weight="600" fill="#374151">Δ OI (contracts)</text>
+                <text x="${legendX}" y="${legendY + legendHeight + 15}" font-size="8" fill="#64748b">${min_delta}</text>
+                <text x="${legendX + legendWidth}" y="${legendY + legendHeight + 15}" font-size="8" fill="#64748b" text-anchor="end">${max_delta}</text>
+            </svg>
+        `;
+    }
+
+    renderDeltaDistribution() {
+        const container = document.getElementById('delta-distribution-chart');
+        if (!container) {
+            console.log('Delta Distribution chart container not available');
+            return;
+        }
+
+        const data = this.deltaDistributionData;
+        if (!data || !data.bins || !data.counts) {
+            container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #64748b;">No delta distribution data available</div>';
+            return;
+        }
+
+        const { bins, counts, bin_centers, max_count } = data;
+        
+        // Create SVG histogram
+        const containerWidth = container.clientWidth || 400;
+        const width = Math.min(containerWidth, 450);
+        const height = 350;
+        const margin = { top: 30, right: 40, bottom: 80, left: 50 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        const barWidth = chartWidth / (bins.length - 1);
+        const maxHeight = chartHeight * 0.9;
+
+        // Create bars
+        const bars = counts.map((count, i) => {
+            const barHeight = (count / max_count) * maxHeight;
+            const x = margin.left + i * barWidth;
+            const y = margin.top + maxHeight - barHeight;
+            
+            return `
+                <rect x="${x}" y="${y}" width="${barWidth * 0.8}" height="${barHeight}" 
+                      fill="#ff7f0e" stroke="white" stroke-width="1">
+                    <title>Delta: ${bin_centers[i]?.toFixed(2) || 'N/A'} | Contracts: ${count}</title>
+                </rect>
+            `;
+        }).join('');
+
+        // Create x-axis labels with better spacing
+        const xLabels = bin_centers.map((center, i) => {
+            if (i % 3 === 0) { // Show every third label to avoid crowding
+                const x = margin.left + i * barWidth + barWidth/2;
+                return `
+                    <text x="${x}" 
+                          y="${height - 25}" 
+                          text-anchor="middle" 
+                          font-size="11" 
+                          fill="#374151"
+                          font-weight="500">
+                        ${center?.toFixed(1) || 'N/A'}
+                    </text>
+                `;
+            }
+            return '';
+        }).join('');
+
+        // Create y-axis labels with better formatting
+        const yLabels = [0, 0.25, 0.5, 0.75, 1].map(ratio => {
+            const value = Math.round(ratio * max_count);
+            const y = margin.top + maxHeight - (ratio * maxHeight);
+            const formattedValue = value >= 1000 ? `${(value/1000).toFixed(1)}k` : value.toString();
+            return `
+                <text x="${margin.left - 10}" 
+                      y="${y + 3}" 
+                      text-anchor="end" 
+                      font-size="10" 
+                      fill="#64748b">
+                    ${formattedValue}
+                </text>
+            `;
+        }).join('');
+
+        // Create grid lines
+        const gridLines = [0, 0.25, 0.5, 0.75, 1].map(ratio => {
+            const y = margin.top + maxHeight - (ratio * maxHeight);
+            return `
+                <line x1="${margin.left}" y1="${y}" x2="${margin.left + chartWidth}" y2="${y}" 
+                      stroke="#f1f5f9" stroke-width="1"/>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <svg width="100%" height="${height}" style="overflow: visible;">
+                <!-- Grid lines -->
+                ${gridLines}
+                
+                <!-- Bars -->
+                ${bars}
+                
+                <!-- Axis labels -->
+                ${xLabels}
+                ${yLabels}
+                
+                <!-- Axis titles -->
+                <text x="${margin.left + chartWidth/2}" 
+                      y="${height - 10}" 
+                      text-anchor="middle" 
+                      font-size="11" 
+                      font-weight="600" 
+                      fill="#374151">Delta</text>
+                <text x="${margin.left + chartWidth + 15}" 
+                      y="${margin.top + chartHeight/2}" 
+                      text-anchor="middle" 
+                      font-size="11" 
+                      font-weight="600" 
+                      fill="#374151" 
+                      transform="rotate(-90, ${margin.left + chartWidth + 15}, ${margin.top + chartHeight/2})">Contracts (weighted)</text>
+            </svg>
+        `;
+    }
 
     renderChainTable() {
         const displayRows = this.onlyUnusual ? this.unusual : this.chain;
@@ -751,6 +1197,81 @@ class ConsumerOptionsReactDashboard {
         if (container) {
             container.innerHTML = this.getChainTableHTML(displayRows);
         }
+    }
+
+    setupTooltips() {
+        if (this.tooltipsSetup) {
+            console.log('Tooltips already set up');
+            return;
+        }
+        
+        console.log('Setting up tooltips...');
+        
+        // Use event delegation to handle tooltips
+        const container = document.getElementById('consumeroptions-dashboard');
+        if (!container) {
+            console.log('Container not found for tooltips');
+            return;
+        }
+
+        container.addEventListener('mouseenter', (e) => {
+            if (e.target.id === 'iv-term-tooltip-trigger') {
+                const tooltip = document.getElementById('iv-term-tooltip');
+                if (tooltip) {
+                    console.log('IV tooltip mouseenter');
+                    tooltip.style.opacity = '1';
+                }
+            } else if (e.target.id === 'underlying-tooltip-trigger') {
+                const tooltip = document.getElementById('underlying-tooltip');
+                if (tooltip) {
+                    console.log('Underlying tooltip mouseenter');
+                    tooltip.style.opacity = '1';
+                }
+            } else if (e.target.id === 'oi-change-tooltip-trigger') {
+                const tooltip = document.getElementById('oi-change-tooltip');
+                if (tooltip) {
+                    console.log('OI tooltip mouseenter');
+                    tooltip.style.opacity = '1';
+                }
+            } else if (e.target.id === 'delta-dist-tooltip-trigger') {
+                const tooltip = document.getElementById('delta-dist-tooltip');
+                if (tooltip) {
+                    console.log('Delta tooltip mouseenter');
+                    tooltip.style.opacity = '1';
+                }
+            }
+        }, true);
+
+        container.addEventListener('mouseleave', (e) => {
+            if (e.target.id === 'iv-term-tooltip-trigger') {
+                const tooltip = document.getElementById('iv-term-tooltip');
+                if (tooltip) {
+                    console.log('IV tooltip mouseleave');
+                    tooltip.style.opacity = '0';
+                }
+            } else if (e.target.id === 'underlying-tooltip-trigger') {
+                const tooltip = document.getElementById('underlying-tooltip');
+                if (tooltip) {
+                    console.log('Underlying tooltip mouseleave');
+                    tooltip.style.opacity = '0';
+                }
+            } else if (e.target.id === 'oi-change-tooltip-trigger') {
+                const tooltip = document.getElementById('oi-change-tooltip');
+                if (tooltip) {
+                    console.log('OI tooltip mouseleave');
+                    tooltip.style.opacity = '0';
+                }
+            } else if (e.target.id === 'delta-dist-tooltip-trigger') {
+                const tooltip = document.getElementById('delta-dist-tooltip');
+                if (tooltip) {
+                    console.log('Delta tooltip mouseleave');
+                    tooltip.style.opacity = '0';
+                }
+            }
+        }, true);
+        
+        this.tooltipsSetup = true;
+        console.log('Tooltips setup complete');
     }
 
     showLoading(show) {

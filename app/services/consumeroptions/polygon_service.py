@@ -161,13 +161,13 @@ class ConsumerOptionsPolygonService:
         base_price = {"COST": 900, "WMT": 180, "TGT": 150, "AMZN": 180, "AAPL": 220}.get(underlying, 200)
         contracts = []
         
-        # Generate contracts for next 3 expiries
-        for weeks_out in [1, 2, 4]:
+        # Generate contracts for next 8 expiries (more realistic options chain)
+        for weeks_out in [1, 2, 3, 4, 6, 8, 12, 16]:
             expiry = date.today() + timedelta(weeks=weeks_out)
             expiry_str = expiry.strftime("%Y-%m-%d")
             
-            # Generate strikes around current price
-            for i in range(-5, 6):
+            # Generate strikes around current price (more strikes for better heatmap)
+            for i in range(-8, 9):
                 strike = base_price + (i * 10)
                 
                 for contract_type in ["call", "put"]:
