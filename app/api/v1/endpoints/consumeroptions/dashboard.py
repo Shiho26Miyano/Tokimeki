@@ -5,6 +5,7 @@ import logging
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
+from datetime import datetime
 
 from app.services.consumeroptions.dashboard_service import ConsumerOptionsDashboardService
 from app.services.consumeroptions.analytics_service import ConsumerOptionsAnalyticsService
@@ -60,6 +61,69 @@ async def get_dashboard_data(
             error=str(e)
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-chain-overview/{ticker}")
+async def get_historical_chain_overview(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    limit: int = Query(default=50, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical option chain overview with contracts from date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        # Limit results
+        if limit and len(contracts) > limit:
+            contracts = contracts[:limit]
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "type": contract.type.value if contract.type else None,
+                    "strike": contract.strike,
+                    "iv": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega,
+                    "last": contract.last_price,
+                    "vol": contract.day_volume,
+                    "oi": contract.day_oi
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now(),
+            "description": f"Historical option chain overview for {ticker} from {start_date} to {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical chain overview: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         await dashboard_service.close()
 
@@ -90,6 +154,69 @@ async def get_dashboard_data_simple(
         logger.error(f"Dashboard data error for {ticker}: {str(e)}")
         await usage_service.track_request(
             endpoint="consumeroptions_dashboard_data_simple",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-chain-overview/{ticker}")
+async def get_historical_chain_overview(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    limit: int = Query(default=50, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical option chain overview with contracts from date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        # Limit results
+        if limit and len(contracts) > limit:
+            contracts = contracts[:limit]
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "type": contract.type.value if contract.type else None,
+                    "strike": contract.strike,
+                    "iv": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega,
+                    "last": contract.last_price,
+                    "vol": contract.day_volume,
+                    "oi": contract.day_oi
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now(),
+            "description": f"Historical option chain overview for {ticker} from {start_date} to {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical chain overview: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
             response_time=0.0,
             success=False,
             error=str(e)
@@ -127,6 +254,69 @@ async def get_multi_ticker_analytics(
             error=str(e)
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-chain-overview/{ticker}")
+async def get_historical_chain_overview(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    limit: int = Query(default=50, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical option chain overview with contracts from date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        # Limit results
+        if limit and len(contracts) > limit:
+            contracts = contracts[:limit]
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "type": contract.type.value if contract.type else None,
+                    "strike": contract.strike,
+                    "iv": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega,
+                    "last": contract.last_price,
+                    "vol": contract.day_volume,
+                    "oi": contract.day_oi
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now(),
+            "description": f"Historical option chain overview for {ticker} from {start_date} to {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical chain overview: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         await dashboard_service.close()
 
@@ -154,6 +344,69 @@ async def get_contract_drilldown(
         logger.error(f"Contract drilldown error for {contract}: {str(e)}")
         await usage_service.track_request(
             endpoint="consumeroptions_contract_drilldown",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-chain-overview/{ticker}")
+async def get_historical_chain_overview(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    limit: int = Query(default=50, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical option chain overview with contracts from date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        # Limit results
+        if limit and len(contracts) > limit:
+            contracts = contracts[:limit]
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "type": contract.type.value if contract.type else None,
+                    "strike": contract.strike,
+                    "iv": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega,
+                    "last": contract.last_price,
+                    "vol": contract.day_volume,
+                    "oi": contract.day_oi
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now(),
+            "description": f"Historical option chain overview for {ticker} from {start_date} to {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical chain overview: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
             response_time=0.0,
             success=False,
             error=str(e)
@@ -191,6 +444,69 @@ async def get_top_movers(
             error=str(e)
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-chain-overview/{ticker}")
+async def get_historical_chain_overview(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    limit: int = Query(default=50, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical option chain overview with contracts from date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        # Limit results
+        if limit and len(contracts) > limit:
+            contracts = contracts[:limit]
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "type": contract.type.value if contract.type else None,
+                    "strike": contract.strike,
+                    "iv": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega,
+                    "last": contract.last_price,
+                    "vol": contract.day_volume,
+                    "oi": contract.day_oi
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now(),
+            "description": f"Historical option chain overview for {ticker} from {start_date} to {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical chain overview: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         await dashboard_service.close()
 
@@ -218,6 +534,69 @@ async def get_top_movers_simple(
         logger.error(f"Top movers simple error: {str(e)}")
         await usage_service.track_request(
             endpoint="consumeroptions_top_movers_simple",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-chain-overview/{ticker}")
+async def get_historical_chain_overview(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    limit: int = Query(default=50, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical option chain overview with contracts from date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        # Limit results
+        if limit and len(contracts) > limit:
+            contracts = contracts[:limit]
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "type": contract.type.value if contract.type else None,
+                    "strike": contract.strike,
+                    "iv": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega,
+                    "last": contract.last_price,
+                    "vol": contract.day_volume,
+                    "oi": contract.day_oi
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now(),
+            "description": f"Historical option chain overview for {ticker} from {start_date} to {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical chain overview: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
             response_time=0.0,
             success=False,
             error=str(e)
@@ -270,6 +649,69 @@ async def get_dashboard_summary(
             error=str(e)
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-chain-overview/{ticker}")
+async def get_historical_chain_overview(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    limit: int = Query(default=50, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical option chain overview with contracts from date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        # Limit results
+        if limit and len(contracts) > limit:
+            contracts = contracts[:limit]
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "type": contract.type.value if contract.type else None,
+                    "strike": contract.strike,
+                    "iv": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega,
+                    "last": contract.last_price,
+                    "vol": contract.day_volume,
+                    "oi": contract.day_oi
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now(),
+            "description": f"Historical option chain overview for {ticker} from {start_date} to {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical chain overview: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         await dashboard_service.close()
 
@@ -299,6 +741,292 @@ async def health_check(
         logger.error(f"Health check error: {str(e)}")
         await usage_service.track_request(
             endpoint="consumeroptions_health_check",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-chain-overview/{ticker}")
+async def get_historical_chain_overview(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    limit: int = Query(default=50, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical option chain overview with contracts from date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        # Limit results
+        if limit and len(contracts) > limit:
+            contracts = contracts[:limit]
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "type": contract.type.value if contract.type else None,
+                    "strike": contract.strike,
+                    "iv": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega,
+                    "last": contract.last_price,
+                    "vol": contract.day_volume,
+                    "oi": contract.day_oi
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now(),
+            "description": f"Historical option chain overview for {ticker} from {start_date} to {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical chain overview: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-options/{ticker}")
+async def get_historical_options_data(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical options data for ticker over date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_options",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "underlying": contract.underlying,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "strike": contract.strike,
+                    "type": contract.type.value if contract.type else None,
+                    "last_price": contract.last_price,
+                    "day_volume": contract.day_volume,
+                    "day_oi": contract.day_oi,
+                    "implied_volatility": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical options data: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_options",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-chain-overview/{ticker}")
+async def get_historical_chain_overview(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    limit: int = Query(default=50, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical option chain overview with contracts from date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        # Limit results
+        if limit and len(contracts) > limit:
+            contracts = contracts[:limit]
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "type": contract.type.value if contract.type else None,
+                    "strike": contract.strike,
+                    "iv": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega,
+                    "last": contract.last_price,
+                    "vol": contract.day_volume,
+                    "oi": contract.day_oi
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now(),
+            "description": f"Historical option chain overview for {ticker} from {start_date} to {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical chain overview: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/options-full-history/{ticker}")
+async def get_options_with_full_history(
+    ticker: str,
+    limit: int = Query(default=20, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get options contracts with all available historical pricing data"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get options with full history
+        contracts_with_history = await dashboard_service.polygon_service.get_options_with_full_history(
+            ticker.upper(), limit
+        )
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_full_history",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "contracts": contracts_with_history,
+            "count": len(contracts_with_history),
+            "timestamp": datetime.now(),
+            "description": "Options contracts with all available historical pricing data"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting options with full history: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_full_history",
+            response_time=0.0,
+            success=False,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/historical-chain-overview/{ticker}")
+async def get_historical_chain_overview(
+    ticker: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    limit: int = Query(default=50, description="Maximum number of contracts to return"),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """Get historical option chain overview with contracts from date range"""
+    try:
+        dashboard_service = ConsumerOptionsDashboardService()
+        
+        # Get historical options contracts
+        contracts = await dashboard_service.polygon_service.get_historical_options_contracts(
+            ticker.upper(), start_date, end_date
+        )
+        
+        # Limit results
+        if limit and len(contracts) > limit:
+            contracts = contracts[:limit]
+        
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
+            response_time=0.0,
+            success=True
+        )
+        
+        return {
+            "ticker": ticker.upper(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "contracts": [
+                {
+                    "contract": contract.contract,
+                    "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                    "type": contract.type.value if contract.type else None,
+                    "strike": contract.strike,
+                    "iv": contract.implied_volatility,
+                    "delta": contract.delta,
+                    "gamma": contract.gamma,
+                    "theta": contract.theta,
+                    "vega": contract.vega,
+                    "last": contract.last_price,
+                    "vol": contract.day_volume,
+                    "oi": contract.day_oi
+                }
+                for contract in contracts
+            ],
+            "count": len(contracts),
+            "timestamp": datetime.now(),
+            "description": f"Historical option chain overview for {ticker} from {start_date} to {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting historical chain overview: {str(e)}")
+        await usage_service.track_request(
+            endpoint="consumeroptions_historical_chain_overview",
             response_time=0.0,
             success=False,
             error=str(e)

@@ -34,6 +34,35 @@ class ConsumerOptionsAnalyticsService:
             "lookback_days": 20            # Days for historical average
         }
     
+    def _get_historical_volume_average(self, contract: str) -> Optional[float]:
+        """Get historical volume average for a contract"""
+        try:
+            # Check cache first
+            cache_key = f"volume_avg_{contract}"
+            if cache_key in self.historical_cache:
+                return self.historical_cache[cache_key]
+            
+            # In a real implementation, this would fetch historical data
+            # For now, return None to indicate no historical data available
+            logger.warning(f"No historical volume data available for {contract}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting historical volume for {contract}: {str(e)}")
+            return None
+    
+    def _get_historical_oi_data(self, contracts: List[OptionContract], expiries: List[date], strikes: List[float]) -> Optional[pd.DataFrame]:
+        """Get historical OI data for heatmap calculation"""
+        try:
+            # In a real implementation, this would fetch historical OI data
+            # For now, return None to indicate no historical data available
+            logger.warning("No historical OI data available for heatmap calculation")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting historical OI data: {str(e)}")
+            return None
+    
     def calculate_call_put_ratios(self, contracts: List[OptionContract], ticker: str) -> CallPutRatios:
         """
         Calculate call/put volume and open interest ratios
@@ -226,12 +255,16 @@ class ConsumerOptionsAnalyticsService:
                 if (contract.day_volume and 
                     contract.day_volume >= self.unusual_thresholds["min_volume"]):
                     
-                    # For demo purposes, use simple heuristics
-                    # In production, this would use historical data
-                    avg_volume = contract.day_volume * 0.3  # Assume current is 3x average
-                    z_score = 3.0  # Simplified z-score
+                    # Use historical data for proper analysis
+                    # Get historical volume data for this contract
+                    avg_volume = self._get_historical_volume_average(contract.contract)
+                    if avg_volume is None:
+                        continue  # Skip if no historical data available
                     
-                    if contract.day_volume >= avg_volume * self.unusual_thresholds["volume_multiplier"]:
+                    # Calculate proper z-score
+                    z_score = (contract.day_volume - avg_volume) / max(avg_volume * 0.1, 1.0)  # 10% std dev assumption
+                    
+                    if avg_volume and contract.day_volume >= avg_volume * self.unusual_thresholds["volume_multiplier"]:
                         unusual = UnusualActivity(
                             contract=contract.contract,
                             trigger_type="Volume",
@@ -464,11 +497,12 @@ class ConsumerOptionsAnalyticsService:
                 logger.error(f"Error creating pivot table: {str(e)}")
                 return {"expiries": [], "strikes": [], "delta_oi": []}
             
-            # For demo purposes, simulate yesterday's OI with some variation
-            # In production, this would come from historical data
-            np.random.seed(42)  # For consistent demo data
-            variation_factor = np.random.uniform(0.7, 1.3, grid_today.shape)
-            grid_yesterday = (grid_today * variation_factor).round().astype(int)
+            # Get actual historical OI data instead of simulation
+            grid_yesterday = self._get_historical_oi_data(contracts, expiries, strikes)
+            if grid_yesterday is None:
+                # If no historical data available, return empty heatmap
+                logger.warning("No historical OI data available for heatmap calculation")
+                return {"expiries": [], "strikes": [], "delta_oi": []}
             
             # Calculate delta OI
             delta_oi = grid_today - grid_yesterday
