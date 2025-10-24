@@ -23,8 +23,8 @@ class PolygonAPIError(Exception):
     pass
 
 
-def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
-    """Decorator for retrying API calls with exponential backoff"""
+def retry_with_backoff(max_retries: int = 5, base_delay: float = 2.0):
+    """Decorator for retrying API calls with exponential backoff, handling rate limits"""
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -33,13 +33,35 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
             for attempt in range(max_retries + 1):
                 try:
                     return await func(*args, **kwargs)
-                except (httpx.RequestError, httpx.HTTPStatusError) as e:
+                except httpx.HTTPStatusError as e:
+                    last_exception = e
+                    
+                    # Handle rate limiting (429) with longer delays
+                    if e.response.status_code == 429:
+                        if attempt == max_retries:
+                            break
+                        
+                        # Longer delay for rate limits: 5s, 10s, 20s, 40s, 80s
+                        delay = base_delay * (2 ** attempt) + 3  # Extra 3 seconds for rate limits
+                        logger.warning(f"Rate limited (429) - attempt {attempt + 1}, waiting {delay}s before retry")
+                        await asyncio.sleep(delay)
+                        continue
+                    
+                    # Handle other HTTP errors
+                    if attempt == max_retries:
+                        break
+                    
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"HTTP error {e.response.status_code} (attempt {attempt + 1}), retrying in {delay}s")
+                    await asyncio.sleep(delay)
+                    
+                except httpx.RequestError as e:
                     last_exception = e
                     if attempt == max_retries:
                         break
                     
                     delay = base_delay * (2 ** attempt)
-                    logger.warning(f"API call failed (attempt {attempt + 1}), retrying in {delay}s: {e}")
+                    logger.warning(f"Request error (attempt {attempt + 1}), retrying in {delay}s: {e}")
                     await asyncio.sleep(delay)
             
             raise last_exception
@@ -56,16 +78,24 @@ class ConsumerOptionsPolygonService:
         self.base_url = "https://api.polygon.io"
         self.client = None
         
-        # Simple in-memory cache
+        # Simple in-memory cache with longer TTL to reduce API calls
         self.cache: Dict[str, tuple[float, Any]] = {}
-        self.cache_ttl = 300  # 5 minutes default
+        self.cache_ttl = 1800  # 30 minutes default (increased from 5 minutes)
         
         # Statistics
         self.api_calls = 0
         self.errors: List[str] = []
         
+        # Rate limiting
+        self.last_request_time = 0
+        self.min_request_interval = 0.1  # Minimum 100ms between requests
+        
         if not self.api_key:
-            logger.warning("POLYGON_API_KEY not set - will use mock data")
+            raise ValueError("POLYGON_API_KEY is required but not set")
+        
+        # Ensure we're not using mock data
+        if self.api_key == "mock_key" or self.api_key.startswith("mock"):
+            raise ValueError("Mock data is not allowed for Consumer Options. Please set a valid POLYGON_API_KEY")
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client"""
@@ -77,6 +107,68 @@ class ConsumerOptionsPolygonService:
         """Generate cache key from endpoint and parameters"""
         param_str = "&".join(f"{k}={v}" for k, v in sorted(params.items()) if k != "apikey")
         return f"{endpoint}?{param_str}"
+    
+    def _validate_iv(self, iv_value) -> Optional[float]:
+        """Validate and normalize implied volatility values"""
+        if iv_value is None:
+            return None
+        
+        try:
+            iv_float = float(iv_value)
+            # If IV is > 1, it's likely already a percentage, convert to decimal
+            if iv_float > 1.0:
+                iv_float = iv_float / 100.0
+            
+            # Validate reasonable range (0.01% to 500%)
+            if 0.0001 <= iv_float <= 5.0:
+                return round(iv_float, 4)
+            else:
+                logger.warning(f"IV value {iv_float} outside reasonable range, setting to None")
+                return None
+        except (ValueError, TypeError):
+            return None
+    
+    def _validate_greek(self, greek_value) -> Optional[float]:
+        """Validate and normalize Greek values"""
+        if greek_value is None:
+            return None
+        
+        try:
+            greek_float = float(greek_value)
+            # Round to reasonable precision
+            return round(greek_float, 6)
+        except (ValueError, TypeError):
+            return None
+    
+    def _extract_price(self, price_value) -> Optional[float]:
+        """Extract and validate price values"""
+        if price_value is None:
+            return None
+        
+        try:
+            price_float = float(price_value)
+            # Validate reasonable price range (0.01 to 10000)
+            if 0.01 <= price_float <= 10000:
+                return round(price_float, 2)
+            else:
+                return None
+        except (ValueError, TypeError):
+            return None
+    
+    def _extract_number(self, number_value) -> Optional[int]:
+        """Extract and validate integer values (volume, OI)"""
+        if number_value is None:
+            return None
+        
+        try:
+            number_int = int(float(number_value))
+            # Validate reasonable range
+            if 0 <= number_int <= 10000000:
+                return number_int
+            else:
+                return None
+        except (ValueError, TypeError):
+            return None
     
     def _get_cached_data(self, cache_key: str) -> Optional[Any]:
         """Get cached data if not expired"""
@@ -94,9 +186,19 @@ class ConsumerOptionsPolygonService:
     
     @retry_with_backoff()
     async def _make_request(self, endpoint: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Make HTTP request to Polygon API with caching and error handling"""
+        """Make HTTP request to Polygon API with caching, rate limiting, and error handling"""
         if params is None:
             params = {}
+        
+        # Rate limiting - ensure minimum interval between requests
+        current_time = time.time()
+        time_since_last = current_time - self.last_request_time
+        if time_since_last < self.min_request_interval:
+            sleep_time = self.min_request_interval - time_since_last
+            logger.debug(f"Rate limiting: sleeping {sleep_time:.3f}s")
+            await asyncio.sleep(sleep_time)
+        
+        self.last_request_time = time.time()
         
         # Check cache first
         cache_key = self._get_cache_key(endpoint, params)
@@ -105,12 +207,13 @@ class ConsumerOptionsPolygonService:
             logger.debug(f"Cache hit for {endpoint}")
             return cached_data
         
-        # If no API key, return mock data
+        # Require API key for all requests
         if not self.api_key:
-            logger.info(f"No API key - generating mock data for {endpoint}")
-            mock_data = self._generate_mock_response(endpoint, params)
-            self._cache_data(cache_key, mock_data)
-            return mock_data
+            raise ValueError("POLYGON_API_KEY is required but not set")
+        
+        # Ensure we're using real API data, not mock data
+        if self.api_key == "mock_key" or self.api_key.startswith("mock"):
+            raise PolygonAPIError("Cannot make API request: Invalid or mock API key detected")
         
         try:
             client = await self._get_client()
@@ -134,153 +237,232 @@ class ConsumerOptionsPolygonService:
             self.errors.append(error_msg)
             logger.error(error_msg)
             
-            # Return mock data on error
-            mock_data = self._generate_mock_response(endpoint, params)
-            self._cache_data(cache_key, mock_data)
-            return mock_data
+            # Re-raise the exception instead of returning mock data
+            raise
     
-    def _generate_mock_response(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate mock response based on endpoint"""
-        if "/v3/snapshot/options/" in endpoint:
-            underlying = endpoint.split("/")[-1].upper()
-            return self._mock_option_chain_response(underlying)
-        elif "/v2/aggs/ticker/" in endpoint and "/day/" in endpoint:
-            ticker = endpoint.split("/")[4].upper()
-            return self._mock_daily_bars_response(ticker, params)
-        elif "/v2/aggs/t/" in endpoint and "/minute/" in endpoint:
-            return self._mock_minute_bars_response()
-        elif "/v1/indicators/rsi/" in endpoint:
-            return {"results": {"values": [{"value": 45.5}]}}
-        else:
-            return {"results": []}
     
-    def _mock_option_chain_response(self, underlying: str) -> Dict[str, Any]:
-        """Generate realistic mock option chain data"""
-        import random
+    async def get_historical_options_contracts(self, underlying: str, start_date: str, end_date: str) -> List[OptionContract]:
+        """Get historical options contracts for underlying ticker over date range with pagination"""
+        all_contracts = []
+        offset = 0
+        limit = 1000  # Polygon's max limit per request
         
-        base_price = {"COST": 900, "WMT": 180, "TGT": 150, "AMZN": 180, "AAPL": 220}.get(underlying, 200)
-        contracts = []
-        
-        # Generate contracts for next 8 expiries (more realistic options chain)
-        for weeks_out in [1, 2, 3, 4, 6, 8, 12, 16]:
-            expiry = date.today() + timedelta(weeks=weeks_out)
-            expiry_str = expiry.strftime("%Y-%m-%d")
-            
-            # Generate strikes around current price (more strikes for better heatmap)
-            for i in range(-8, 9):
-                strike = base_price + (i * 10)
-                
-                for contract_type in ["call", "put"]:
-                    # Generate realistic Greeks
-                    moneyness = strike / base_price
-                    time_factor = weeks_out / 4.0
-                    
-                    if contract_type == "call":
-                        delta = max(0.05, min(0.95, 0.5 + (base_price - strike) / base_price * 2))
-                        contract_symbol = f"O:{underlying}{expiry.strftime('%y%m%d')}C{int(strike * 1000):08d}"
-                    else:
-                        delta = max(-0.95, min(-0.05, -0.5 + (strike - base_price) / base_price * 2))
-                        contract_symbol = f"O:{underlying}{expiry.strftime('%y%m%d')}P{int(strike * 1000):08d}"
-                    
-                    iv = 0.20 + random.uniform(-0.05, 0.10) + (abs(moneyness - 1) * 0.1)
-                    gamma = 0.02 * (1 - abs(moneyness - 1)) * time_factor
-                    theta = -0.05 * time_factor
-                    vega = 0.15 * time_factor
-                    
-                    volume = random.randint(50, 2000) if random.random() > 0.3 else 0
-                    oi = random.randint(100, 5000) if random.random() > 0.2 else 0
-                    last_price = max(0.01, abs(delta) * base_price * 0.1 + random.uniform(-5, 5))
-                    
-                    contract_data = {
-                        "contract": contract_symbol,
-                        "details": {
-                            "contract_type": contract_type,
-                            "strike_price": strike,
-                            "expiration_date": expiry_str
-                        },
-                        "day": {
-                            "volume": volume,
-                            "open_interest": oi
-                        },
-                        "last_quote": {
-                            "p": round(last_price, 2),
-                            "b": round(last_price * 0.98, 2),
-                            "a": round(last_price * 1.02, 2)
-                        },
-                        "implied_volatility": round(iv, 4),
-                        "greeks": {
-                            "delta": round(delta, 4),
-                            "gamma": round(gamma, 4),
-                            "theta": round(theta, 4),
-                            "vega": round(vega, 4)
-                        }
-                    }
-                    contracts.append(contract_data)
-        
-        return {"results": contracts}
-    
-    def _mock_daily_bars_response(self, ticker: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate mock daily bars data"""
-        import random
-        
-        # Generate 60 days of data
-        bars = []
-        base_price = {"COST": 900, "WMT": 180, "TGT": 150, "AMZN": 180, "AAPL": 220}.get(ticker, 200)
-        current_price = base_price
-        
-        for i in range(60):
-            bar_date = date.today() - timedelta(days=60-i)
-            
-            # Skip weekends
-            if bar_date.weekday() < 5:
-                # Generate realistic price movement
-                change_pct = random.uniform(-0.03, 0.03)
-                current_price *= (1 + change_pct)
-                
-                daily_range = current_price * 0.02
-                open_price = current_price + random.uniform(-daily_range/2, daily_range/2)
-                close_price = current_price + random.uniform(-daily_range/2, daily_range/2)
-                high_price = max(open_price, close_price) + random.uniform(0, daily_range/2)
-                low_price = min(open_price, close_price) - random.uniform(0, daily_range/2)
-                
-                volume = random.randint(1000000, 5000000)
-                timestamp = int(bar_date.strftime("%s")) * 1000
-                
-                bar_data = {
-                    "t": timestamp,
-                    "o": round(open_price, 2),
-                    "h": round(high_price, 2),
-                    "l": round(low_price, 2),
-                    "c": round(close_price, 2),
-                    "v": volume
-                }
-                bars.append(bar_data)
-        
-        return {"results": bars}
-    
-    def _mock_minute_bars_response(self) -> Dict[str, Any]:
-        """Generate mock minute bars data"""
-        import random
-        
-        bars = []
-        base_price = 10.0
-        
-        for i in range(100):
-            timestamp = int((datetime.now() - timedelta(minutes=100-i)).timestamp() * 1000)
-            change = random.uniform(-0.1, 0.1)
-            base_price *= (1 + change)
-            
-            bar_data = {
-                "t": timestamp,
-                "o": round(base_price, 2),
-                "h": round(base_price * 1.02, 2),
-                "l": round(base_price * 0.98, 2),
-                "c": round(base_price, 2),
-                "v": random.randint(100, 1000)
+        while True:
+            endpoint = f"/v3/reference/options/contracts"
+            params = {
+                "underlying_ticker": underlying.upper(),
+                "expiration_date.gte": start_date,
+                "expiration_date.lte": end_date,
+                "limit": limit,
+                "offset": offset,
+                "sort": "expiration_date"
             }
-            bars.append(bar_data)
+            
+            try:
+                logger.info(f"Fetching contracts for {underlying} with offset {offset}")
+                data = await self._make_request(endpoint, params)
+                contracts_batch = data.get("results", [])
+                
+                if not contracts_batch:
+                    logger.info(f"No more contracts found at offset {offset}")
+                    break
+                
+                # Parse contracts
+                for contract_data in contracts_batch:
+                    try:
+                        # Parse contract details
+                        contract_type_raw = contract_data.get("contract_type", "").lower()
+                        contract_type = ContractType.CALL if contract_type_raw == "call" else ContractType.PUT
+                        
+                        # Parse expiry date
+                        expiry_str = contract_data.get("expiration_date")
+                        expiry = datetime.strptime(expiry_str, "%Y-%m-%d").date() if expiry_str else None
+                        
+                        if not expiry:
+                            continue  # Skip contracts without valid expiry
+                        
+                        contract = OptionContract(
+                            contract=contract_data.get("ticker", ""),
+                            underlying=underlying.upper(),
+                            expiry=expiry,
+                            strike=float(contract_data.get("strike_price", 0)),
+                            type=contract_type,
+                            
+                            # Historical contracts may not have current market data
+                            last_price=None,
+                            bid=None,
+                            ask=None,
+                            day_volume=None,
+                            day_oi=None,
+                            implied_volatility=None,
+                            delta=None,
+                            gamma=None,
+                            theta=None,
+                            vega=None
+                        )
+                        
+                        all_contracts.append(contract)
+                        
+                    except Exception as e:
+                        logger.warning(f"Error parsing historical contract data: {str(e)}")
+                        continue
+                
+                logger.info(f"Retrieved {len(contracts_batch)} contracts in this batch (total so far: {len(all_contracts)})")
+                
+                # If we got fewer contracts than the limit, we've reached the end
+                if len(contracts_batch) < limit:
+                    logger.info(f"Reached end of data (got {len(contracts_batch)} < {limit})")
+                    break
+                
+                # Move to next page
+                offset += limit
+                
+                # Safety limit to prevent infinite loops
+                if offset > 10000:  # Max 10,000 contracts
+                    logger.warning(f"Reached safety limit of 10,000 contracts for {underlying}")
+                    break
+                
+            except Exception as e:
+                logger.error(f"Error fetching contracts batch at offset {offset}: {str(e)}")
+                break
         
-        return {"results": bars}
+        logger.info(f"Retrieved {len(all_contracts)} total historical contracts for {underlying} from {start_date} to {end_date}")
+        return all_contracts
+    
+    async def get_options_with_full_history(self, underlying: str, limit_contracts: int = 50) -> List[Dict[str, Any]]:
+        """Get options contracts with all available historical pricing data"""
+        try:
+            # Get contracts from a wider range to ensure we have contracts with sufficient history
+            end_date = date.today()
+            start_date = end_date - timedelta(days=60)  # Look back 60 days for contracts
+            
+            logger.info(f"Getting options with full history for {underlying}")
+            
+            # Get contracts
+            contracts = await self.get_historical_options_contracts(
+                underlying, start_date.isoformat(), end_date.isoformat()
+            )
+            
+            # Limit to most recent contracts to avoid rate limits
+            recent_contracts = contracts[:limit_contracts]
+            
+            # Get full historical data for each contract
+            contracts_with_history = []
+            for contract in recent_contracts:
+                try:
+                    # Calculate full historical range - get as much data as possible
+                    history_end = date.today()
+                    history_start = history_end - timedelta(days=365)  # Go back 1 year to get maximum data
+                    
+                    # Get historical pricing data
+                    logger.info(f"Getting full history for contract {contract.contract} from {history_start} to {history_end}")
+                    historical_data = await self.get_contract_historical_pricing(
+                        contract.contract, 
+                        history_start.isoformat(), 
+                        history_end.isoformat()
+                    )
+                    logger.info(f"Retrieved {len(historical_data)} days of data for contract {contract.contract}")
+                    
+                    # Keep all available historical data - no limiting
+                    
+                    # Create contract data with history
+                    contract_data = {
+                        "contract": contract.contract,
+                        "underlying": contract.underlying,
+                        "expiry": contract.expiry.isoformat() if contract.expiry else None,
+                        "strike": contract.strike,
+                        "type": contract.type.value if contract.type else None,
+                        "historical_data": historical_data,
+                        "days_of_data": len(historical_data),
+                        "latest_price": historical_data[-1].get('close') if historical_data else None,
+                        "latest_volume": historical_data[-1].get('volume') if historical_data else None
+                    }
+                    
+                    contracts_with_history.append(contract_data)
+                    
+                    # Small delay to avoid rate limits
+                    await asyncio.sleep(0.1)
+                    
+                except Exception as e:
+                    logger.warning(f"Error getting history for contract {contract.contract}: {str(e)}")
+                    continue
+            
+            logger.info(f"Retrieved {len(contracts_with_history)} contracts with full history for {underlying}")
+            return contracts_with_history
+            
+        except Exception as e:
+            logger.error(f"Error getting options with full history for {underlying}: {str(e)}")
+            raise PolygonAPIError(f"Failed to get options with full history: {str(e)}")
+    
+    async def get_historical_options_data(self, underlying: str, start_date: str, end_date: str) -> List[OptionContract]:
+        """Get historical options data with prices and Greeks for underlying ticker over date range"""
+        try:
+            # First get historical contracts
+            contracts = await self.get_historical_options_contracts(underlying, start_date, end_date)
+            
+            # For each contract, get historical pricing data
+            enriched_contracts = []
+            for contract in contracts[:50]:  # Limit to first 50 to avoid rate limits
+                try:
+                    # Get historical pricing for this contract
+                    pricing_data = await self.get_contract_historical_pricing(
+                        contract.contract, start_date, end_date
+                    )
+                    
+                    if pricing_data:
+                        # Update contract with latest pricing data
+                        latest_data = pricing_data[-1] if pricing_data else None
+                        if latest_data:
+                            contract.last_price = latest_data.get('close')
+                            contract.day_volume = latest_data.get('volume')
+                            # Note: Historical data may not have Greeks
+                    
+                    enriched_contracts.append(contract)
+                    
+                except Exception as e:
+                    logger.warning(f"Error enriching contract {contract.contract}: {str(e)}")
+                    enriched_contracts.append(contract)  # Add without enrichment
+            
+            logger.info(f"Retrieved {len(enriched_contracts)} enriched historical contracts for {underlying}")
+            return enriched_contracts
+            
+        except Exception as e:
+            logger.error(f"Error fetching historical options data for {underlying}: {str(e)}")
+            raise PolygonAPIError(f"Failed to fetch historical options data: {str(e)}")
+    
+    async def get_contract_historical_pricing(self, contract: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        """Get historical pricing data for a specific contract"""
+        endpoint = f"/v2/aggs/ticker/{contract}/range/1/day/{start_date}/{end_date}"
+        params = {
+            "adjusted": "true",
+            "sort": "asc",
+            "limit": 1000
+        }
+        
+        try:
+            data = await self._make_request(endpoint, params)
+            results = data.get("results", [])
+            
+            logger.info(f"API response for {contract}: status={data.get('status')}, results_count={len(results)}")
+            
+            # Process the raw data into the expected format
+            processed_data = []
+            for result in results:
+                processed_data.append({
+                    "date": datetime.fromtimestamp(result['t'] / 1000).strftime('%Y-%m-%d'),
+                    "open": result.get('o'),
+                    "high": result.get('h'),
+                    "low": result.get('l'),
+                    "close": result.get('c'),
+                    "volume": result.get('v')
+                })
+            
+            logger.info(f"Processed {len(processed_data)} data points for contract {contract}")
+            return processed_data
+            
+        except Exception as e:
+            logger.warning(f"Error fetching pricing for {contract}: {str(e)}")
+            return []
     
     async def get_option_chain_snapshot(self, underlying: str) -> List[OptionContract]:
         """Get option chain snapshot for underlying ticker"""
@@ -288,6 +470,7 @@ class ConsumerOptionsPolygonService:
         
         try:
             data = await self._make_request(endpoint)
+            logger.info(f"Retrieved option chain data for {underlying}")
             contracts = []
             
             for contract_data in data.get("results", []):
@@ -316,25 +499,25 @@ class ConsumerOptionsPolygonService:
                         strike=float(details.get("strike_price", 0)),
                         type=contract_type,
                         
-                        # Market data
-                        last_price=last_quote.get("p"),
-                        bid=last_quote.get("b"),
-                        ask=last_quote.get("a"),
+                        # Market data - try multiple sources
+                        last_price=self._extract_price(last_quote.get("p") or contract_data.get("last_quote", {}).get("p")),
+                        bid=self._extract_price(last_quote.get("b") or contract_data.get("last_quote", {}).get("b")),
+                        ask=self._extract_price(last_quote.get("a") or contract_data.get("last_quote", {}).get("a")),
                         
-                        # Volume and OI
-                        day_volume=day_data.get("volume"),
-                        day_oi=day_data.get("open_interest"),
+                        # Volume and OI - try multiple sources
+                        day_volume=self._extract_number(day_data.get("volume") or contract_data.get("day", {}).get("volume")),
+                        day_oi=self._extract_number(day_data.get("open_interest") or contract_data.get("day", {}).get("open_interest")),
                         
-                        # Greeks and IV - check multiple possible locations
-                        implied_volatility=(
+                        # Greeks and IV - check multiple possible locations and validate
+                        implied_volatility=self._validate_iv(
                             contract_data.get("implied_volatility") or 
                             greeks.get("implied_volatility") or
                             contract_data.get("iv")
                         ),
-                        delta=greeks.get("delta"),
-                        gamma=greeks.get("gamma"),
-                        theta=greeks.get("theta"),
-                        vega=greeks.get("vega")
+                        delta=self._validate_greek(greeks.get("delta")),
+                        gamma=self._validate_greek(greeks.get("gamma")),
+                        theta=self._validate_greek(greeks.get("theta")),
+                        vega=self._validate_greek(greeks.get("vega"))
                     )
                     
                     contracts.append(contract)
