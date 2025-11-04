@@ -17,11 +17,8 @@ from .endpoints.minigolfstrategy import (
     strategy_router as minigolf_strategy,
     factor_analysis_router
 )
-from .endpoints.consumeroptions import (
-    chain_router, analytics_router as consumeroptions_analytics_router, 
-    dashboard_router as consumeroptions_dashboard_router
-)
 from .endpoints import quantitative_analysis, websocket
+from .endpoints.consumeroptions import dashboard_router as consumeroptions_dashboard_router
 
 # Create main API router
 api_router = APIRouter()
@@ -57,13 +54,11 @@ api_router.include_router(minigolf_strategy, prefix="/minigolfstrategy", tags=["
 api_router.include_router(minigolf_courses, prefix="/minigolfstrategy", tags=["minigolfstrategy_courses"])
 api_router.include_router(factor_analysis_router, prefix="/minigolfstrategy/factor-analysis", tags=["minigolfstrategy_factor_analysis"])
 
-# Include Consumer Options Sentiment endpoints
-api_router.include_router(chain_router, prefix="/consumeroptions/chain", tags=["consumeroptions_chain"])
-api_router.include_router(consumeroptions_analytics_router, prefix="/consumeroptions/analytics", tags=["consumeroptions_analytics"])
-api_router.include_router(consumeroptions_dashboard_router, prefix="/consumeroptions/dashboard", tags=["consumeroptions_dashboard"])
-
 # Include Quantitative Analysis endpoints
 api_router.include_router(quantitative_analysis.router, prefix="/quantitative-analysis", tags=["quantitative_analysis"])
+
+# Include Consumer Options endpoints
+api_router.include_router(consumeroptions_dashboard_router, prefix="/consumeroptions/dashboard", tags=["consumeroptions"])
 
 # Include WebSocket endpoints
 api_router.include_router(websocket.router, tags=["websocket"])
@@ -105,8 +100,6 @@ async def api_info():
                 "courses": "/minigolfstrategy/courses"
             },
             "consumeroptions": {
-                "chain": "/consumeroptions/chain",
-                "analytics": "/consumeroptions/analytics",
                 "dashboard": "/consumeroptions/dashboard"
             },
             "quantitative_analysis": "/quantitative-analysis",

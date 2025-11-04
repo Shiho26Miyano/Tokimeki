@@ -1,486 +1,520 @@
 """
-Unified Consumer Options Polygon API Service
-Streamlined service for fetching options data from Polygon.io
+Consumer Options Polygon API Service
+Handles fetching Open Interest change data for heatmap visualization
+Uses the massive library for Polygon API access
 """
-import os
-import time
-import logging
 import asyncio
-from datetime import datetime, date, timedelta
-from typing import List, Dict, Optional, Any
-import httpx
-from functools import wraps
+import os
+import logging
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, timedelta
+from typing import Dict, List, Optional, Tuple, Any
 
-from app.models.options_models import (
-    OptionContract, UnderlyingData, ContractBars, ContractType
-)
+import numpy as np
+import yfinance as yf
+from massive import RESTClient
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-
-class PolygonAPIError(Exception):
-    """Custom exception for Polygon API errors"""
-    pass
+# Thread pool executor for running synchronous massive library calls
+_executor = ThreadPoolExecutor(max_workers=10)
 
 
-def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
-    """Decorator for retrying API calls with exponential backoff"""
-    def decorator(func):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            last_exception = None
-            
-            for attempt in range(max_retries + 1):
-                try:
-                    return await func(*args, **kwargs)
-                except (httpx.RequestError, httpx.HTTPStatusError) as e:
-                    last_exception = e
-                    if attempt == max_retries:
-                        break
-                    
-                    delay = base_delay * (2 ** attempt)
-                    logger.warning(f"API call failed (attempt {attempt + 1}), retrying in {delay}s: {e}")
-                    await asyncio.sleep(delay)
-            
-            raise last_exception
-        
-        return wrapper
-    return decorator
+def trading_days_2() -> Tuple[str, str]:
+    """Return (T_minus_1, T) as ISO dates (skip weekends)."""
+    d = date.today()
+    if d.weekday() >= 5:  # Sat/Sun -> last Friday is T
+        d = d - timedelta(days=d.weekday() - 4)
+    t = d
+    t1 = t - timedelta(days=1)
+    while t1.weekday() >= 5:
+        t1 -= timedelta(days=1)
+    return t1.isoformat(), t.isoformat()
 
 
 class ConsumerOptionsPolygonService:
-    """Unified Polygon service for Consumer Options data"""
-    
-    def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv("POLYGON_API_KEY")
-        self.base_url = "https://api.polygon.io"
-        self.client = None
-        
-        # Simple in-memory cache
-        self.cache: Dict[str, tuple[float, Any]] = {}
-        self.cache_ttl = 300  # 5 minutes default
-        
-        # Statistics
-        self.api_calls = 0
-        self.errors: List[str] = []
-        
+    """Service for fetching consumer options data from Polygon API using massive library."""
+
+    def __init__(self) -> None:
+        self.api_key = settings.polygon_api_key or os.getenv("POLYGON_API_KEY")
         if not self.api_key:
-            logger.warning("POLYGON_API_KEY not set - will use mock data")
-    
-    async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create HTTP client"""
-        if self.client is None or self.client.is_closed:
-            self.client = httpx.AsyncClient(timeout=30.0)
+            logger.warning(
+                "POLYGON_API_KEY not set. Consumer options features may not work."
+            )
+        self.client: Optional[RESTClient] = None
+
+    def _get_client(self) -> RESTClient:
+        """Get or create RESTClient."""
+        if self.client is None:
+            if not self.api_key:
+                raise ValueError("POLYGON_API_KEY is not set. Cannot create RESTClient.")
+            self.client = RESTClient(self.api_key)
         return self.client
-    
-    def _get_cache_key(self, endpoint: str, params: Dict[str, Any]) -> str:
-        """Generate cache key from endpoint and parameters"""
-        param_str = "&".join(f"{k}={v}" for k, v in sorted(params.items()) if k != "apikey")
-        return f"{endpoint}?{param_str}"
-    
-    def _get_cached_data(self, cache_key: str) -> Optional[Any]:
-        """Get cached data if not expired"""
-        if cache_key in self.cache:
-            timestamp, data = self.cache[cache_key]
-            if time.time() - timestamp < self.cache_ttl:
-                return data
-            else:
-                del self.cache[cache_key]
-        return None
-    
-    def _cache_data(self, cache_key: str, data: Any):
-        """Cache data with current timestamp"""
-        self.cache[cache_key] = (time.time(), data)
-    
-    @retry_with_backoff()
-    async def _make_request(self, endpoint: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Make HTTP request to Polygon API with caching and error handling"""
-        if params is None:
-            params = {}
-        
-        # Check cache first
-        cache_key = self._get_cache_key(endpoint, params)
-        cached_data = self._get_cached_data(cache_key)
-        if cached_data is not None:
-            logger.debug(f"Cache hit for {endpoint}")
-            return cached_data
-        
-        # If no API key, return mock data
-        if not self.api_key:
-            logger.info(f"No API key - generating mock data for {endpoint}")
-            mock_data = self._generate_mock_response(endpoint, params)
-            self._cache_data(cache_key, mock_data)
-            return mock_data
-        
-        try:
-            client = await self._get_client()
-            params['apikey'] = self.api_key
-            url = f"{self.base_url}{endpoint}"
+
+    async def close(self) -> None:
+        """Close client (no-op for RESTClient, but keeping interface consistent)."""
+        self.client = None
+
+
+    async def get_spot_price(self, client: RESTClient, ticker: str) -> float:
+        """Get current spot price for underlying using massive library."""
+        def _get_price():
+            """Get price from Polygon API using available endpoints"""
+            from datetime import date, timedelta
             
-            response = await client.get(url, params=params)
-            response.raise_for_status()
+            ticker_upper = ticker.upper()
+            today = date.today().strftime("%Y-%m-%d")
+            yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
             
-            self.api_calls += 1
-            result = response.json()
+            # Method 1: Try get_previous_close_agg (usually available on lower tier plans)
+            try:
+                logger.debug(f"Trying get_previous_close_agg for {ticker}")
+                prev_close = client.get_previous_close_agg(ticker_upper)
+                logger.debug(f"get_previous_close_agg response type: {type(prev_close)}, attributes: {dir(prev_close) if hasattr(prev_close, '__dict__') else 'N/A'}")
+                
+                # Try to extract price from various possible attributes
+                for attr in ['close', 'c', 'price', 'p', 'results']:
+                    if hasattr(prev_close, attr):
+                        try:
+                            value = getattr(prev_close, attr)
+                            logger.debug(f"  Found attribute '{attr}': {type(value)} = {value}")
+                            if attr in ['close', 'c', 'price', 'p'] and value:
+                                logger.info(f"Got price for {ticker} from get_previous_close_agg.{attr}: {value}")
+                                return float(value)
+                        except Exception as e_attr:
+                            logger.debug(f"  Error accessing attribute '{attr}': {e_attr}")
+                
+                # Try results attribute
+                if hasattr(prev_close, 'results'):
+                    results = prev_close.results
+                    logger.debug(f"  Found results attribute: {type(results)}")
+                    if isinstance(results, dict):
+                        price = results.get("c") or results.get("close") or results.get("price") or results.get("p")
+                        if price:
+                            logger.info(f"Got price for {ticker} from get_previous_close_agg.results: {price}")
+                            return float(price)
+                    elif isinstance(results, list) and results:
+                        price = results[0].get("c") or results[0].get("close") or results[0].get("price") or results[0].get("p")
+                        if price:
+                            logger.info(f"Got price for {ticker} from get_previous_close_agg.results[0]: {price}")
+                            return float(price)
+                
+                # Try dict conversion
+                try:
+                    prev_dict = vars(prev_close) if hasattr(prev_close, '__dict__') else {}
+                    logger.debug(f"  Dict representation keys: {list(prev_dict.keys()) if prev_dict else 'empty'}")
+                    for key in ['c', 'close', 'price', 'p', 'results']:
+                        if key in prev_dict and prev_dict[key]:
+                            if key == 'results':
+                                continue  # Already handled above
+                            logger.info(f"Got price for {ticker} from get_previous_close_agg dict[{key}]: {prev_dict[key]}")
+                            return float(prev_dict[key])
+                except Exception as e_dict:
+                    logger.debug(f"  Error converting to dict: {e_dict}")
+                    
+            except Exception as e1:
+                logger.warning(f"get_previous_close_agg failed for {ticker}: {type(e1).__name__}: {str(e1)}")
             
-            # Cache successful response
-            self._cache_data(cache_key, result)
+            # Method 2: Try get_aggs with recent day data
+            try:
+                logger.debug(f"Trying get_aggs for {ticker} from {yesterday} to {today}")
+                aggs = client.get_aggs(
+                    ticker=ticker_upper,
+                    multiplier=1,
+                    timespan="day",
+                    from_=yesterday,
+                    to=today,
+                )
+                
+                # Get the most recent aggregate
+                latest_agg = None
+                count = 0
+                for agg in aggs:
+                    latest_agg = agg
+                    count += 1
+                    if count == 1:  # Log first one
+                        logger.debug(f"  First agg type: {type(agg)}, attributes: {dir(agg) if hasattr(agg, '__dict__') else 'N/A'}")
+                
+                if latest_agg:
+                    for attr in ['c', 'close', 'price', 'p']:
+                        if hasattr(latest_agg, attr):
+                            try:
+                                price = getattr(latest_agg, attr)
+                                if price:
+                                    logger.info(f"Got price for {ticker} from get_aggs.{attr}: {price}")
+                                    return float(price)
+                            except Exception as e_attr:
+                                logger.debug(f"  Error accessing get_aggs attribute '{attr}': {e_attr}")
+                    
+                    # Try dict conversion
+                    try:
+                        agg_dict = vars(latest_agg) if hasattr(latest_agg, '__dict__') else {}
+                        logger.debug(f"  get_aggs dict keys: {list(agg_dict.keys()) if agg_dict else 'empty'}")
+                        for key in ['c', 'close', 'price', 'p']:
+                            if key in agg_dict and agg_dict[key]:
+                                logger.info(f"Got price for {ticker} from get_aggs dict[{key}]: {agg_dict[key]}")
+                                return float(agg_dict[key])
+                    except Exception as e_dict:
+                        logger.debug(f"  Error converting get_aggs to dict: {e_dict}")
+                else:
+                    logger.debug(f"  No aggregates returned from get_aggs")
+            except Exception as e2:
+                logger.warning(f"get_aggs failed for {ticker}: {type(e2).__name__}: {str(e2)}")
             
-            logger.debug(f"API call successful: {endpoint}")
-            return result
+            # Method 3: Try get_daily_open_close_agg
+            try:
+                logger.debug(f"Trying get_daily_open_close_agg for {ticker} on {yesterday}")
+                daily_agg = client.get_daily_open_close_agg(ticker_upper, yesterday)
+                logger.debug(f"  Response type: {type(daily_agg)}, attributes: {dir(daily_agg) if hasattr(daily_agg, '__dict__') else 'N/A'}")
+                for attr in ['close', 'c', 'price', 'p']:
+                    if hasattr(daily_agg, attr):
+                        try:
+                            price = getattr(daily_agg, attr)
+                            if price:
+                                logger.info(f"Got price for {ticker} from get_daily_open_close_agg.{attr}: {price}")
+                                return float(price)
+                        except Exception as e_attr:
+                            logger.debug(f"  Error accessing get_daily_open_close_agg attribute '{attr}': {e_attr}")
+            except Exception as e3:
+                logger.warning(f"get_daily_open_close_agg failed for {ticker}: {type(e3).__name__}: {str(e3)}")
             
-        except Exception as e:
-            error_msg = f"API error for {endpoint}: {str(e)}"
-            self.errors.append(error_msg)
+            # Method 4: Try get_ticker_details
+            try:
+                logger.debug(f"Trying get_ticker_details for {ticker}")
+                details = client.get_ticker_details(ticker_upper)
+                logger.debug(f"  Response type: {type(details)}, attributes: {dir(details) if hasattr(details, '__dict__') else 'N/A'}")
+                for attr in ['price', 'p', 'market_cap', 'marketCap']:
+                    if hasattr(details, attr):
+                        try:
+                            price = getattr(details, attr)
+                            if price and attr in ['price', 'p']:  # Only use price fields
+                                logger.info(f"Got price for {ticker} from get_ticker_details.{attr}: {price}")
+                                return float(price)
+                        except Exception as e_attr:
+                            logger.debug(f"  Error accessing get_ticker_details attribute '{attr}': {e_attr}")
+            except Exception as e4:
+                logger.warning(f"get_ticker_details failed for {ticker}: {type(e4).__name__}: {str(e4)}")
+            
+            # If all Polygon methods failed, try yfinance as fallback
+            logger.warning(f"All Polygon API methods failed for {ticker}, trying yfinance fallback")
+            price = None
+            yfinance_error = None
+            
+            try:
+                logger.debug(f"Fetching {ticker} price from yfinance...")
+                yf_ticker = yf.Ticker(ticker_upper)
+                
+                # Try info first
+                try:
+                    info = yf_ticker.info
+                    logger.debug(f"yfinance info keys: {list(info.keys())[:10] if isinstance(info, dict) else 'not a dict'}")
+                    
+                    # Try multiple price fields from yfinance
+                    price = (
+                        info.get('regularMarketPrice') or
+                        info.get('currentPrice') or
+                        info.get('previousClose') or
+                        info.get('regularMarketPreviousClose') or
+                        info.get('close') or
+                        None
+                    )
+                    if price:
+                        logger.info(f"Got price for {ticker} from yfinance.info: {price}")
+                        return float(price)
+                except Exception as e_info:
+                    logger.debug(f"yfinance.info failed: {e_info}")
+                    yfinance_error = str(e_info)
+                
+                # Try getting from recent history (1 minute intervals)
+                if price is None:
+                    try:
+                        logger.debug(f"Trying yfinance history 1d 1m...")
+                        hist = yf_ticker.history(period="1d", interval="1m")
+                        if not hist.empty:
+                            price = float(hist['Close'].iloc[-1])
+                            logger.info(f"Got price for {ticker} from yfinance history (1d 1m): {price}")
+                            return float(price)
+                    except Exception as e_hist1:
+                        logger.debug(f"yfinance history 1d 1m failed: {e_hist1}")
+                        yfinance_error = str(e_hist1)
+                
+                # Try last 5 days and get most recent close
+                if price is None:
+                    try:
+                        logger.debug(f"Trying yfinance history 5d...")
+                        hist = yf_ticker.history(period="5d")
+                        if not hist.empty:
+                            price = float(hist['Close'].iloc[-1])
+                            logger.info(f"Got price for {ticker} from yfinance history (5d): {price}")
+                            return float(price)
+                    except Exception as e_hist5:
+                        logger.debug(f"yfinance history 5d failed: {e_hist5}")
+                        yfinance_error = str(e_hist5)
+                
+                # Try 1 day daily
+                if price is None:
+                    try:
+                        logger.debug(f"Trying yfinance history 1d...")
+                        hist = yf_ticker.history(period="1d")
+                        if not hist.empty:
+                            price = float(hist['Close'].iloc[-1])
+                            logger.info(f"Got price for {ticker} from yfinance history (1d): {price}")
+                            return float(price)
+                    except Exception as e_hist1d:
+                        logger.debug(f"yfinance history 1d failed: {e_hist1d}")
+                        yfinance_error = str(e_hist1d)
+                    
+            except Exception as e_yf:
+                logger.error(f"yfinance fallback failed for {ticker}: {type(e_yf).__name__}: {e_yf}")
+                yfinance_error = str(e_yf)
+            
+            # If we get here, all methods including yfinance failed
+            error_msg = (
+                f"Could not get price for {ticker} using any method. "
+                f"Polygon methods tried: get_previous_close_agg, get_aggs, get_daily_open_close_agg, get_ticker_details. "
+                f"yfinance fallback also failed: {yfinance_error or 'unknown error'}"
+            )
             logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        try:
+            # Run synchronous call in thread pool
+            loop = asyncio.get_event_loop()
+            price = await loop.run_in_executor(_executor, _get_price)
+            return price
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching spot price for {ticker}: {e}")
+            raise ValueError(f"Failed to fetch spot price for {ticker}: {e}")
+
+    async def list_contracts(
+        self,
+        client: RESTClient,
+        underlying: str,
+        contract_type: Optional[str] = None,  # "call"/"put" or None for both
+        limit_expiries: int = 8,
+    ) -> List[Dict[str, Any]]:
+        """Pull option contract metadata and keep the nearest N expiries."""
+        def _get_contracts():
+            res: List[Dict[str, Any]] = []
             
-            # Return mock data on error
-            mock_data = self._generate_mock_response(endpoint, params)
-            self._cache_data(cache_key, mock_data)
-            return mock_data
-    
-    def _generate_mock_response(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate mock response based on endpoint"""
-        if "/v3/snapshot/options/" in endpoint:
-            underlying = endpoint.split("/")[-1].upper()
-            return self._mock_option_chain_response(underlying)
-        elif "/v2/aggs/ticker/" in endpoint and "/day/" in endpoint:
-            ticker = endpoint.split("/")[4].upper()
-            return self._mock_daily_bars_response(ticker, params)
-        elif "/v2/aggs/t/" in endpoint and "/minute/" in endpoint:
-            return self._mock_minute_bars_response()
-        elif "/v1/indicators/rsi/" in endpoint:
-            return {"results": {"values": [{"value": 45.5}]}}
-        else:
-            return {"results": []}
-    
-    def _mock_option_chain_response(self, underlying: str) -> Dict[str, Any]:
-        """Generate realistic mock option chain data"""
-        import random
-        
-        base_price = {"COST": 900, "WMT": 180, "TGT": 150, "AMZN": 180, "AAPL": 220}.get(underlying, 200)
-        contracts = []
-        
-        # Generate contracts for next 8 expiries (more realistic options chain)
-        for weeks_out in [1, 2, 3, 4, 6, 8, 12, 16]:
-            expiry = date.today() + timedelta(weeks=weeks_out)
-            expiry_str = expiry.strftime("%Y-%m-%d")
-            
-            # Generate strikes around current price (more strikes for better heatmap)
-            for i in range(-8, 9):
-                strike = base_price + (i * 10)
-                
-                for contract_type in ["call", "put"]:
-                    # Generate realistic Greeks
-                    moneyness = strike / base_price
-                    time_factor = weeks_out / 4.0
-                    
-                    if contract_type == "call":
-                        delta = max(0.05, min(0.95, 0.5 + (base_price - strike) / base_price * 2))
-                        contract_symbol = f"O:{underlying}{expiry.strftime('%y%m%d')}C{int(strike * 1000):08d}"
-                    else:
-                        delta = max(-0.95, min(-0.05, -0.5 + (strike - base_price) / base_price * 2))
-                        contract_symbol = f"O:{underlying}{expiry.strftime('%y%m%d')}P{int(strike * 1000):08d}"
-                    
-                    iv = 0.20 + random.uniform(-0.05, 0.10) + (abs(moneyness - 1) * 0.1)
-                    gamma = 0.02 * (1 - abs(moneyness - 1)) * time_factor
-                    theta = -0.05 * time_factor
-                    vega = 0.15 * time_factor
-                    
-                    volume = random.randint(50, 2000) if random.random() > 0.3 else 0
-                    oi = random.randint(100, 5000) if random.random() > 0.2 else 0
-                    last_price = max(0.01, abs(delta) * base_price * 0.1 + random.uniform(-5, 5))
-                    
-                    contract_data = {
-                        "contract": contract_symbol,
-                        "details": {
-                            "contract_type": contract_type,
-                            "strike_price": strike,
-                            "expiration_date": expiry_str
-                        },
-                        "day": {
-                            "volume": volume,
-                            "open_interest": oi
-                        },
-                        "last_quote": {
-                            "p": round(last_price, 2),
-                            "b": round(last_price * 0.98, 2),
-                            "a": round(last_price * 1.02, 2)
-                        },
-                        "implied_volatility": round(iv, 4),
-                        "greeks": {
-                            "delta": round(delta, 4),
-                            "gamma": round(gamma, 4),
-                            "theta": round(theta, 4),
-                            "vega": round(vega, 4)
-                        }
-                    }
-                    contracts.append(contract_data)
-        
-        return {"results": contracts}
-    
-    def _mock_daily_bars_response(self, ticker: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate mock daily bars data"""
-        import random
-        
-        # Generate 60 days of data
-        bars = []
-        base_price = {"COST": 900, "WMT": 180, "TGT": 150, "AMZN": 180, "AAPL": 220}.get(ticker, 200)
-        current_price = base_price
-        
-        for i in range(60):
-            bar_date = date.today() - timedelta(days=60-i)
-            
-            # Skip weekends
-            if bar_date.weekday() < 5:
-                # Generate realistic price movement
-                change_pct = random.uniform(-0.03, 0.03)
-                current_price *= (1 + change_pct)
-                
-                daily_range = current_price * 0.02
-                open_price = current_price + random.uniform(-daily_range/2, daily_range/2)
-                close_price = current_price + random.uniform(-daily_range/2, daily_range/2)
-                high_price = max(open_price, close_price) + random.uniform(0, daily_range/2)
-                low_price = min(open_price, close_price) - random.uniform(0, daily_range/2)
-                
-                volume = random.randint(1000000, 5000000)
-                timestamp = int(bar_date.strftime("%s")) * 1000
-                
-                bar_data = {
-                    "t": timestamp,
-                    "o": round(open_price, 2),
-                    "h": round(high_price, 2),
-                    "l": round(low_price, 2),
-                    "c": round(close_price, 2),
-                    "v": volume
-                }
-                bars.append(bar_data)
-        
-        return {"results": bars}
-    
-    def _mock_minute_bars_response(self) -> Dict[str, Any]:
-        """Generate mock minute bars data"""
-        import random
-        
-        bars = []
-        base_price = 10.0
-        
-        for i in range(100):
-            timestamp = int((datetime.now() - timedelta(minutes=100-i)).timestamp() * 1000)
-            change = random.uniform(-0.1, 0.1)
-            base_price *= (1 + change)
-            
-            bar_data = {
-                "t": timestamp,
-                "o": round(base_price, 2),
-                "h": round(base_price * 1.02, 2),
-                "l": round(base_price * 0.98, 2),
-                "c": round(base_price, 2),
-                "v": random.randint(100, 1000)
+            # Build parameters for list_options_contracts
+            params: Dict[str, Any] = {
+                "underlying_ticker": underlying.upper(),
+                "expired": "false",
+                "limit": 1000,
             }
-            bars.append(bar_data)
-        
-        return {"results": bars}
-    
-    async def get_option_chain_snapshot(self, underlying: str) -> List[OptionContract]:
-        """Get option chain snapshot for underlying ticker"""
-        endpoint = f"/v3/snapshot/options/{underlying.upper()}"
+            if contract_type:
+                params["contract_type"] = contract_type[0].upper()  # C/P
+
+            # Iterate through contracts using massive library
+            for contract in client.list_options_contracts(**params):
+                # Convert contract object to dict
+                try:
+                    contract_dict = vars(contract)
+                except:
+                    # Fallback: build dict from attributes
+                    contract_dict = {
+                        attr: getattr(contract, attr)
+                        for attr in dir(contract)
+                        if not attr.startswith('_') and not callable(getattr(contract, attr, None))
+                    }
+                res.append(contract_dict)
+                
+                # Limit total contracts fetched to avoid too many API calls
+                if len(res) >= 5000:
+                    break
+            
+            # Order expiries and keep nearest N
+            by_exp: Dict[str, List[Dict[str, Any]]] = {}
+            for x in res:
+                e = x.get("expiration_date")
+                if e:
+                    by_exp.setdefault(e, []).append(x)
+
+            expiries = sorted(by_exp.keys())[:limit_expiries]
+            trimmed = [x for e in expiries for x in by_exp[e]]
+            return trimmed
         
         try:
-            data = await self._make_request(endpoint)
-            contracts = []
-            
-            for contract_data in data.get("results", []):
-                try:
-                    # Extract contract details
-                    details = contract_data.get("details", {})
-                    day_data = contract_data.get("day", {}) or {}
-                    greeks = contract_data.get("greeks", {}) or {}
-                    last_quote = contract_data.get("last_quote", {}) or {}
-                    
-                    # Parse contract type
-                    contract_type_raw = details.get("contract_type", "").lower()
-                    contract_type = ContractType.CALL if contract_type_raw == "call" else ContractType.PUT
-                    
-                    # Parse expiry date
-                    expiry_str = details.get("expiration_date")
-                    expiry = datetime.strptime(expiry_str, "%Y-%m-%d").date() if expiry_str else None
-                    
-                    if not expiry:
-                        continue  # Skip contracts without valid expiry
-                    
-                    contract = OptionContract(
-                        contract=contract_data.get("contract", ""),
-                        underlying=underlying.upper(),
-                        expiry=expiry,
-                        strike=float(details.get("strike_price", 0)),
-                        type=contract_type,
-                        
-                        # Market data
-                        last_price=last_quote.get("p"),
-                        bid=last_quote.get("b"),
-                        ask=last_quote.get("a"),
-                        
-                        # Volume and OI
-                        day_volume=day_data.get("volume"),
-                        day_oi=day_data.get("open_interest"),
-                        
-                        # Greeks and IV - check multiple possible locations
-                        implied_volatility=(
-                            contract_data.get("implied_volatility") or 
-                            greeks.get("implied_volatility") or
-                            contract_data.get("iv")
-                        ),
-                        delta=greeks.get("delta"),
-                        gamma=greeks.get("gamma"),
-                        theta=greeks.get("theta"),
-                        vega=greeks.get("vega")
-                    )
-                    
-                    contracts.append(contract)
-                    
-                except Exception as e:
-                    logger.warning(f"Error parsing contract data: {str(e)}")
-                    continue
-            
-            logger.info(f"Retrieved {len(contracts)} contracts for {underlying}")
+            # Run synchronous call in thread pool
+            loop = asyncio.get_event_loop()
+            contracts = await loop.run_in_executor(_executor, _get_contracts)
             return contracts
-            
         except Exception as e:
-            logger.error(f"Error fetching option chain for {underlying}: {str(e)}")
-            raise PolygonAPIError(f"Failed to fetch option chain: {str(e)}")
-    
-    async def get_underlying_daily_bars(self, ticker: str, start_date: str, end_date: str) -> List[UnderlyingData]:
-        """Get daily bars for underlying stock"""
-        endpoint = f"/v2/aggs/ticker/{ticker.upper()}/range/1/day/{start_date}/{end_date}"
-        params = {
-            "adjusted": "true",
-            "sort": "asc",
-            "limit": 5000
-        }
-        
-        try:
-            data = await self._make_request(endpoint, params)
-            bars = []
+            logger.error(f"Error fetching contracts: {e}")
+            raise ValueError(f"Failed to fetch contracts: {e}")
+
+    async def daily_oi_pair(
+        self, client: RESTClient, option_ticker: str, d1: str, d2: str
+    ) -> Tuple[int, int]:
+        """Return (oi_T1, oi_T) for a single contract using 1D aggs."""
+        def _get_oi():
+            # Use massive library's get_aggs method
+            aggs = client.get_aggs(
+                ticker=option_ticker,
+                multiplier=1,
+                timespan="day",
+                from_=d1,
+                to=d2,
+            )
             
-            for bar_data in data.get("results", []):
+            results = []
+            for agg in aggs:
+                # Convert agg object to dict
                 try:
-                    # Convert timestamp to date
-                    timestamp = bar_data.get("t", 0)
-                    bar_date = datetime.fromtimestamp(timestamp / 1000).date()
-                    
-                    bar = UnderlyingData(
-                        ticker=ticker.upper(),
-                        bar_date=bar_date,
-                        open=float(bar_data.get("o", 0)),
-                        high=float(bar_data.get("h", 0)),
-                        low=float(bar_data.get("l", 0)),
-                        close=float(bar_data.get("c", 0)),
-                        volume=int(bar_data.get("v", 0))
-                    )
-                    
-                    bars.append(bar)
-                    
-                except Exception as e:
-                    logger.warning(f"Error parsing bar data: {str(e)}")
-                    continue
+                    agg_dict = vars(agg)
+                except:
+                    agg_dict = {
+                        attr: getattr(agg, attr)
+                        for attr in dir(agg)
+                        if not attr.startswith('_') and not callable(getattr(agg, attr, None))
+                    }
+                results.append(agg_dict)
             
-            logger.info(f"Retrieved {len(bars)} daily bars for {ticker}")
-            return bars
-            
-        except Exception as e:
-            logger.error(f"Error fetching daily bars for {ticker}: {str(e)}")
-            raise PolygonAPIError(f"Failed to fetch daily bars: {str(e)}")
-    
-    async def get_contract_minute_bars(self, contract: str, start_date: str, end_date: str) -> List[ContractBars]:
-        """Get 1-minute bars for specific option contract"""
-        endpoint = f"/v2/aggs/t/{contract}/range/1/minute/{start_date}/{end_date}"
-        params = {
-            "adjusted": "true",
-            "sort": "asc",
-            "limit": 50000
-        }
+            if not results:
+                logger.debug(f"No results for {option_ticker} from {d1} to {d2}")
+                return 0, 0
+
+            # Sort by timestamp and get first and last OI
+            sorted_results = sorted(results, key=lambda x: x.get("t", x.get("timestamp", 0)))
+
+            oi_t1 = int(sorted_results[0].get("oi", sorted_results[0].get("open_interest", 0)))
+            oi_t = int(sorted_results[-1].get("oi", sorted_results[-1].get("open_interest", 0)))
+            return oi_t1, oi_t
         
         try:
-            data = await self._make_request(endpoint, params)
-            bars = []
-            
-            for bar_data in data.get("results", []):
-                try:
-                    # Convert timestamp to datetime
-                    timestamp = bar_data.get("t", 0)
-                    bar_time = datetime.fromtimestamp(timestamp / 1000)
-                    
-                    bar = ContractBars(
-                        contract=contract,
-                        timestamp=bar_time,
-                        open=float(bar_data.get("o", 0)),
-                        high=float(bar_data.get("h", 0)),
-                        low=float(bar_data.get("l", 0)),
-                        close=float(bar_data.get("c", 0)),
-                        volume=int(bar_data.get("v", 0))
-                    )
-                    
-                    bars.append(bar)
-                    
-                except Exception as e:
-                    logger.warning(f"Error parsing contract bar data: {str(e)}")
-                    continue
-            
-            logger.info(f"Retrieved {len(bars)} minute bars for {contract}")
-            return bars
-            
+            # Run synchronous call in thread pool
+            loop = asyncio.get_event_loop()
+            oi_pair = await loop.run_in_executor(_executor, _get_oi)
+            return oi_pair
         except Exception as e:
-            logger.error(f"Error fetching minute bars for {contract}: {str(e)}")
-            raise PolygonAPIError(f"Failed to fetch minute bars: {str(e)}")
-    
-    async def get_underlying_rsi(self, ticker: str, window: int = 14) -> Optional[float]:
-        """Get RSI indicator for underlying stock"""
-        endpoint = f"/v1/indicators/rsi/{ticker.upper()}"
-        params = {
-            "timespan": "day",
-            "window": window
-        }
-        
+            logger.debug(
+                f"Error fetching OI for {option_ticker} from {d1} to {d2}: {e}"
+            )
+            return 0, 0
+
+    async def get_oi_change(
+        self,
+        symbol: str,
+        strike_band_pct: float = 0.2,
+        expiries: int = 8,
+        combine_cp: bool = True,
+        max_concurrency: int = 24,
+    ) -> Dict[str, Any]:
+        """
+        Return a heatmap-ready payload: rows=expiries, cols=strikes, values=ΔOI.
+        """
+        if not self.api_key:
+            raise ValueError(
+                "POLYGON_API_KEY is not set. Please set POLYGON_API_KEY environment variable."
+            )
+
+        client = self._get_client()
         try:
-            data = await self._make_request(endpoint, params)
-            
-            # Get the latest RSI value
-            results = data.get("results", {})
-            values = results.get("values", [])
-            
-            if values:
-                latest = values[-1]
-                return latest.get("value")
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error fetching RSI for {ticker}: {str(e)}")
-            return None
-    
-    async def close(self):
-        """Close the HTTP client"""
-        if self.client and not self.client.is_closed:
-            await self.client.aclose()
-    
-    def get_diagnostics(self) -> Dict[str, Any]:
-        """Get service diagnostics"""
-        return {
-            "api_calls": self.api_calls,
-            "errors": self.errors[-10:],  # Last 10 errors
-            "cache_size": len(self.cache),
-            "has_api_key": bool(self.api_key)
-        }
-    
-    def clear_cache(self):
-        """Clear all cached data"""
-        self.cache.clear()
-    
-    async def __aenter__(self):
-        """Async context manager entry"""
-        return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit"""
-        await self.close()
+            # Get trading days
+            t1, t = trading_days_2()
+
+            # Get spot price
+            spot = await self.get_spot_price(client, symbol)
+            logger.info(f"Spot price for {symbol}: ${spot:.2f}")
+
+            # Get contracts metadata
+            contracts = await self.list_contracts(client, symbol, None, expiries)
+            logger.info(f"Found {len(contracts)} contracts for {symbol}")
+
+            # Filter to strike band
+            lo = spot * (1 - strike_band_pct)
+            hi = spot * (1 + strike_band_pct)
+            filtered = [
+                c
+                for c in contracts
+                if (s := c.get("strike_price")) is not None and lo <= float(s) <= hi
+            ]
+            logger.info(
+                f"Filtered to {len(filtered)} contracts within ±{strike_band_pct*100:.0f}% of spot"
+            )
+
+            if not filtered:
+                return {
+                    "symbol": symbol.upper(),
+                    "t": t,
+                    "t_minus_1": t1,
+                    "expiries": [],
+                    "strikes": [],
+                    "matrix": [],
+                    "spot": spot,
+                }
+
+            # Collect all (expiry, strike) buckets
+            expiries_sorted = sorted({c["expiration_date"] for c in filtered})
+            strikes_sorted = sorted({round(float(c["strike_price"]), 2) for c in filtered})
+            idx_exp = {e: i for i, e in enumerate(expiries_sorted)}
+            idx_str = {s: i for i, s in enumerate(strikes_sorted)}
+
+            # Async gather OI for each contract
+            sem = asyncio.Semaphore(max_concurrency)
+            results: List[Tuple[str, float, str, int]] = []  # (expiry, strike, cp, dOI)
+
+            async def worker(c: Dict[str, Any]) -> None:
+                async with sem:
+                    ti = c["ticker"]
+                    expiry = c["expiration_date"]
+                    s = round(float(c["strike_price"]), 2)
+                    cp = c.get("contract_type", "")
+                    try:
+                        oi_t1, oi_t = await self.daily_oi_pair(client, ti, t1, t)
+                        d_oi = oi_t - oi_t1
+                        results.append((expiry, s, cp, d_oi))
+                    except Exception as err:
+                        logger.debug(f"Error processing contract {ti}: {err}")
+                        results.append((expiry, s, cp, 0))
+
+            await asyncio.gather(*(worker(c) for c in filtered))
+            logger.info(f"Processed OI data for {len(results)} contracts")
+
+            # Build matrix
+            mat = np.zeros((len(expiries_sorted), len(strikes_sorted)), dtype=int)
+
+            if combine_cp:
+                for e, s, _, doi in results:
+                    mat[idx_exp[e], idx_str[s]] += int(doi)
+
+                return {
+                    "symbol": symbol.upper(),
+                    "t": t,
+                    "t_minus_1": t1,
+                    "expiries": expiries_sorted,
+                    "strikes": strikes_sorted,
+                    "matrix": mat.tolist(),
+                    "spot": spot,
+                }
+
+            # Separate calls / puts
+            mat_c = np.zeros_like(mat)
+            mat_p = np.zeros_like(mat)
+            for e, s, cp, doi in results:
+                (mat_c if cp.upper() == "C" else mat_p)[idx_exp[e], idx_str[s]] += int(doi)
+
+            return {
+                "symbol": symbol.upper(),
+                "t": t,
+                "t_minus_1": t1,
+                "expiries": expiries_sorted,
+                "strikes": strikes_sorted,
+                "matrix_calls": mat_c.tolist(),
+                "matrix_puts": mat_p.tolist(),
+                "spot": spot,
+            }
+
+        except Exception:
+            logger.error(f"Error in get_oi_change for {symbol}", exc_info=True)
+            # Optionally close the client on fatal errors
+            try:
+                await self.close()
+            except Exception:
+                pass
+            raise

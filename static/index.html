@@ -861,13 +861,12 @@
                         </div>
                     </div>
 
+
                     <!-- Consumer Options Content -->
                     <div class="tab-pane fade show active" id="consumeroptions-content" role="tabpanel" aria-labelledby="consumeroptions-tab">
-                        <div id="consumeroptions-dashboard" style="min-height: 500px;">
-                            <!-- Consumer Options Dashboard will render here -->
-                        </div>
+                        <div id="consumeroptions-dashboard"></div>
                     </div>
-
+                    
                     <div class="tab-pane fade" id="rag-bi-content" role="tabpanel" aria-labelledby="rag-bi-tab">
                         <div id="rag-bi-root"></div>
                     </div>
@@ -1878,7 +1877,7 @@
             <script src="/static/main.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
     
     <!-- Consumer Options Dashboard Component -->
-    <script src="/static/js/components/consumeroptions.js"></script>
+    <script type="text/babel" src="/static/js/components/consumeroptions-dashboard.js"></script>
     
     <!-- AAPL Analysis Dashboard Component -->
     <!-- Load AAPL Dashboard components -->
@@ -4902,20 +4901,21 @@ Recommendation: ${currentAnalysis.recommendation}`;
                 try {
                     console.log('Attempting to render React component...');
                     
-                    // Clear any existing content first
-                    rootElement.innerHTML = '';
-                    
                     // Try React 18 style first, then fallback to React 17
                     const ComponentToRender = window.AAPLWeeklyTracker || window.AAPLAnalysisDashboard;
                     
                     if (ReactDOM.createRoot) {
-                        // React 18 style
+                        // React 18 style - reuse existing root if available
                         console.log('Using React 18 rendering');
-                        const root = ReactDOM.createRoot(rootElement);
-                        root.render(React.createElement(ComponentToRender));
+                        if (!window.aaplDashboardRoot) {
+                            window.aaplDashboardRoot = ReactDOM.createRoot(rootElement);
+                        }
+                        window.aaplDashboardRoot.render(React.createElement(ComponentToRender));
                     } else {
                         // React 17 style fallback
                         console.log('Using React 17 rendering');
+                        // Clear any existing content first
+                        rootElement.innerHTML = '';
                         ReactDOM.render(React.createElement(ComponentToRender), rootElement);
                     }
                     
@@ -4962,19 +4962,6 @@ Recommendation: ${currentAnalysis.recommendation}`;
         });
     </script>
 
-    <!-- Consumer Options Dashboard Initialization -->
-    <script>
-        // Initialize Consumer Options Dashboard when DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('📊 Consumer Options Dashboard Loading...');
-            if (typeof ConsumerOptionsReactDashboard !== 'undefined') {
-                // Initialize the dashboard
-                window.consumerOptionsDashboard = new ConsumerOptionsReactDashboard();
-            } else {
-                console.error('ConsumerOptionsReactDashboard class not found. Make sure the JS file is loaded.');
-            }
-        });
-    </script>
 
 </body>
 </html>
