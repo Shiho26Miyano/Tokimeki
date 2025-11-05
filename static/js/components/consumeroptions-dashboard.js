@@ -31,7 +31,6 @@ class ConsumerOptionsDashboard extends React.Component {
             error: null,
             
             // Chart state
-            chartData: {},
             refreshKey: 0
         };
         
@@ -54,6 +53,11 @@ class ConsumerOptionsDashboard extends React.Component {
         if (prevState.oiChangeData !== this.state.oiChangeData && this.state.oiChangeData) {
             setTimeout(() => this.renderHeatmap(), 100);
         }
+        
+        // Also trigger on refreshKey change
+        if (prevState.refreshKey !== this.state.refreshKey && this.state.oiChangeData) {
+            setTimeout(() => this.renderHeatmap(), 100);
+        }
     }
     
     handleTickerChange(event) {
@@ -69,13 +73,12 @@ class ConsumerOptionsDashboard extends React.Component {
         
         try {
             const { selectedTicker } = this.state;
-            const url = `/api/v1/consumeroptions/dashboard/oi-change?symbol=${selectedTicker}&strike_band_pct=0.2&expiries=8&combine_cp=true`;
+            const url = `/api/v1/consumeroptions/dashboard/oi-change?symbol=${encodeURIComponent(selectedTicker)}&strike_band_pct=0.2&expiries=8&combine_cp=true`;
             
             console.log('Fetching OI change data from:', url);
             const response = await fetch(url);
             
             if (!response.ok) {
-                // Try to get the actual error message from the response
                 let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
                 try {
                     const errorData = await response.json();
@@ -114,97 +117,159 @@ class ConsumerOptionsDashboard extends React.Component {
     }
     
     renderHeatmap() {
+        const container = document.getElementById('oi-heatmap-chart');
+        if (!container) return;
+
         const { oiChangeData } = this.state;
-        
         if (!oiChangeData || !oiChangeData.matrix || !oiChangeData.expiries || !oiChangeData.strikes) {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:#64748b;">No OI change data available</div>';
             return;
         }
-        
-        // Check if Plotly is available
-        if (typeof Plotly === 'undefined') {
-            console.warn('Plotly is not available. Waiting...');
-            setTimeout(() => this.renderHeatmap(), 100);
-            return;
-        }
-        
+
         const matrix = oiChangeData.matrix;
         const expiries = oiChangeData.expiries;
         const strikes = oiChangeData.strikes;
-        
-        // Format expiry dates for display (e.g., "2024-11-09" -> "11-09")
-        const formattedExpiries = expiries.map(exp => {
-            const date = new Date(exp);
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${month}-${day}`;
+
+        if (!Array.isArray(matrix) || !Array.isArray(matrix[0])) {
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:#dc2626;">Invalid matrix data structure</div>';
+            return;
+        }
+
+        const formattedExpiries = expiries.map((exp) => {
+            const d = new Date(exp);
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${m}-${day}`;
         });
-        
-        // Format strikes for display
-        const formattedStrikes = strikes.map(s => String(s));
-        
-        // Find min and max values for color scale
-        const flatMatrix = matrix.flat();
-        const minValue = Math.min(...flatMatrix);
-        const maxValue = Math.max(...flatMatrix);
-        
-        // Create heatmap data
-        const heatmapData = [{
-            z: matrix,
-            x: formattedStrikes,
-            y: formattedExpiries,
-            type: 'heatmap',
-            colorscale: [
-                [0, 'rgb(75, 0, 130)'],      // Dark purple for negative/low values
-                [0.33, 'rgb(25, 25, 112)'],  // Midnight blue
-                [0.5, 'rgb(0, 128, 128)'],  // Teal
-                [0.66, 'rgb(144, 238, 144)'], // Light green
-                [0.83, 'rgb(255, 255, 0)'],  // Yellow
-                [1, 'rgb(255, 215, 0)']      // Gold for high positive values
-            ],
-            colorbar: {
-                title: {
-                    text: 'Δ OI (contracts)',
-                    font: { size: 12 }
-                },
-                len: 0.8
-            },
-            hovertemplate: '<b>Expiry:</b> %{y}<br><b>Strike:</b> %{x}<br><b>Δ OI:</b> %{z}<extra></extra>',
-            text: matrix.map(row => row.map(val => val.toString())),
-            texttemplate: '%{text}',
-            textfont: { size: 10 },
-            showscale: true
-        }];
-        
-        const layout = {
-            title: {
-                text: 'Open Interest Change',
-                font: { size: 18, weight: 'bold' }
-            },
-            xaxis: {
-                title: 'Strike',
-                side: 'bottom',
-                type: 'category',
-                automargin: true
-            },
-            yaxis: {
-                title: 'Expiry',
-                type: 'category',
-                automargin: true
-            },
-            height: 500,
-            margin: { l: 80, r: 50, t: 60, b: 80 },
-            plot_bgcolor: 'white',
-            paper_bgcolor: 'white'
+
+        const flat = matrix.flat();
+        const min_delta = Math.min(...flat);
+        const max_delta = Math.max(...flat);
+
+        // viridis-like scale as a function -> returns hex
+        const getColor = (value) => {
+            if (max_delta === min_delta) return '#35b779'; // neutral if constant
+            const t = Math.max(0, Math.min(1, (value - min_delta) / (max_delta - min_delta)));
+            if (t < 0.1) return '#440154';
+            if (t < 0.2) return '#482777';
+            if (t < 0.3) return '#3f4a8a';
+            if (t < 0.4) return '#31688e';
+            if (t < 0.5) return '#26828e';
+            if (t < 0.6) return '#1f9e89';
+            if (t < 0.7) return '#35b779';
+            if (t < 0.8) return '#6ece58';
+            if (t < 0.9) return '#b5de2b';
+            return '#fde725';
         };
+
+        const width = Math.max(container.clientWidth || 800, 600);
+        const height = 450;
+        const margin = { top: 40, right: 100, bottom: 80, left: 60 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        const cellW = chartWidth / strikes.length;
+        const cellH = chartHeight / expiries.length;
+
+        // cells
+        let cells = '';
+        for (let i = 0; i < expiries.length; i++) {
+            for (let j = 0; j < strikes.length; j++) {
+                const v = matrix[i][j];
+                const x = margin.left + j * cellW;
+                const y = margin.top + i * cellH;
+                const c = getColor(v);
+                cells += `<rect x="${x}" y="${y}" width="${cellW}" height="${cellH}" fill="${c}" stroke="#e2e8f0" stroke-width="0.5">
+        <title>Expiry: ${formattedExpiries[i]} | Strike: ${strikes[j]} | Δ OI: ${v} contracts</title>
+      </rect>`;
+            }
+        }
+
+        // x labels
+        let xLabels = '';
+        for (let i = 0; i < strikes.length; i++) {
+            const x = margin.left + i * cellW + cellW / 2;
+            const y = height - 25;
+            xLabels += `<text x="${x}" y="${y}" text-anchor="middle" font-size="11" fill="#374151" font-weight="500"
+      transform="rotate(-45, ${x}, ${y})">${strikes[i]}</text>`;
+        }
+
+        // y labels
+        let yLabels = '';
+        for (let i = 0; i < formattedExpiries.length; i++) {
+            const x = margin.left - 10;
+            const y = margin.top + i * cellH + cellH / 2;
+            yLabels += `<text x="${x}" y="${y}" text-anchor="end" font-size="10" fill="#64748b" dominant-baseline="middle">${formattedExpiries[i]}</text>`;
+        }
+
+        // legend gradient stops
+        const legendWidth = Math.min(140, chartWidth * 0.35);
+        const legendHeight = 20;
+        const legendX = margin.left + chartWidth - legendWidth - 5;
+        const legendY = margin.top;
+        let stops = '';
+        for (let i = 0; i < 20; i++) {
+            const v = min_delta + (i / 19) * (max_delta - min_delta);
+            const col = getColor(v);
+            stops += `<stop offset="${(i / 19)}" stop-color="${col}"/>`;
+        }
+
+        const sameNote = (max_delta === min_delta)
+            ? `<text x="${legendX + legendWidth/2}" y="${legendY + legendHeight + 30}" font-size="9" fill="#dc2626" text-anchor="middle" font-weight="600">⚠ All values are ${min_delta === 0 ? 'zero' : 'the same'}</text>`
+            : '';
+
+        // Build matrix table HTML
+        let tableHTML = '<div style="margin-top: 20px; overflow-x: auto;"><h5 style="margin-bottom: 10px; color: #374151; font-weight: 600;">Open Interest Change Matrix (Δ OI in contracts)</h5>';
+        tableHTML += '<table style="border-collapse: collapse; width: 100%; font-size: 11px; background: white; border: 1px solid #e2e8f0;">';
         
-        const config = {
-            responsive: true,
-            displayModeBar: true,
-            modeBarButtonsToRemove: ['select2d', 'lasso2d']
-        };
+        // Header row with strikes
+        tableHTML += '<thead><tr>';
+        tableHTML += '<th style="padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; text-align: left; font-weight: 600; color: #64748b; position: sticky; left: 0; z-index: 10; background: #f8fafc;">Expiry →<br/>Strike ↓</th>';
+        for (let j = 0; j < strikes.length; j++) {
+            tableHTML += `<th style="padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; text-align: center; font-weight: 600; color: #374151; min-width: 60px;">${strikes[j]}</th>`;
+        }
+        tableHTML += '</tr></thead>';
         
-        // Render the heatmap
-        Plotly.newPlot('oi-heatmap-chart', heatmapData, layout, config);
+        // Data rows
+        tableHTML += '<tbody>';
+        for (let i = 0; i < expiries.length; i++) {
+            tableHTML += '<tr>';
+            tableHTML += `<td style="padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; text-align: center; font-weight: 600; color: #64748b; position: sticky; left: 0; z-index: 5; background: #f8fafc;">${formattedExpiries[i]}</td>`;
+            for (let j = 0; j < strikes.length; j++) {
+                const v = matrix[i][j];
+                const c = getColor(v);
+                // Color the cell background based on value
+                const bgColor = max_delta === min_delta ? '#f0fdf4' : c;
+                const textColor = v < 0 ? '#dc2626' : (v > 0 ? '#059669' : '#64748b');
+                tableHTML += `<td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center; background-color: ${bgColor}; color: ${textColor}; font-weight: ${v !== 0 ? '600' : '400'};">
+                    ${v.toLocaleString()}
+                </td>`;
+            }
+            tableHTML += '</tr>';
+        }
+        tableHTML += '</tbody></table></div>';
+
+        container.innerHTML = `
+  <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" style="overflow:visible;max-width:100%;">
+    <defs>
+      <linearGradient id="heatmapGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        ${stops}
+      </linearGradient>
+    </defs>
+    <text x="${margin.left}" y="20" font-size="16" font-weight="bold" fill="#374151">Open Interest Change</text>
+    ${cells}
+    ${xLabels}
+    ${yLabels}
+    <text x="${margin.left + chartWidth/2}" y="${height - 10}" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Strike</text>
+    <text x="${margin.left + chartWidth + 15}" y="${margin.top + chartHeight/2}" text-anchor="middle" font-size="11" font-weight="600" fill="#374151"
+      transform="rotate(-90, ${margin.left + chartWidth + 15}, ${margin.top + chartHeight/2})">Expiry</text>
+    <rect x="${legendX}" y="${legendY}" width="${legendWidth}" height="${legendHeight}" fill="url(#heatmapGradient)" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="${legendX}" y="${legendY - 5}" font-size="10" font-weight="600" fill="#374151">Δ OI (contracts)</text>
+    <text x="${legendX}" y="${legendY + legendHeight + 15}" font-size="8" fill="#64748b">${Math.round(min_delta)}</text>
+    <text x="${legendX + legendWidth}" y="${legendY + legendHeight + 15}" font-size="8" fill="#64748b" text-anchor="end">${Math.round(max_delta)}</text>
+    ${sameNote}
+  </svg>
+  ${tableHTML}`;
     }
     
     renderPlaceholderChart(title, id) {
@@ -291,43 +356,26 @@ class ConsumerOptionsDashboard extends React.Component {
                     </div>
                 </div>
                 
-                {/* Charts Grid - 3 per row, 9 total */}
+                {/* Charts Grid */}
                 <div className="row g-4">
-                    {/* Row 1 */}
-                    <div className="col-md-4">
+                    {/* Open Interest Change Heatmap */}
+                    <div className="col-md-12">
                         <div className="card shadow-sm">
                             <div className="card-body">
                                 <div id="oi-heatmap-chart" style={{ minHeight: '500px' }}></div>
                             </div>
                         </div>
                     </div>
+                    
+                    {/* Placeholder charts */}
                     <div className="col-md-4">
                         {this.renderPlaceholderChart('Chart 2', 'chart-2')}
                     </div>
                     <div className="col-md-4">
                         {this.renderPlaceholderChart('Chart 3', 'chart-3')}
                     </div>
-                    
-                    {/* Row 2 */}
                     <div className="col-md-4">
                         {this.renderPlaceholderChart('Chart 4', 'chart-4')}
-                    </div>
-                    <div className="col-md-4">
-                        {this.renderPlaceholderChart('Chart 5', 'chart-5')}
-                    </div>
-                    <div className="col-md-4">
-                        {this.renderPlaceholderChart('Chart 6', 'chart-6')}
-                    </div>
-                    
-                    {/* Row 3 */}
-                    <div className="col-md-4">
-                        {this.renderPlaceholderChart('Chart 7', 'chart-7')}
-                    </div>
-                    <div className="col-md-4">
-                        {this.renderPlaceholderChart('Chart 8', 'chart-8')}
-                    </div>
-                    <div className="col-md-4">
-                        {this.renderPlaceholderChart('Chart 9', 'chart-9')}
                     </div>
                 </div>
             </div>
@@ -380,4 +428,3 @@ if (typeof window !== 'undefined') {
         // Start trying to define the component
         defineComponent();
     })();
-
