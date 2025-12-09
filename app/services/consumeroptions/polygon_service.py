@@ -594,77 +594,88 @@ class ConsumerOptionsPolygonService:
             return None
     
     async def get_option_chain_snapshot(self, underlying: str) -> List[OptionContract]:
-        """Get option chain snapshot for underlying ticker, enriched with latest pricing from RESTClient"""
-        endpoint = f"/v3/snapshot/options/{underlying.upper()}"
-        
+        """Get option chain snapshot for underlying ticker using RESTClient.list_snapshot_options_chain"""
         try:
-            data = await self._make_request(endpoint)
+            logger.info(f"Fetching option chain snapshot for {underlying} using RESTClient.list_snapshot_options_chain")
             
-            # Log API response details for debugging
-            logger.info(f"API response for {underlying}: status={data.get('status')}, results_count={len(data.get('results', []))}")
+            def fetch_options_chain():
+                """Fetch options chain using RESTClient (synchronous)"""
+                options_chain = []
+                try:
+                    # Fetch all contracts with pagination, capped at 500
+                    for contract_data in self.rest_client.list_snapshot_options_chain(
+                        underlying.upper(),
+                        params={
+                            "order": "asc",
+                            "limit": 100,  # Fetch 100 at a time
+                            "sort": "ticker",
+                        }
+                    ):
+                        options_chain.append(contract_data)
+                        # Cap at 500 contracts to avoid rate limits
+                        if len(options_chain) >= 500:
+                            logger.info(f"Reached cap of 500 contracts for {underlying}")
+                            break
+                    
+                    logger.info(f"Fetched {len(options_chain)} contracts from Polygon API for {underlying}")
+                    return options_chain
+                except Exception as e:
+                    logger.error(f"Error in RESTClient.list_snapshot_options_chain for {underlying}: {str(e)}", exc_info=True)
+                    raise
             
-            # Check if API returned an error status
-            if data.get("status") == "ERROR":
-                error_msg = data.get("error", "Unknown error from Polygon API")
-                logger.error(f"Polygon API error for {underlying}: {error_msg}")
-                raise PolygonAPIError(f"Polygon API error: {error_msg}")
+            # Execute in thread pool to maintain async interface
+            loop = asyncio.get_event_loop()
+            raw_contracts = await loop.run_in_executor(self.executor, fetch_options_chain)
             
-            # Check if results array exists
-            results = data.get("results", [])
-            if not results:
-                logger.warning(f"No results returned from Polygon API for {underlying}. Response: {data}")
-                # Return empty list instead of raising error - let the dashboard handle empty state
+            if not raw_contracts:
+                logger.warning(f"No contracts returned from Polygon API for {underlying}")
                 return []
             
-            logger.info(f"Retrieved option chain data for {underlying}: {len(results)} raw contracts")
+            logger.info(f"Processing {len(raw_contracts)} raw contracts for {underlying}")
             contracts = []
             skipped_count = 0
             
-            for contract_data in results:
+            for contract_data in raw_contracts:
                 try:
-                    # Extract contract details
-                    details = contract_data.get("details", {})
-                    if not details:
-                        logger.debug(f"Skipping contract with no details: {contract_data.get('contract', 'unknown')}")
+                    # OptionContractSnapshot is a dataclass object
+                    # Contract ticker is in details.ticker
+                    if not hasattr(contract_data, 'details') or contract_data.details is None:
+                        logger.debug(f"Skipping contract with no details")
                         skipped_count += 1
                         continue
                     
-                    day_data = contract_data.get("day", {}) or {}
-                    greeks = contract_data.get("greeks", {}) or {}
-                    last_quote = contract_data.get("last_quote", {}) or {}
+                    details = contract_data.details
+                    contract_ticker = getattr(details, 'ticker', None)
+                    if not contract_ticker:
+                        logger.debug(f"Skipping contract with no ticker in details")
+                        skipped_count += 1
+                        continue
                     
                     # Parse contract type
-                    contract_type_raw = details.get("contract_type", "").lower()
+                    contract_type_raw = getattr(details, 'contract_type', '').lower()
                     if not contract_type_raw:
-                        logger.debug(f"Skipping contract with no contract_type: {contract_data.get('contract', 'unknown')}")
+                        logger.debug(f"Skipping contract {contract_ticker} with no contract_type")
                         skipped_count += 1
                         continue
                     
                     contract_type = ContractType.CALL if contract_type_raw == "call" else ContractType.PUT
                     
                     # Parse expiry date
-                    expiry_str = details.get("expiration_date")
+                    expiry_str = getattr(details, 'expiration_date', None)
                     if not expiry_str:
-                        logger.debug(f"Skipping contract with no expiration_date: {contract_data.get('contract', 'unknown')}")
+                        logger.debug(f"Skipping contract {contract_ticker} with no expiration_date")
                         skipped_count += 1
                         continue
                     
                     try:
                         expiry = datetime.strptime(expiry_str, "%Y-%m-%d").date()
                     except ValueError as e:
-                        logger.warning(f"Invalid expiry date format '{expiry_str}' for contract {contract_data.get('contract', 'unknown')}: {e}")
-                        skipped_count += 1
-                        continue
-                    
-                    # Get contract ticker
-                    contract_ticker = contract_data.get("contract", "")
-                    if not contract_ticker:
-                        logger.debug(f"Skipping contract with no ticker")
+                        logger.warning(f"Invalid expiry date format '{expiry_str}' for contract {contract_ticker}: {e}")
                         skipped_count += 1
                         continue
                     
                     # Get strike price
-                    strike_price = details.get("strike_price", 0)
+                    strike_price = getattr(details, 'strike_price', 0)
                     try:
                         strike = float(strike_price)
                     except (ValueError, TypeError):
@@ -672,33 +683,40 @@ class ConsumerOptionsPolygonService:
                         skipped_count += 1
                         continue
                     
-                    # Get initial pricing data from snapshot
-                    last_price = self._extract_price(last_quote.get("p") or contract_data.get("last_quote", {}).get("p"))
-                    day_volume = self._extract_number(day_data.get("volume") or contract_data.get("day", {}).get("volume"))
+                    # Extract day data
+                    day_data = contract_data.day if hasattr(contract_data, 'day') and contract_data.day else None
+                    day_volume = self._extract_number(getattr(day_data, 'volume', None) if day_data else None)
+                    # Open interest is at top level, not in day
+                    day_oi = self._extract_number(getattr(contract_data, 'open_interest', None))
                     
-                    # Always try to enrich with RESTClient if data is missing or very low
-                    # This ensures we get the most recent pricing data
-                    should_enrich = (last_price is None or last_price == 0) or (day_volume is None or day_volume == 0)
+                    # Extract last trade/quote data
+                    last_trade = contract_data.last_trade if hasattr(contract_data, 'last_trade') and contract_data.last_trade else None
+                    last_quote = contract_data.last_quote if hasattr(contract_data, 'last_quote') and contract_data.last_quote else None
                     
-                    if should_enrich:
-                        logger.info(f"Enriching pricing data for {contract_ticker} (last_price={last_price}, day_volume={day_volume})")
-                        latest_agg = await self._get_latest_agg_for_contract(contract_ticker)
-                        if latest_agg:
-                            if last_price is None or last_price == 0:
-                                new_price = self._extract_price(latest_agg.get("close"))
-                                if new_price:
-                                    last_price = new_price
-                                    logger.info(f"✓ Enriched last_price for {contract_ticker}: {last_price}")
-                            if day_volume is None or day_volume == 0:
-                                new_volume = self._extract_number(latest_agg.get("volume"))
-                                if new_volume:
-                                    day_volume = new_volume
-                                    logger.info(f"✓ Enriched day_volume for {contract_ticker}: {day_volume}")
-                        else:
-                            logger.debug(f"No aggregate data available for {contract_ticker}")
-                        
-                        # Small delay to avoid rate limits
-                        await asyncio.sleep(0.1)
+                    # Try last_trade first, then last_quote
+                    if last_trade:
+                        last_price = self._extract_price(getattr(last_trade, 'price', None))
+                        bid = self._extract_price(getattr(last_trade, 'bid', None))
+                        ask = self._extract_price(getattr(last_trade, 'ask', None))
+                    elif last_quote:
+                        last_price = self._extract_price(getattr(last_quote, 'p', None))
+                        bid = self._extract_price(getattr(last_quote, 'b', None))
+                        ask = self._extract_price(getattr(last_quote, 'a', None))
+                    else:
+                        # Fallback to day close price
+                        last_price = self._extract_price(getattr(day_data, 'close', None) if day_data else None)
+                        bid = None
+                        ask = None
+                    
+                    # Extract Greeks - greeks is a dataclass object
+                    greeks = contract_data.greeks if hasattr(contract_data, 'greeks') and contract_data.greeks else None
+                    delta = self._validate_greek(getattr(greeks, 'delta', None) if greeks else None)
+                    gamma = self._validate_greek(getattr(greeks, 'gamma', None) if greeks else None)
+                    theta = self._validate_greek(getattr(greeks, 'theta', None) if greeks else None)
+                    vega = self._validate_greek(getattr(greeks, 'vega', None) if greeks else None)
+                    
+                    # Implied volatility is at top level
+                    implied_volatility = self._validate_iv(getattr(contract_data, 'implied_volatility', None))
                     
                     contract = OptionContract(
                         contract=contract_ticker,
@@ -706,48 +724,44 @@ class ConsumerOptionsPolygonService:
                         expiry=expiry,
                         strike=strike,
                         type=contract_type,
-                        
-                        # Market data - enriched with RESTClient data if needed
                         last_price=last_price,
-                        bid=self._extract_price(last_quote.get("b") or contract_data.get("last_quote", {}).get("b")),
-                        ask=self._extract_price(last_quote.get("a") or contract_data.get("last_quote", {}).get("a")),
-                        
-                        # Volume and OI - enriched with RESTClient data if needed
+                        bid=bid,
+                        ask=ask,
                         day_volume=day_volume,
-                        day_oi=self._extract_number(day_data.get("open_interest") or contract_data.get("day", {}).get("open_interest")),
-                        
-                        # Greeks and IV - check multiple possible locations and validate
-                        implied_volatility=self._validate_iv(
-                            contract_data.get("implied_volatility") or 
-                            greeks.get("implied_volatility") or
-                            contract_data.get("iv")
-                        ),
-                        delta=self._validate_greek(greeks.get("delta")),
-                        gamma=self._validate_greek(greeks.get("gamma")),
-                        theta=self._validate_greek(greeks.get("theta")),
-                        vega=self._validate_greek(greeks.get("vega"))
+                        day_oi=day_oi,
+                        implied_volatility=implied_volatility,
+                        delta=delta,
+                        gamma=gamma,
+                        theta=theta,
+                        vega=vega
                     )
                     
                     contracts.append(contract)
+                    logger.debug(f"Successfully parsed contract {contract_ticker}: strike={strike}, type={contract_type.value}, last_price={last_price}, volume={day_volume}, oi={day_oi}")
                     
                 except Exception as e:
-                    logger.warning(f"Error parsing contract data for {contract_data.get('contract', 'unknown')}: {str(e)}")
+                    logger.warning(f"Error parsing contract data: {str(e)}", exc_info=True)
                     skipped_count += 1
                     continue
             
             logger.info(f"Retrieved {len(contracts)} valid contracts for {underlying} (skipped {skipped_count} invalid contracts)")
             
-            if len(contracts) == 0 and len(results) > 0:
-                logger.warning(f"All {len(results)} contracts were filtered out for {underlying}. This may indicate a data format issue.")
+            if len(contracts) == 0:
+                if len(raw_contracts) > 0:
+                    logger.warning(f"All {len(raw_contracts)} contracts were filtered out for {underlying}. This may indicate a data format issue.")
+                    # Log a sample contract to help debug
+                    if len(raw_contracts) > 0:
+                        sample = raw_contracts[0]
+                        logger.warning(f"Sample contract structure: type={type(sample)}, has_details={hasattr(sample, 'details')}, details_type={type(sample.details) if hasattr(sample, 'details') else 'N/A'}")
+                else:
+                    logger.warning(f"No raw contracts returned from Polygon API for {underlying}")
             
             return contracts
             
-        except PolygonAPIError:
-            # Re-raise PolygonAPIError as-is
-            raise
         except Exception as e:
             logger.error(f"Error fetching option chain for {underlying}: {str(e)}", exc_info=True)
-            raise PolygonAPIError(f"Failed to fetch option chain: {str(e)}")
+            # Return empty list instead of raising error - let dashboard handle empty state
+            return []
     
     async def get_underlying_daily_bars(self, ticker: str, start_date: str, end_date: str) -> List[UnderlyingData]:
         """Get daily bars for underlying stock using Polygon RESTClient"""

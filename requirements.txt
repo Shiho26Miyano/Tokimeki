@@ -18,7 +18,7 @@ psutil==5.9.8
 httpx[http2]==0.25.2
 
 # Polygon.io official API client
-polygon-api-client==1.13.0
+polygon-api-client>=1.13.0
 
 # Essential data processing
 numpy==1.26.4

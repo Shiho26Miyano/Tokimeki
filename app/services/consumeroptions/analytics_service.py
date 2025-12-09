@@ -448,29 +448,29 @@ class ConsumerOptionsAnalyticsService:
     
     def calculate_oi_change_heatmap_data(self, contracts: List[OptionContract]) -> Dict[str, Any]:
         """
-        Calculate Open Interest Change heatmap data
+        Calculate Volume heatmap data (changed from OI change to volume as requested)
         
         Args:
             contracts: List of option contracts
             
         Returns:
-            Dictionary with heatmap data for frontend
+            Dictionary with heatmap data for frontend using volume metric
         """
         try:
             if not contracts:
-                logger.warning("No contracts provided for OI heatmap calculation")
-                return {"expiries": [], "strikes": [], "delta_oi": []}
+                logger.warning("No contracts provided for volume heatmap calculation")
+                return {"expiries": [], "strikes": [], "volume": []}
             
-            logger.info(f"Calculating OI heatmap for {len(contracts)} contracts")
+            logger.info(f"Calculating volume heatmap for {len(contracts)} contracts")
             
             # Create DataFrame for easier manipulation
             df = pd.DataFrame([{
                 'expiry': pd.to_datetime(c.expiry) if isinstance(c.expiry, str) else c.expiry,
                 'strike': c.strike,
                 'type': c.type.value,
-                'oi_today': c.day_oi or 0,
-                'delta': c.delta or 0,
-                'volume': c.day_volume or 0
+                'volume': c.day_volume or 0,  # Use volume instead of OI
+                'oi': c.day_oi or 0,
+                'delta': c.delta or 0
             } for c in contracts])
             
             logger.info(f"Created DataFrame with {len(df)} rows")
@@ -483,48 +483,39 @@ class ConsumerOptionsAnalyticsService:
             
             if len(expiries) == 0 or len(strikes) == 0:
                 logger.warning("No valid expiries or strikes found")
-                return {"expiries": [], "strikes": [], "delta_oi": []}
+                return {"expiries": [], "strikes": [], "volume": []}
             
-            # Create pivot tables for today's OI
+            # Create pivot table for volume (not OI change)
             try:
-                grid_today = df.pivot_table(
+                volume_grid = df.pivot_table(
                     index="expiry", columns="strike",
-                    values="oi_today", aggfunc="sum"
+                    values="volume", aggfunc="sum"
                 ).reindex(index=expiries, columns=strikes).fillna(0)
                 
-                logger.info(f"Created grid_today with shape: {grid_today.shape}")
+                logger.info(f"Created volume_grid with shape: {volume_grid.shape}")
             except Exception as e:
                 logger.error(f"Error creating pivot table: {str(e)}")
-                return {"expiries": [], "strikes": [], "delta_oi": []}
-            
-            # Get actual historical OI data instead of simulation
-            grid_yesterday = self._get_historical_oi_data(contracts, expiries, strikes)
-            if grid_yesterday is None:
-                # If no historical data available, return empty heatmap
-                logger.warning("No historical OI data available for heatmap calculation")
-                return {"expiries": [], "strikes": [], "delta_oi": []}
-            
-            # Calculate delta OI
-            delta_oi = grid_today - grid_yesterday
+                return {"expiries": [], "strikes": [], "volume": []}
             
             # Convert to list format for frontend
             heatmap_data = {
                 "expiries": [expiry.strftime('%m-%d') for expiry in expiries],
                 "strikes": list(strikes),
-                "delta_oi": delta_oi.values.tolist(),
-                "min_delta": float(delta_oi.min().min()),
-                "max_delta": float(delta_oi.max().max())
+                "volume": volume_grid.values.tolist(),  # Use volume instead of delta_oi
+                "min_volume": float(volume_grid.min().min()),
+                "max_volume": float(volume_grid.max().max())
             }
             
-            logger.info(f"Calculated OI change heatmap with {len(expiries)} expiries and {len(strikes)} strikes")
+            logger.info(f"Calculated volume heatmap with {len(expiries)} expiries and {len(strikes)} strikes")
             logger.info(f"Heatmap data keys: {list(heatmap_data.keys())}")
+            logger.info(f"Volume range: {heatmap_data['min_volume']} to {heatmap_data['max_volume']}")
             return heatmap_data
             
         except Exception as e:
-            logger.error(f"Error calculating OI change heatmap: {str(e)}")
+            logger.error(f"Error calculating volume heatmap: {str(e)}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            return {"expiries": [], "strikes": [], "delta_oi": []}
+            return {"expiries": [], "strikes": [], "volume": []}
     
     def calculate_delta_distribution_data(self, contracts: List[OptionContract]) -> Dict[str, Any]:
         """

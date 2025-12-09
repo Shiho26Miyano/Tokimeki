@@ -575,7 +575,7 @@ class ConsumerOptionsReactDashboard {
                         </div>
                     </div>
 
-                    <!-- Open Interest Change Heatmap -->
+                    <!-- Volume Heatmap -->
                     <div style="
                         background: white;
                         border-radius: 12px;
@@ -585,7 +585,7 @@ class ConsumerOptionsReactDashboard {
                         <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0;">
                             <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0; position: relative; display: inline-block; cursor: help;" 
                                 id="oi-change-tooltip-trigger">
-                                Open Interest Change
+                                Volume Heatmap
                                 <span id="oi-change-tooltip" style="
                                     position: absolute;
                                     background: #1e293b;
@@ -604,7 +604,7 @@ class ConsumerOptionsReactDashboard {
                                     left: 0;
                                     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
                                 ">
-                                    Heatmap showing how much open interest changed from yesterday. Green/Yellow = more contracts opened, Purple/Blue = contracts closed. Shows where "smart money" is positioning.
+                                    Heatmap showing trading volume by expiry and strike. Green/Yellow = high volume, Purple/Blue = low volume. Shows where active trading is happening.
                                 </span>
                             </h3>
                         </div>
@@ -942,12 +942,18 @@ class ConsumerOptionsReactDashboard {
         }
 
         const data = this.oiHeatmapData;
-        if (!data || !data.expiries || !data.strikes || !data.delta_oi) {
-            container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #64748b;">No OI change data available</div>';
+        // Support both old format (delta_oi) and new format (volume)
+        const volumeData = data.volume || data.delta_oi;
+        const minValue = data.min_volume !== undefined ? data.min_volume : (data.min_delta !== undefined ? data.min_delta : 0);
+        const maxValue = data.max_volume !== undefined ? data.max_volume : (data.max_delta !== undefined ? data.max_delta : 0);
+        
+        if (!data || !data.expiries || !data.strikes || !volumeData) {
+            container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #64748b;">No heatmap data available</div>';
             return;
         }
 
-        const { expiries, strikes, delta_oi, min_delta, max_delta } = data;
+        const { expiries, strikes } = data;
+        const volume = volumeData; // Use volume data
         
         // Create SVG heatmap
         const containerWidth = container.clientWidth || 400;
@@ -962,7 +968,7 @@ class ConsumerOptionsReactDashboard {
 
         // Color scale function (viridis-like: dark purple/blue to bright yellow/green)
         const getColor = (value) => {
-            const normalized = (value - min_delta) / (max_delta - min_delta);
+            const normalized = maxValue !== minValue ? (value - minValue) / (maxValue - minValue) : 0;
             
             // Viridis color scheme approximation
             if (normalized < 0.1) return '#440154'; // Dark purple
@@ -977,18 +983,18 @@ class ConsumerOptionsReactDashboard {
             return '#fde725'; // Bright yellow
         };
 
-        // Create heatmap cells
+        // Create heatmap cells using volume data
         const cells = [];
         for (let i = 0; i < expiries.length; i++) {
             for (let j = 0; j < strikes.length; j++) {
-                const value = delta_oi[i][j];
+                const value = volume[i][j];
                 const x = margin.left + j * cellWidth;
                 const y = margin.top + i * cellHeight;
                 
                 cells.push(`
                     <rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" 
                           fill="${getColor(value)}" stroke="#e2e8f0" stroke-width="0.5">
-                        <title>${expiries[i]} | ${strikes[j]} | Δ OI: ${value}</title>
+                        <title>${expiries[i]} | ${strikes[j]} | Volume: ${value}</title>
                     </rect>
                 `);
             }
@@ -1033,7 +1039,7 @@ class ConsumerOptionsReactDashboard {
         const legendY = margin.top;
 
         const legendGradient = Array.from({length: 20}, (_, i) => {
-            const value = min_delta + (i / 19) * (max_delta - min_delta);
+            const value = minValue + (i / 19) * (maxValue - minValue);
             const color = getColor(value);
             return `<stop offset="${i/19}" stop-color="${color}"/>`;
         }).join('');
@@ -1071,9 +1077,9 @@ class ConsumerOptionsReactDashboard {
                 <!-- Color legend -->
                 <rect x="${legendX}" y="${legendY}" width="${legendWidth}" height="${legendHeight}" 
                       fill="url(#heatmapGradient)" stroke="#e2e8f0"/>
-                <text x="${legendX}" y="${legendY - 5}" font-size="10" font-weight="600" fill="#374151">Δ OI (contracts)</text>
-                <text x="${legendX}" y="${legendY + legendHeight + 15}" font-size="8" fill="#64748b">${min_delta}</text>
-                <text x="${legendX + legendWidth}" y="${legendY + legendHeight + 15}" font-size="8" fill="#64748b" text-anchor="end">${max_delta}</text>
+                <text x="${legendX}" y="${legendY - 5}" font-size="10" font-weight="600" fill="#374151">Volume (contracts)</text>
+                <text x="${legendX}" y="${legendY + legendHeight + 15}" font-size="8" fill="#64748b">${minValue.toLocaleString()}</text>
+                <text x="${legendX + legendWidth}" y="${legendY + legendHeight + 15}" font-size="8" fill="#64748b" text-anchor="end">${maxValue.toLocaleString()}</text>
             </svg>
         `;
     }

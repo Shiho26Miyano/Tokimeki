@@ -78,6 +78,7 @@ class ConsumerOptionsDashboardService:
                 # Return default empty analytics on error
                 CallPutRatios(
                     ticker=focus_ticker,
+                    analysis_date=date.today(),
                     volume_ratio=None,
                     oi_ratio=None,
                     call_volume=0,
@@ -258,6 +259,7 @@ class ConsumerOptionsDashboardService:
                 return (
                     CallPutRatios(
                         ticker=ticker,
+                        analysis_date=date.today(),
                         volume_ratio=None,
                         oi_ratio=None,
                         call_volume=0,
@@ -290,6 +292,7 @@ class ConsumerOptionsDashboardService:
             return (
                 CallPutRatios(
                     ticker=ticker,
+                    analysis_date=date.today(),
                     volume_ratio=None,
                     oi_ratio=None,
                     call_volume=0,
