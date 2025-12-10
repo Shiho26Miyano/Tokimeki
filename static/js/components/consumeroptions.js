@@ -942,12 +942,26 @@ class ConsumerOptionsReactDashboard {
         }
 
         const data = this.oiHeatmapData;
+        console.log('Heatmap data received:', data);
+        
         // Support both old format (delta_oi) and new format (volume)
-        const volumeData = data.volume || data.delta_oi;
+        const volumeData = data.volume || data.delta_oi || data.volume_data;
         const minValue = data.min_volume !== undefined ? data.min_volume : (data.min_delta !== undefined ? data.min_delta : 0);
         const maxValue = data.max_volume !== undefined ? data.max_volume : (data.max_delta !== undefined ? data.max_delta : 0);
         
+        console.log('Volume data:', volumeData);
+        console.log('Expiries:', data.expiries);
+        console.log('Strikes:', data.strikes);
+        console.log('Min/Max:', minValue, maxValue);
+        
         if (!data || !data.expiries || !data.strikes || !volumeData) {
+            console.warn('Missing heatmap data:', { hasData: !!data, hasExpiries: !!data?.expiries, hasStrikes: !!data?.strikes, hasVolumeData: !!volumeData });
+            container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #64748b;">No heatmap data available</div>';
+            return;
+        }
+        
+        if (data.expiries.length === 0 || data.strikes.length === 0 || !Array.isArray(volumeData) || volumeData.length === 0) {
+            console.warn('Empty heatmap data arrays:', { expiriesLength: data.expiries.length, strikesLength: data.strikes.length, volumeDataLength: volumeData?.length });
             container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #64748b;">No heatmap data available</div>';
             return;
         }
@@ -955,60 +969,73 @@ class ConsumerOptionsReactDashboard {
         const { expiries, strikes } = data;
         const volume = volumeData; // Use volume data
         
-        // Create SVG heatmap
-        const containerWidth = container.clientWidth || 400;
-        const width = Math.min(containerWidth, 450);
-        const height = 350;
-        const margin = { top: 30, right: 80, bottom: 80, left: 50 };
+        // Create SVG heatmap with better dimensions for readability
+        const containerWidth = container.clientWidth || 600;
+        const width = Math.max(containerWidth, 600); // Wider for better strike price visibility
+        const height = Math.max(400, expiries.length * 40); // Dynamic height based on number of expiries
+        const margin = { top: 40, right: 100, bottom: 100, left: 60 };
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = height - margin.top - margin.bottom;
 
         const cellWidth = chartWidth / strikes.length;
         const cellHeight = chartHeight / expiries.length;
 
-        // Color scale function (viridis-like: dark purple/blue to bright yellow/green)
+        // Color scale function matching the second image (blue/green/teal to yellow)
         const getColor = (value) => {
             const normalized = maxValue !== minValue ? (value - minValue) / (maxValue - minValue) : 0;
             
-            // Viridis color scheme approximation
-            if (normalized < 0.1) return '#440154'; // Dark purple
-            if (normalized < 0.2) return '#482777'; // Purple
-            if (normalized < 0.3) return '#3f4a8a'; // Blue-purple
-            if (normalized < 0.4) return '#31688e'; // Blue
-            if (normalized < 0.5) return '#26828e'; // Blue-green
-            if (normalized < 0.6) return '#1f9e89'; // Teal
-            if (normalized < 0.7) return '#35b779'; // Green
-            if (normalized < 0.8) return '#6ece58'; // Light green
-            if (normalized < 0.9) return '#b5de2b'; // Yellow-green
-            return '#fde725'; // Bright yellow
+            // Color scheme: dark blue/purple -> blue -> teal -> green -> yellow
+            if (normalized < 0.05) return '#2c3e50'; // Very dark blue-gray
+            if (normalized < 0.1) return '#34495e'; // Dark blue-gray
+            if (normalized < 0.15) return '#3d5a80'; // Dark blue
+            if (normalized < 0.2) return '#457b9d'; // Medium blue
+            if (normalized < 0.3) return '#4a90a4'; // Blue-teal
+            if (normalized < 0.4) return '#52a8a8'; // Teal
+            if (normalized < 0.5) return '#5abf9e'; // Teal-green
+            if (normalized < 0.6) return '#6bc48a'; // Green
+            if (normalized < 0.7) return '#7fd66f'; // Light green
+            if (normalized < 0.8) return '#9ee85e'; // Yellow-green
+            if (normalized < 0.9) return '#c4e84e'; // Bright yellow-green
+            return '#f1c40f'; // Bright yellow (like second image)
         };
 
-        // Create heatmap cells using volume data
+        // Create heatmap cells using volume data with better formatting
         const cells = [];
         for (let i = 0; i < expiries.length; i++) {
             for (let j = 0; j < strikes.length; j++) {
                 const value = volume[i][j];
                 const x = margin.left + j * cellWidth;
                 const y = margin.top + i * cellHeight;
+                const normalized = maxValue !== minValue ? (value - minValue) / (maxValue - minValue) : 0;
+                
+                // Only show value text for cells with significant volume (top 20%)
+                const showValue = normalized > 0.8 && value > 0;
                 
                 cells.push(`
                     <rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" 
-                          fill="${getColor(value)}" stroke="#e2e8f0" stroke-width="0.5">
-                        <title>${expiries[i]} | ${strikes[j]} | Volume: ${value}</title>
+                          fill="${getColor(value)}" stroke="#ffffff" stroke-width="1">
+                        <title>${expiries[i]} | Strike: ${strikes[j]} | Volume: ${value.toLocaleString()}</title>
                     </rect>
+                    ${showValue ? `
+                    <text x="${x + cellWidth/2}" y="${y + cellHeight/2}" 
+                          text-anchor="middle" dominant-baseline="middle"
+                          font-size="9" font-weight="600" fill="#1e293b">
+                        ${Math.round(value)}
+                    </text>
+                    ` : ''}
                 `);
             }
         }
 
-        // Create axis labels with better spacing and wrapping
+        // Create axis labels for strike ranges (now we have exactly 10 ranges)
         const strikeLabels = strikes.map((strike, i) => {
             const x = margin.left + i * cellWidth + cellWidth/2;
-            const y = height - 25;
+            const y = height - 20;
             return `
                 <text x="${x}" 
                       y="${y}" 
                       text-anchor="middle" 
-                      font-size="11" 
+                      font-size="10" 
                       fill="#374151" 
                       font-weight="500"
                       transform="rotate(-45, ${x}, ${y})">
@@ -1018,25 +1045,26 @@ class ConsumerOptionsReactDashboard {
         }).join('');
 
         const expiryLabels = expiries.map((expiry, i) => {
-            const x = margin.left - 10;
+            const x = margin.left - 15;
             const y = margin.top + i * cellHeight + cellHeight/2;
             return `
                 <text x="${x}" 
                       y="${y}" 
                       text-anchor="end" 
-                      font-size="10" 
-                      fill="#64748b" 
+                      font-size="11" 
+                      fill="#374151" 
+                      font-weight="500"
                       dominant-baseline="middle">
                     ${expiry}
                 </text>
             `;
         }).join('');
 
-        // Create color legend
-        const legendWidth = Math.min(140, chartWidth * 0.35);
+        // Create color legend with better positioning
+        const legendWidth = Math.min(180, chartWidth * 0.4);
         const legendHeight = 20;
-        const legendX = margin.left + chartWidth - legendWidth - 5;
-        const legendY = margin.top;
+        const legendX = margin.left + chartWidth - legendWidth - 10;
+        const legendY = margin.top - 5;
 
         const legendGradient = Array.from({length: 20}, (_, i) => {
             const value = minValue + (i / 19) * (maxValue - minValue);

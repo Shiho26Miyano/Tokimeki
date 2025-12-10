@@ -448,10 +448,10 @@ class ConsumerOptionsAnalyticsService:
     
     def calculate_oi_change_heatmap_data(self, contracts: List[OptionContract]) -> Dict[str, Any]:
         """
-        Calculate Volume heatmap data (changed from OI change to volume as requested)
+        Calculate Volume heatmap data - SIMPLIFIED, no expiry filtering, use all contracts
         
         Args:
-            contracts: List of option contracts
+            contracts: List of option contracts (ALL contracts, no filtering)
             
         Returns:
             Dictionary with heatmap data for frontend using volume metric
@@ -461,60 +461,154 @@ class ConsumerOptionsAnalyticsService:
                 logger.warning("No contracts provided for volume heatmap calculation")
                 return {"expiries": [], "strikes": [], "volume": []}
             
-            logger.info(f"Calculating volume heatmap for {len(contracts)} contracts")
+            logger.info(f"Calculating volume heatmap for {len(contracts)} contracts (no filtering)")
             
-            # Create DataFrame for easier manipulation
+            # Create DataFrame - use ALL contracts
             df = pd.DataFrame([{
                 'expiry': pd.to_datetime(c.expiry) if isinstance(c.expiry, str) else c.expiry,
                 'strike': c.strike,
                 'type': c.type.value,
-                'volume': c.day_volume or 0,  # Use volume instead of OI
+                'volume': c.day_volume or 0,
                 'oi': c.day_oi or 0,
                 'delta': c.delta or 0
             } for c in contracts])
             
             logger.info(f"Created DataFrame with {len(df)} rows")
             
-            # Get unique expiries and strikes
-            expiries = sorted(df["expiry"].unique())
-            strikes = sorted(df["strike"].unique())
+            # Get unique expiries and strikes - use ALL
+            all_expiries = sorted(df["expiry"].unique())
+            all_strikes = sorted(df["strike"].unique())
             
-            logger.info(f"Found {len(expiries)} expiries and {len(strikes)} strikes")
+            logger.info(f"Found {len(all_expiries)} unique expiries and {len(all_strikes)} unique strikes")
             
-            if len(expiries) == 0 or len(strikes) == 0:
-                logger.warning("No valid expiries or strikes found")
+            # Select top 10 expiries by total volume (most active expiries)
+            # This ensures we show the most relevant expiries with actual trading activity
+            expiry_volumes = df.groupby('expiry')['volume'].sum().sort_values(ascending=False)
+            top_expiries = expiry_volumes.head(10).index.tolist()
+            
+            # Convert to date format for frontend
+            selected_expiry_dates = []
+            for e in top_expiries:
+                if hasattr(e, 'date'):
+                    selected_expiry_dates.append(e.date())
+                elif isinstance(e, date):
+                    selected_expiry_dates.append(e)
+                else:
+                    try:
+                        selected_expiry_dates.append(pd.to_datetime(e).date())
+                    except:
+                        continue
+            
+            selected_expiry_dates = sorted(selected_expiry_dates)
+            
+            logger.info(f"Selected top {len(selected_expiry_dates)} expiries by volume: {[str(d) for d in selected_expiry_dates[:3]]}...{[str(d) for d in selected_expiry_dates[-3:]] if len(selected_expiry_dates) > 3 else ''}")
+            
+            # Filter DataFrame to only selected expiries (top 10 by volume)
+            df_filtered = df[df['expiry'].isin(top_expiries)].copy()
+            
+            if len(df_filtered) == 0:
+                logger.warning("No contracts after filtering by top expiries")
                 return {"expiries": [], "strikes": [], "volume": []}
             
-            # Create pivot table for volume (not OI change)
-            try:
-                volume_grid = df.pivot_table(
-                    index="expiry", columns="strike",
-                    values="volume", aggfunc="sum"
-                ).reindex(index=expiries, columns=strikes).fillna(0)
+            logger.info(f"Filtered to {len(df_filtered)} contracts for {len(selected_expiry_dates)} expiries")
+            
+            # Select 10 evenly distributed strikes from ALL strikes (not just filtered)
+            if len(all_strikes) == 0:
+                logger.warning("No valid strikes found")
+                return {"expiries": [], "strikes": [], "volume": []}
+            
+            # Select 10 evenly distributed strikes
+            if len(all_strikes) <= 10:
+                selected_strikes = all_strikes
+            else:
+                step = len(all_strikes) / 10
+                selected_strikes = [all_strikes[int(i * step)] for i in range(10)]
+            
+            logger.info(f"Selected {len(selected_strikes)} strikes from {len(all_strikes)} total")
+            
+            # Create strike labels
+            strike_labels = [str(int(s)) if s >= 1 else f"{s:.2f}" for s in selected_strikes]
+            
+            # Assign each contract to the closest selected strike
+            def assign_strike_index(strike):
+                closest_idx = 0
+                min_distance = abs(strike - selected_strikes[0])
+                for idx, selected_strike in enumerate(selected_strikes):
+                    distance = abs(strike - selected_strike)
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_idx = idx
+                return closest_idx
+            
+            df_filtered['strike_index'] = df_filtered['strike'].apply(assign_strike_index)
+            
+            # Create pivot table - SIMPLIFIED
+            volume_grid = df_filtered.pivot_table(
+                index="expiry", columns="strike_index",
+                values="volume", aggfunc="sum",
+                fill_value=0
+            )
+            
+            # Ensure we have all 10 strike indices (0-9)
+            all_strike_indices = list(range(10))
+            for idx in all_strike_indices:
+                if idx not in volume_grid.columns:
+                    volume_grid[idx] = 0
+            
+            # Reindex to ensure correct order
+            volume_grid = volume_grid.reindex(index=top_expiries, columns=all_strike_indices, fill_value=0)
+            
+            logger.info(f"Volume grid shape: {volume_grid.shape}")
+            
+            # Convert expiries to date format
+            actual_expiries = []
+            for e in top_expiries:
+                if hasattr(e, 'date'):
+                    actual_expiries.append(e.date())
+                elif isinstance(e, date):
+                    actual_expiries.append(e)
+                else:
+                    try:
+                        actual_expiries.append(pd.to_datetime(e).date())
+                    except:
+                        continue
+            
+            actual_expiries = sorted(actual_expiries)
+            
+            # Calculate min/max
+            min_vol = float(volume_grid.min().min())
+            max_vol = float(volume_grid.max().max())
+            
+            logger.info(f"Final: {len(actual_expiries)} expiries, {len(strike_labels)} strikes, volume range: {min_vol} to {max_vol}")
                 
-                logger.info(f"Created volume_grid with shape: {volume_grid.shape}")
-            except Exception as e:
-                logger.error(f"Error creating pivot table: {str(e)}")
+            # Convert to list format for frontend
+            volume_list = volume_grid.values.tolist()
+            
+            # Verify dimensions
+            if len(volume_list) != len(actual_expiries) or (len(volume_list) > 0 and len(volume_list[0]) != len(strike_labels)):
+                logger.error(f"Dimension mismatch: {len(volume_list)}x{len(volume_list[0]) if volume_list else 0} vs {len(actual_expiries)}x{len(strike_labels)}")
                 return {"expiries": [], "strikes": [], "volume": []}
             
-            # Convert to list format for frontend
+            # If all volumes are zero, set a small range for display
+            if min_vol == 0 and max_vol == 0:
+                max_vol = 1.0
+            
             heatmap_data = {
-                "expiries": [expiry.strftime('%m-%d') for expiry in expiries],
-                "strikes": list(strikes),
-                "volume": volume_grid.values.tolist(),  # Use volume instead of delta_oi
-                "min_volume": float(volume_grid.min().min()),
-                "max_volume": float(volume_grid.max().max())
+                "expiries": [expiry.strftime('%m-%d') for expiry in actual_expiries],
+                "strikes": strike_labels,
+                "volume": volume_list,
+                "min_volume": min_vol,
+                "max_volume": max_vol
             }
             
-            logger.info(f"Calculated volume heatmap with {len(expiries)} expiries and {len(strikes)} strikes")
-            logger.info(f"Heatmap data keys: {list(heatmap_data.keys())}")
-            logger.info(f"Volume range: {heatmap_data['min_volume']} to {heatmap_data['max_volume']}")
+            logger.info(f"✓ SUCCESS: Heatmap data - {len(heatmap_data['expiries'])} expiries, {len(heatmap_data['strikes'])} strikes")
+            logger.info(f"✓ Volume range: {min_vol} to {max_vol}")
             return heatmap_data
             
         except Exception as e:
             logger.error(f"Error calculating volume heatmap: {str(e)}")
             import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error(traceback.format_exc())
             return {"expiries": [], "strikes": [], "volume": []}
     
     def calculate_delta_distribution_data(self, contracts: List[OptionContract]) -> Dict[str, Any]:
