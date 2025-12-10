@@ -62,8 +62,14 @@ class ConsumerOptionsChainService:
             )
             
         except Exception as e:
-            logger.error(f"Error getting chain snapshot for {ticker}: {str(e)}")
-            raise
+            logger.error(f"Error getting chain snapshot for {ticker}: {str(e)}", exc_info=True)
+            # Return empty chain snapshot instead of raising error
+            return ChainSnapshotResponse(
+                ticker=ticker,
+                timestamp=datetime.now(),
+                contracts=[],
+                total_contracts=0
+            )
     
     def sort_contracts(self, contracts: List[OptionContract], 
                       sort_by: str = "oi", ascending: bool = False) -> List[OptionContract]:

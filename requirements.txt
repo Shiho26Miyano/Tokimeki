@@ -17,6 +17,9 @@ psutil==5.9.8
 # HTTP client (used by AI service and Polygon API)
 httpx[http2]==0.25.2
 
+# Polygon.io official API client
+polygon-api-client>=1.13.0
+
 # Essential data processing
 numpy==1.26.4
 pandas==2.2.1

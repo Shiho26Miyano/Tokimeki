@@ -56,14 +56,46 @@ class ConsumerOptionsDashboardService:
             end_date = date.today()
             start_date = end_date - timedelta(days=date_range_days)
             
-            # Fetch data concurrently
+            # Fetch data concurrently with error handling
             tasks = [
                 self._get_chain_data(focus_ticker),
                 self._get_underlying_data(focus_ticker, start_date.isoformat(), end_date.isoformat()),
                 self._get_analytics_data(focus_ticker)
             ]
             
-            chain_data, underlying_data, (call_put_ratios, iv_term, unusual_activity, oi_heatmap_data, delta_distribution_data) = await asyncio.gather(*tasks)
+            # Use return_exceptions=True to handle individual task failures gracefully
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Extract results, handling exceptions
+            chain_data = results[0] if not isinstance(results[0], Exception) else ChainSnapshotResponse(
+                ticker=focus_ticker,
+                timestamp=datetime.now(),
+                contracts=[],
+                total_contracts=0
+            )
+            underlying_data = results[1] if not isinstance(results[1], Exception) else []
+            analytics_result = results[2] if not isinstance(results[2], Exception) else (
+                # Return default empty analytics on error
+                CallPutRatios(
+                    ticker=focus_ticker,
+                    analysis_date=date.today(),
+                    volume_ratio=None,
+                    oi_ratio=None,
+                    call_volume=0,
+                    put_volume=0,
+                    call_oi=0,
+                    put_oi=0,
+                    median_iv=None,
+                    sentiment="Neutral",
+                    confidence=0.0
+                ),
+                [],
+                [],
+                {},
+                {}
+            )
+            
+            call_put_ratios, iv_term, unusual_activity, oi_heatmap_data, delta_distribution_data = analytics_result
             
             return DashboardResponse(
                 focus_ticker=focus_ticker,
@@ -187,28 +219,95 @@ class ConsumerOptionsDashboardService:
     
     async def _get_chain_data(self, ticker: str) -> ChainSnapshotResponse:
         """Get option chain data for ticker"""
-        return await self.chain_service.get_chain_snapshot(ticker)
+        try:
+            result = await self.chain_service.get_chain_snapshot(ticker)
+            if result.total_contracts == 0:
+                logger.warning(f"No contracts found for {ticker}. This may indicate the ticker has no options data available or the API returned empty results.")
+            return result
+        except Exception as e:
+            logger.error(f"Error getting chain data for {ticker}: {str(e)}")
+            # Return empty chain snapshot instead of raising error
+            return ChainSnapshotResponse(
+                ticker=ticker,
+                timestamp=datetime.now(),
+                contracts=[],
+                total_contracts=0
+            )
     
     async def _get_underlying_data(self, ticker: str, start_date: str, end_date: str) -> List[UnderlyingData]:
         """Get underlying stock data with technical indicators"""
-        bars = await self.polygon_service.get_underlying_daily_bars(ticker, start_date, end_date)
-        return self.analytics_service.calculate_technical_indicators(bars)
+        try:
+            bars = await self.polygon_service.get_underlying_daily_bars(ticker, start_date, end_date)
+            if not bars:
+                logger.warning(f"No underlying data found for {ticker} from {start_date} to {end_date}")
+                return []
+            return self.analytics_service.calculate_technical_indicators(bars)
+        except Exception as e:
+            logger.error(f"Error getting underlying data for {ticker}: {str(e)}")
+            # Return empty list instead of raising error
+            return []
     
     async def _get_analytics_data(self, ticker: str) -> tuple:
         """Get analytics data for ticker"""
-        # Get option chain
-        contracts = await self.polygon_service.get_option_chain_snapshot(ticker)
-        
-        # Calculate analytics
-        call_put_ratios = self.analytics_service.calculate_call_put_ratios(contracts, ticker)
-        iv_term = self.analytics_service.calculate_iv_term_structure(contracts)
-        unusual_activity = self.analytics_service.detect_unusual_activity(contracts, ticker)
-        
-        # Calculate new chart data
-        oi_heatmap_data = self.analytics_service.calculate_oi_change_heatmap_data(contracts)
-        delta_distribution_data = self.analytics_service.calculate_delta_distribution_data(contracts)
-        
-        return call_put_ratios, iv_term, unusual_activity, oi_heatmap_data, delta_distribution_data
+        try:
+            # Get option chain
+            contracts = await self.polygon_service.get_option_chain_snapshot(ticker)
+            
+            if not contracts:
+                logger.warning(f"No contracts available for {ticker} to calculate analytics")
+                # Return empty/default analytics data
+                return (
+                    CallPutRatios(
+                        ticker=ticker,
+                        analysis_date=date.today(),
+                        volume_ratio=None,
+                        oi_ratio=None,
+                        call_volume=0,
+                        put_volume=0,
+                        call_oi=0,
+                        put_oi=0,
+                        median_iv=None,
+                        sentiment="Neutral",
+                        confidence=0.0
+                    ),
+                    [],
+                    [],
+                    {},
+                    {}
+                )
+            
+            # Calculate analytics
+            call_put_ratios = self.analytics_service.calculate_call_put_ratios(contracts, ticker)
+            iv_term = self.analytics_service.calculate_iv_term_structure(contracts)
+            unusual_activity = self.analytics_service.detect_unusual_activity(contracts, ticker)
+            
+            # Calculate new chart data
+            oi_heatmap_data = self.analytics_service.calculate_oi_change_heatmap_data(contracts)
+            delta_distribution_data = self.analytics_service.calculate_delta_distribution_data(contracts)
+            
+            return call_put_ratios, iv_term, unusual_activity, oi_heatmap_data, delta_distribution_data
+        except Exception as e:
+            logger.error(f"Error getting analytics data for {ticker}: {str(e)}")
+            # Return empty/default analytics data on error
+            return (
+                CallPutRatios(
+                    ticker=ticker,
+                    analysis_date=date.today(),
+                    volume_ratio=None,
+                    oi_ratio=None,
+                    call_volume=0,
+                    put_volume=0,
+                    call_oi=0,
+                    put_oi=0,
+                    median_iv=None,
+                    sentiment="Neutral",
+                    confidence=0.0
+                ),
+                [],
+                [],
+                {},
+                {}
+            )
     
     def _extract_underlying_from_contract(self, contract: str) -> Optional[str]:
         """

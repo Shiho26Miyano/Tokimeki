@@ -5,7 +5,7 @@ import logging
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, date
 
 from app.services.consumeroptions.dashboard_service import ConsumerOptionsDashboardService
 from app.services.consumeroptions.analytics_service import ConsumerOptionsAnalyticsService
@@ -151,14 +151,43 @@ async def get_dashboard_data_simple(
         return result
         
     except Exception as e:
-        logger.error(f"Dashboard data error for {ticker}: {str(e)}")
+        logger.error(f"Dashboard data error for {ticker}: {str(e)}", exc_info=True)
         await usage_service.track_request(
             endpoint="consumeroptions_dashboard_data_simple",
             response_time=0.0,
             success=False,
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return empty response instead of raising error to show empty state
+        from app.models.options_models import DashboardResponse, ChainSnapshotResponse, CallPutRatios
+        return DashboardResponse(
+            focus_ticker=ticker.upper(),
+            timestamp=datetime.now(),
+            chain_data=ChainSnapshotResponse(
+                ticker=ticker.upper(),
+                timestamp=datetime.now(),
+                contracts=[],
+                total_contracts=0
+            ),
+            call_put_ratios=CallPutRatios(
+                ticker=ticker.upper(),
+                analysis_date=date.today(),
+                volume_ratio=None,
+                oi_ratio=None,
+                call_volume=0,
+                put_volume=0,
+                call_oi=0,
+                put_oi=0,
+                median_iv=None,
+                sentiment="Neutral",
+                confidence=0.0
+            ),
+            iv_term_structure=[],
+            unusual_activity=[],
+            oi_heatmap_data={},
+            delta_distribution_data={},
+            underlying_data=[]
+        )
 
 @router.get("/historical-chain-overview/{ticker}")
 async def get_historical_chain_overview(

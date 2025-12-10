@@ -8,8 +8,10 @@ import logging
 import asyncio
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Optional, Any
+from concurrent.futures import ThreadPoolExecutor
 import httpx
 from functools import wraps
+from polygon import RESTClient
 
 from app.models.options_models import (
     OptionContract, UnderlyingData, ContractBars, ContractType
@@ -76,7 +78,11 @@ class ConsumerOptionsPolygonService:
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.getenv("POLYGON_API_KEY")
         self.base_url = "https://api.polygon.io"
-        self.client = None
+        self.client = None  # httpx client for REST API calls
+        self.rest_client = None  # Polygon RESTClient for aggregates
+        
+        # Thread pool executor for running synchronous RESTClient calls
+        self.executor = ThreadPoolExecutor(max_workers=5)
         
         # Simple in-memory cache with longer TTL to reduce API calls
         self.cache: Dict[str, tuple[float, Any]] = {}
@@ -96,6 +102,14 @@ class ConsumerOptionsPolygonService:
         # Ensure we're not using mock data
         if self.api_key == "mock_key" or self.api_key.startswith("mock"):
             raise ValueError("Mock data is not allowed for Consumer Options. Please set a valid POLYGON_API_KEY")
+        
+        # Initialize Polygon RESTClient
+        try:
+            self.rest_client = RESTClient(self.api_key)
+            logger.info("Polygon RESTClient initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Polygon RESTClient: {str(e)}")
+            raise ValueError(f"Failed to initialize Polygon RESTClient: {str(e)}")
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client"""
@@ -220,11 +234,37 @@ class ConsumerOptionsPolygonService:
             params['apikey'] = self.api_key
             url = f"{self.base_url}{endpoint}"
             
+            logger.debug(f"Making API request to: {url} with params: {dict((k, v) for k, v in params.items() if k != 'apikey')}")
+            
             response = await client.get(url, params=params)
+            
+            # Log response status
+            logger.debug(f"API response status: {response.status_code}")
+            
+            # Check for HTTP errors
+            if response.status_code == 401:
+                error_msg = "Invalid API key. Please check your POLYGON_API_KEY environment variable."
+                logger.error(error_msg)
+                raise PolygonAPIError(error_msg)
+            elif response.status_code == 403:
+                error_msg = "API access forbidden. Please check your Polygon API subscription plan."
+                logger.error(error_msg)
+                raise PolygonAPIError(error_msg)
+            elif response.status_code == 429:
+                error_msg = "Rate limit exceeded. Please wait before making more requests."
+                logger.error(error_msg)
+                raise PolygonAPIError(error_msg)
+            
             response.raise_for_status()
             
             self.api_calls += 1
             result = response.json()
+            
+            # Validate response structure
+            if not isinstance(result, dict):
+                error_msg = f"Invalid API response format: expected dict, got {type(result)}"
+                logger.error(f"{error_msg} for {endpoint}")
+                raise PolygonAPIError(error_msg)
             
             # Cache successful response
             self._cache_data(cache_key, result)
@@ -232,10 +272,20 @@ class ConsumerOptionsPolygonService:
             logger.debug(f"API call successful: {endpoint}")
             return result
             
+        except httpx.HTTPStatusError as e:
+            error_msg = f"HTTP {e.response.status_code} error for {endpoint}: {e.response.text[:200]}"
+            self.errors.append(error_msg)
+            logger.error(error_msg)
+            raise PolygonAPIError(error_msg) from e
+        except httpx.RequestError as e:
+            error_msg = f"Request error for {endpoint}: {str(e)}"
+            self.errors.append(error_msg)
+            logger.error(error_msg)
+            raise PolygonAPIError(error_msg) from e
         except Exception as e:
             error_msg = f"API error for {endpoint}: {str(e)}"
             self.errors.append(error_msg)
-            logger.error(error_msg)
+            logger.error(error_msg, exc_info=True)
             
             # Re-raise the exception instead of returning mock data
             raise
@@ -431,31 +481,49 @@ class ConsumerOptionsPolygonService:
             raise PolygonAPIError(f"Failed to fetch historical options data: {str(e)}")
     
     async def get_contract_historical_pricing(self, contract: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
-        """Get historical pricing data for a specific contract"""
-        endpoint = f"/v2/aggs/ticker/{contract}/range/1/day/{start_date}/{end_date}"
-        params = {
-            "adjusted": "true",
-            "sort": "asc",
-            "limit": 1000
-        }
-        
+        """Get historical pricing data for a specific contract using Polygon RESTClient"""
         try:
-            data = await self._make_request(endpoint, params)
-            results = data.get("results", [])
+            # Run synchronous RESTClient call in thread pool to maintain async interface
+            def fetch_aggs():
+                aggs = []
+                try:
+                    for agg in self.rest_client.list_aggs(
+                        contract,
+                        1,  # multiplier
+                        "day",  # timespan
+                        start_date,
+                        end_date,
+                        adjusted="true",
+                        sort="asc",
+                        limit=1000
+                    ):
+                        aggs.append(agg)
+                    return aggs
+                except Exception as e:
+                    logger.error(f"Error in RESTClient.list_aggs for {contract}: {str(e)}")
+                    raise
             
-            logger.info(f"API response for {contract}: status={data.get('status')}, results_count={len(results)}")
+            # Execute in thread pool
+            loop = asyncio.get_event_loop()
+            aggs = await loop.run_in_executor(self.executor, fetch_aggs)
+            
+            logger.info(f"Retrieved {len(aggs)} aggregates for contract {contract}")
             
             # Process the raw data into the expected format
             processed_data = []
-            for result in results:
-                processed_data.append({
-                    "date": datetime.fromtimestamp(result['t'] / 1000).strftime('%Y-%m-%d'),
-                    "open": result.get('o'),
-                    "high": result.get('h'),
-                    "low": result.get('l'),
-                    "close": result.get('c'),
-                    "volume": result.get('v')
-                })
+            for agg in aggs:
+                try:
+                    processed_data.append({
+                        "date": datetime.fromtimestamp(agg.timestamp / 1000).strftime('%Y-%m-%d'),
+                        "open": agg.open,
+                        "high": agg.high,
+                        "low": agg.low,
+                        "close": agg.close,
+                        "volume": agg.volume
+                    })
+                except Exception as e:
+                    logger.warning(f"Error processing agg data: {str(e)}")
+                    continue
             
             logger.info(f"Processed {len(processed_data)} data points for contract {contract}")
             return processed_data
@@ -464,102 +532,244 @@ class ConsumerOptionsPolygonService:
             logger.warning(f"Error fetching pricing for {contract}: {str(e)}")
             return []
     
-    async def get_option_chain_snapshot(self, underlying: str) -> List[OptionContract]:
-        """Get option chain snapshot for underlying ticker"""
-        endpoint = f"/v3/snapshot/options/{underlying.upper()}"
-        
+    async def _get_latest_agg_for_contract(self, contract_ticker: str) -> Optional[Dict[str, Any]]:
+        """Get the latest aggregate data for a contract using RESTClient"""
         try:
-            data = await self._make_request(endpoint)
-            logger.info(f"Retrieved option chain data for {underlying}")
-            contracts = []
+            # Get date range - last 30 days to ensure we get recent data
+            end_date = date.today()
+            start_date = end_date - timedelta(days=30)
             
-            for contract_data in data.get("results", []):
+            def fetch_latest_agg():
                 try:
-                    # Extract contract details
-                    details = contract_data.get("details", {})
-                    day_data = contract_data.get("day", {}) or {}
-                    greeks = contract_data.get("greeks", {}) or {}
-                    last_quote = contract_data.get("last_quote", {}) or {}
+                    # Ensure contract ticker has the "O:" prefix if it's an options contract
+                    # Polygon RESTClient expects "O:TICKER..." format for options
+                    ticker_to_use = contract_ticker
+                    if not ticker_to_use.startswith("O:"):
+                        # Check if it looks like an options contract (has expiry/strike info)
+                        # If it does, add the "O:" prefix
+                        ticker_to_use = f"O:{ticker_to_use}"
+                    
+                    logger.debug(f"Fetching aggregates for contract: {ticker_to_use} from {start_date} to {end_date}")
+                    
+                    # Get aggregates for the contract
+                    aggs = []
+                    for agg in self.rest_client.list_aggs(
+                        ticker_to_use,
+                        1,  # multiplier
+                        "day",  # timespan
+                        start_date.isoformat(),
+                        end_date.isoformat(),
+                        adjusted="true",
+                        sort="desc",  # Get most recent first
+                        limit=5  # Get last 5 days to find the most recent with data
+                    ):
+                        aggs.append(agg)
+                        # Get the first (most recent) non-zero volume if available
+                        if agg.volume > 0:
+                            break
+                    
+                    if aggs:
+                        # Use the first aggregate (most recent)
+                        agg = aggs[0]
+                        logger.debug(f"Found aggregate for {ticker_to_use}: close={agg.close}, volume={agg.volume}, timestamp={agg.timestamp}")
+                        return {
+                            "close": float(agg.close),
+                            "volume": int(agg.volume),
+                            "timestamp": agg.timestamp
+                        }
+                    else:
+                        logger.warning(f"No aggregates found for {ticker_to_use}")
+                    return None
+                except Exception as e:
+                    logger.warning(f"Error fetching latest agg for {contract_ticker}: {str(e)}", exc_info=True)
+                    return None
+            
+            # Execute in thread pool
+            loop = asyncio.get_event_loop()
+            latest_agg = await loop.run_in_executor(self.executor, fetch_latest_agg)
+            return latest_agg
+            
+        except Exception as e:
+            logger.warning(f"Error getting latest agg for {contract_ticker}: {str(e)}", exc_info=True)
+            return None
+    
+    async def get_option_chain_snapshot(self, underlying: str) -> List[OptionContract]:
+        """Get option chain snapshot for underlying ticker using RESTClient.list_snapshot_options_chain - SIMPLIFIED"""
+        try:
+            logger.info(f"Fetching option chain snapshot for {underlying} using RESTClient.list_snapshot_options_chain")
+            
+            def fetch_options_chain():
+                """Fetch options chain using RESTClient (synchronous)"""
+                options_chain = []
+                try:
+                    # Fetch all contracts - no limit to get all expiry dates
+                    for contract_data in self.rest_client.list_snapshot_options_chain(
+                        underlying.upper(),
+                        params={
+                            "order": "asc",
+                            "limit": 250,  # Fetch 250 at a time (as per user's example)
+                            "sort": "ticker",
+                        }
+                    ):
+                        options_chain.append(contract_data)
+                        # No cap - fetch all available contracts
+                    
+                    logger.info(f"Fetched {len(options_chain)} contracts from Polygon API for {underlying}")
+                    return options_chain
+                except Exception as e:
+                    logger.error(f"Error in RESTClient.list_snapshot_options_chain for {underlying}: {str(e)}", exc_info=True)
+                    raise
+            
+            # Execute in thread pool to maintain async interface
+            loop = asyncio.get_event_loop()
+            raw_contracts = await loop.run_in_executor(self.executor, fetch_options_chain)
+            
+            if not raw_contracts:
+                logger.warning(f"No contracts returned from Polygon API for {underlying}")
+                return []
+            
+            logger.info(f"Processing {len(raw_contracts)} raw contracts for {underlying}")
+            contracts = []
+            skipped_count = 0
+            
+            for contract_data in raw_contracts:
+                try:
+                    # Extract data from OptionContractSnapshot dataclass
+                    if not hasattr(contract_data, 'details') or contract_data.details is None:
+                        skipped_count += 1
+                        continue
+                    
+                    details = contract_data.details
+                    contract_ticker = getattr(details, 'ticker', None)
+                    if not contract_ticker:
+                        skipped_count += 1
+                        continue
                     
                     # Parse contract type
-                    contract_type_raw = details.get("contract_type", "").lower()
+                    contract_type_raw = getattr(details, 'contract_type', '').lower()
+                    if not contract_type_raw:
+                        skipped_count += 1
+                        continue
                     contract_type = ContractType.CALL if contract_type_raw == "call" else ContractType.PUT
                     
                     # Parse expiry date
-                    expiry_str = details.get("expiration_date")
-                    expiry = datetime.strptime(expiry_str, "%Y-%m-%d").date() if expiry_str else None
+                    expiry_str = getattr(details, 'expiration_date', None)
+                    if not expiry_str:
+                        skipped_count += 1
+                        continue
+                    try:
+                        expiry = datetime.strptime(expiry_str, "%Y-%m-%d").date()
+                    except ValueError:
+                        skipped_count += 1
+                        continue
                     
-                    if not expiry:
-                        continue  # Skip contracts without valid expiry
+                    # Get strike price
+                    strike_price = getattr(details, 'strike_price', 0)
+                    try:
+                        strike = float(strike_price)
+                    except (ValueError, TypeError):
+                        skipped_count += 1
+                        continue
+                    
+                    # Extract day data (volume, close price)
+                    day_data = contract_data.day if hasattr(contract_data, 'day') and contract_data.day else None
+                    day_volume = self._extract_number(getattr(day_data, 'volume', None) if day_data else None)
+                    day_oi = self._extract_number(getattr(contract_data, 'open_interest', None))
+                    
+                    # Extract pricing - use day.close as primary, fallback to last_trade/quote
+                    last_price = self._extract_price(getattr(day_data, 'close', None) if day_data else None)
+                    if not last_price:
+                        last_trade = contract_data.last_trade if hasattr(contract_data, 'last_trade') and contract_data.last_trade else None
+                        if last_trade:
+                            last_price = self._extract_price(getattr(last_trade, 'price', None))
+                    bid = None
+                    ask = None
+                    
+                    # Extract Greeks
+                    greeks = contract_data.greeks if hasattr(contract_data, 'greeks') and contract_data.greeks else None
+                    delta = self._validate_greek(getattr(greeks, 'delta', None) if greeks else None)
+                    gamma = self._validate_greek(getattr(greeks, 'gamma', None) if greeks else None)
+                    theta = self._validate_greek(getattr(greeks, 'theta', None) if greeks else None)
+                    vega = self._validate_greek(getattr(greeks, 'vega', None) if greeks else None)
+                    
+                    # Implied volatility
+                    implied_volatility = self._validate_iv(getattr(contract_data, 'implied_volatility', None))
                     
                     contract = OptionContract(
-                        contract=contract_data.get("contract", ""),
+                        contract=contract_ticker,
                         underlying=underlying.upper(),
                         expiry=expiry,
-                        strike=float(details.get("strike_price", 0)),
+                        strike=strike,
                         type=contract_type,
-                        
-                        # Market data - try multiple sources
-                        last_price=self._extract_price(last_quote.get("p") or contract_data.get("last_quote", {}).get("p")),
-                        bid=self._extract_price(last_quote.get("b") or contract_data.get("last_quote", {}).get("b")),
-                        ask=self._extract_price(last_quote.get("a") or contract_data.get("last_quote", {}).get("a")),
-                        
-                        # Volume and OI - try multiple sources
-                        day_volume=self._extract_number(day_data.get("volume") or contract_data.get("day", {}).get("volume")),
-                        day_oi=self._extract_number(day_data.get("open_interest") or contract_data.get("day", {}).get("open_interest")),
-                        
-                        # Greeks and IV - check multiple possible locations and validate
-                        implied_volatility=self._validate_iv(
-                            contract_data.get("implied_volatility") or 
-                            greeks.get("implied_volatility") or
-                            contract_data.get("iv")
-                        ),
-                        delta=self._validate_greek(greeks.get("delta")),
-                        gamma=self._validate_greek(greeks.get("gamma")),
-                        theta=self._validate_greek(greeks.get("theta")),
-                        vega=self._validate_greek(greeks.get("vega"))
+                        last_price=last_price,
+                        bid=bid,
+                        ask=ask,
+                        day_volume=day_volume,
+                        day_oi=day_oi,
+                        implied_volatility=implied_volatility,
+                        delta=delta,
+                        gamma=gamma,
+                        theta=theta,
+                        vega=vega
                     )
                     
                     contracts.append(contract)
                     
                 except Exception as e:
-                    logger.warning(f"Error parsing contract data: {str(e)}")
+                    logger.debug(f"Error parsing contract: {str(e)}")
+                    skipped_count += 1
                     continue
             
-            logger.info(f"Retrieved {len(contracts)} contracts for {underlying}")
+            logger.info(f"Retrieved {len(contracts)} valid contracts for {underlying} (skipped {skipped_count})")
             return contracts
             
         except Exception as e:
-            logger.error(f"Error fetching option chain for {underlying}: {str(e)}")
-            raise PolygonAPIError(f"Failed to fetch option chain: {str(e)}")
+            logger.error(f"Error fetching option chain for {underlying}: {str(e)}", exc_info=True)
+            return []
     
     async def get_underlying_daily_bars(self, ticker: str, start_date: str, end_date: str) -> List[UnderlyingData]:
-        """Get daily bars for underlying stock"""
-        endpoint = f"/v2/aggs/ticker/{ticker.upper()}/range/1/day/{start_date}/{end_date}"
-        params = {
-            "adjusted": "true",
-            "sort": "asc",
-            "limit": 5000
-        }
-        
+        """Get daily bars for underlying stock using Polygon RESTClient"""
         try:
-            data = await self._make_request(endpoint, params)
-            bars = []
+            # Run synchronous RESTClient call in thread pool to maintain async interface
+            def fetch_aggs():
+                aggs = []
+                try:
+                    for agg in self.rest_client.list_aggs(
+                        ticker.upper(),
+                        1,  # multiplier
+                        "day",  # timespan
+                        start_date,
+                        end_date,
+                        adjusted="true",
+                        sort="asc",
+                        limit=5000
+                    ):
+                        aggs.append(agg)
+                    return aggs
+                except Exception as e:
+                    logger.error(f"Error in RESTClient.list_aggs for {ticker}: {str(e)}")
+                    raise
             
-            for bar_data in data.get("results", []):
+            # Execute in thread pool
+            loop = asyncio.get_event_loop()
+            aggs = await loop.run_in_executor(self.executor, fetch_aggs)
+            
+            logger.info(f"Retrieved {len(aggs)} aggregates for {ticker}")
+            
+            bars = []
+            for agg in aggs:
                 try:
                     # Convert timestamp to date
-                    timestamp = bar_data.get("t", 0)
-                    bar_date = datetime.fromtimestamp(timestamp / 1000).date()
+                    bar_date = datetime.fromtimestamp(agg.timestamp / 1000).date()
                     
                     bar = UnderlyingData(
                         ticker=ticker.upper(),
                         bar_date=bar_date,
-                        open=float(bar_data.get("o", 0)),
-                        high=float(bar_data.get("h", 0)),
-                        low=float(bar_data.get("l", 0)),
-                        close=float(bar_data.get("c", 0)),
-                        volume=int(bar_data.get("v", 0))
+                        open=float(agg.open),
+                        high=float(agg.high),
+                        low=float(agg.low),
+                        close=float(agg.close),
+                        volume=int(agg.volume)
                     )
                     
                     bars.append(bar)
@@ -576,32 +786,48 @@ class ConsumerOptionsPolygonService:
             raise PolygonAPIError(f"Failed to fetch daily bars: {str(e)}")
     
     async def get_contract_minute_bars(self, contract: str, start_date: str, end_date: str) -> List[ContractBars]:
-        """Get 1-minute bars for specific option contract"""
-        endpoint = f"/v2/aggs/t/{contract}/range/1/minute/{start_date}/{end_date}"
-        params = {
-            "adjusted": "true",
-            "sort": "asc",
-            "limit": 50000
-        }
-        
+        """Get 1-minute bars for specific option contract using Polygon RESTClient"""
         try:
-            data = await self._make_request(endpoint, params)
-            bars = []
+            # Run synchronous RESTClient call in thread pool to maintain async interface
+            def fetch_aggs():
+                aggs = []
+                try:
+                    for agg in self.rest_client.list_aggs(
+                        contract,
+                        1,  # multiplier
+                        "minute",  # timespan
+                        start_date,
+                        end_date,
+                        adjusted="true",
+                        sort="asc",
+                        limit=50000
+                    ):
+                        aggs.append(agg)
+                    return aggs
+                except Exception as e:
+                    logger.error(f"Error in RESTClient.list_aggs for {contract}: {str(e)}")
+                    raise
             
-            for bar_data in data.get("results", []):
+            # Execute in thread pool
+            loop = asyncio.get_event_loop()
+            aggs = await loop.run_in_executor(self.executor, fetch_aggs)
+            
+            logger.info(f"Retrieved {len(aggs)} aggregates for contract {contract}")
+            
+            bars = []
+            for agg in aggs:
                 try:
                     # Convert timestamp to datetime
-                    timestamp = bar_data.get("t", 0)
-                    bar_time = datetime.fromtimestamp(timestamp / 1000)
+                    bar_time = datetime.fromtimestamp(agg.timestamp / 1000)
                     
                     bar = ContractBars(
                         contract=contract,
                         timestamp=bar_time,
-                        open=float(bar_data.get("o", 0)),
-                        high=float(bar_data.get("h", 0)),
-                        low=float(bar_data.get("l", 0)),
-                        close=float(bar_data.get("c", 0)),
-                        volume=int(bar_data.get("v", 0))
+                        open=float(agg.open),
+                        high=float(agg.high),
+                        low=float(agg.low),
+                        close=float(agg.close),
+                        volume=int(agg.volume)
                     )
                     
                     bars.append(bar)
@@ -643,9 +869,11 @@ class ConsumerOptionsPolygonService:
             return None
     
     async def close(self):
-        """Close the HTTP client"""
+        """Close the HTTP client and executor"""
         if self.client and not self.client.is_closed:
             await self.client.aclose()
+        if self.executor:
+            self.executor.shutdown(wait=True)
     
     def get_diagnostics(self) -> Dict[str, Any]:
         """Get service diagnostics"""
