@@ -286,6 +286,8 @@ class ConsumerOptionsReactDashboard {
             if (this.chain.length > 0 || this.ivTerm.length > 0 || this.underlying.length > 0) {
                 this.renderCharts();
             }
+            // Render simulation charts
+            this.renderSimulationCharts();
             this.setupTooltips();
         }, 200);
     }
@@ -495,7 +497,7 @@ class ConsumerOptionsReactDashboard {
     getSimulationCardsHTML() {
         if (!this.simulationData || this.simulationData.error) {
             return `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; margin-top: 1rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; margin-top: 1rem;">
                     <div style="
                         background: #f8fafc;
                         border-radius: 12px;
@@ -523,8 +525,8 @@ class ConsumerOptionsReactDashboard {
         const signalBg = signalType === 'LONG' ? '#dcfce7' : signalType === 'SHORT' ? '#fee2e2' : '#f1f5f9';
 
         return `
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; margin-top: 1rem;">
-                <!-- Regime State Card -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; margin-top: 1rem;">
+                <!-- Volatility Regime Chart -->
                 <div style="
                     background: white;
                     border-radius: 12px;
@@ -532,7 +534,14 @@ class ConsumerOptionsReactDashboard {
                     border: 1px solid #e2e8f0;
                     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
                 ">
-                    <h3 style="font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.5rem;">Volatility Regime</h3>
+                    <div style="padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                        <h3 style="font-size: 0.875rem; font-weight: 600; color: #1e293b; margin: 0 0 0.25rem 0;">Volatility Regime</h3>
+                        <p style="font-size: 0.625rem; color: #64748b; margin: 0; line-height: 1.4;">
+                            Shows if volatility conditions are met for trading. Green bars = above threshold (pass), Red = below (fail). 
+                            Regime is ON when all 3 rules pass. Green = trade, Red = wait.
+                        </p>
+                    </div>
+                    <div id="regime-chart" style="height: 200px; margin-bottom: 0.75rem;"></div>
                     <div style="
                         display: inline-flex;
                         align-items: center;
@@ -541,16 +550,14 @@ class ConsumerOptionsReactDashboard {
                         border-radius: 8px;
                         font-size: 0.875rem;
                         font-weight: 600;
-                        margin-bottom: 0.5rem;
                         ${regimeOn ? 'background: #dcfce7; color: #166534;' : 'background: #fee2e2; color: #dc2626;'}
                     ">
                         <span style="width: 8px; height: 8px; border-radius: 50%; background: currentColor;"></span>
-                        ${regimeOn ? 'ON' : 'OFF'}
+                        ${regimeOn ? 'REGIME ON' : 'REGIME OFF'}
                     </div>
-                    ${regime.date ? `<p style="font-size: 0.625rem; color: #64748b; margin: 0;">Date: ${regime.date}</p>` : ''}
                 </div>
 
-                <!-- Trading Signal Card -->
+                <!-- Trading Signal Chart -->
                 <div style="
                     background: white;
                     border-radius: 12px;
@@ -558,7 +565,14 @@ class ConsumerOptionsReactDashboard {
                     border: 1px solid #e2e8f0;
                     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
                 ">
-                    <h3 style="font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.5rem;">Trading Signal</h3>
+                    <div style="padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                        <h3 style="font-size: 0.875rem; font-weight: 600; color: #1e293b; margin: 0 0 0.25rem 0;">Trading Signal</h3>
+                        <p style="font-size: 0.625rem; color: #64748b; margin: 0; line-height: 1.4;">
+                            Current trading direction and position size. LONG = buy (green), SHORT = sell (red), FLAT = no position (gray). 
+                            Gauge shows position strength. Arrow indicates direction.
+                        </p>
+                    </div>
+                    <div id="signal-chart" style="height: 200px; margin-bottom: 0.75rem;"></div>
                     <div style="
                         display: inline-flex;
                         align-items: center;
@@ -567,20 +581,18 @@ class ConsumerOptionsReactDashboard {
                         border-radius: 8px;
                         font-size: 0.875rem;
                         font-weight: 600;
-                        margin-bottom: 0.5rem;
                         background: ${signalBg};
                         color: ${signalColor};
                     ">
                         ${signalType}
+                        ${signal.target_position !== null && signal.target_position !== undefined ? 
+                            ` • ${(signal.target_position * 100).toFixed(1)}% NAV` : 
+                            ''
+                        }
                     </div>
-                    ${signal.target_position !== null && signal.target_position !== undefined ? 
-                        `<p style="font-size: 0.625rem; color: #64748b; margin: 0;">Target: ${(signal.target_position * 100).toFixed(1)}% NAV</p>` : 
-                        ''
-                    }
-                    ${signal.date ? `<p style="font-size: 0.625rem; color: #64748b; margin: 0.25rem 0 0 0;">Date: ${signal.date}</p>` : ''}
                 </div>
 
-                <!-- Features Card -->
+                <!-- Key Features Chart -->
                 <div style="
                     background: white;
                     border-radius: 12px;
@@ -588,7 +600,14 @@ class ConsumerOptionsReactDashboard {
                     border: 1px solid #e2e8f0;
                     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
                 ">
-                    <h3 style="font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.5rem;">Key Features</h3>
+                    <div style="padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                        <h3 style="font-size: 0.875rem; font-weight: 600; color: #1e293b; margin: 0 0 0.25rem 0;">Key Features</h3>
+                        <p style="font-size: 0.625rem; color: #64748b; margin: 0; line-height: 1.4;">
+                            Percentile ranks of volatility metrics vs 2-year history. Higher = more volatile. 
+                            Green bars = above threshold (regime rule passes), Red = below. Used to determine regime state.
+                        </p>
+                    </div>
+                    <div id="features-chart" style="height: 200px; margin-bottom: 0.75rem;"></div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.625rem;">
                         ${features.rv20_pct !== null ? `
                             <div>
@@ -615,41 +634,306 @@ class ConsumerOptionsReactDashboard {
                             </div>
                         ` : ''}
                     </div>
-                    ${features.date ? `<p style="font-size: 0.625rem; color: #64748b; margin: 0.5rem 0 0 0;">Date: ${features.date}</p>` : ''}
                 </div>
-
-                <!-- Portfolio Card -->
-                ${portfolio.nav !== null ? `
-                <div style="
-                    background: white;
-                    border-radius: 12px;
-                    padding: 1rem;
-                    border: 1px solid #e2e8f0;
-                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-                ">
-                    <h3 style="font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.5rem;">Portfolio</h3>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">
-                        $${portfolio.nav.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                    </div>
-                    ${portfolio.daily_pnl !== null ? `
-                        <div style="
-                            font-size: 0.75rem;
-                            font-weight: 600;
-                            color: ${portfolio.daily_pnl >= 0 ? '#166534' : '#dc2626'};
-                            margin-bottom: 0.25rem;
-                        ">
-                            Daily P&L: ${portfolio.daily_pnl >= 0 ? '+' : ''}$${portfolio.daily_pnl.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                        </div>
-                    ` : ''}
-                    ${portfolio.drawdown !== null ? `
-                        <div style="font-size: 0.625rem; color: #64748b;">
-                            Drawdown: ${(portfolio.drawdown * 100).toFixed(2)}%
-                        </div>
-                    ` : ''}
-                    ${portfolio.date ? `<p style="font-size: 0.625rem; color: #64748b; margin: 0.5rem 0 0 0;">Date: ${portfolio.date}</p>` : ''}
-                </div>
-                ` : ''}
             </div>
+        `;
+    }
+
+    renderSimulationCharts() {
+        if (!this.simulationData || this.simulationData.error) {
+            return;
+        }
+
+        const sim = this.simulationData;
+        const regime = sim.regime || {};
+        const signal = sim.signal || {};
+        const features = sim.features || {};
+
+        // Render regime chart
+        this.renderRegimeChart(regime, features);
+        
+        // Render signal chart
+        this.renderSignalChart(signal);
+        
+        // Render features chart
+        this.renderFeaturesChart(features);
+    }
+
+    renderRegimeChart(regime, features) {
+        const container = document.getElementById('regime-chart');
+        if (!container) return;
+
+        const width = 300;
+        const height = 200;
+        const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        const regimeOn = regime.on === true;
+        const rv20Value = regime.reasons?.rules?.rv20_pct?.value || features.rv20_pct || 0;
+        const atr14Value = regime.reasons?.rules?.atr14_pct?.value || features.atr14_pct || 0;
+        const ivValue = regime.reasons?.rules?.iv_gate?.iv_median_pct?.value || features.iv_median_pct || 0;
+
+        // Thresholds
+        const rv20Threshold = 70;
+        const atr14Threshold = 60;
+        const ivThreshold = 60;
+
+        // Create bar chart showing values vs thresholds
+        const barData = [
+            { name: 'RV20%', value: rv20Value, threshold: rv20Threshold, pass: rv20Value >= rv20Threshold },
+            { name: 'ATR14%', value: atr14Value, threshold: atr14Threshold, pass: atr14Value >= atr14Threshold },
+            { name: 'IV%', value: ivValue, threshold: ivThreshold, pass: ivValue >= ivThreshold }
+        ];
+
+        const maxValue = Math.max(100, ...barData.map(d => Math.max(d.value, d.threshold)));
+
+        const barWidth = chartWidth / barData.length / 2;
+        const barSpacing = chartWidth / barData.length;
+
+        const bars = barData.map((d, i) => {
+            const x = margin.left + i * barSpacing + barSpacing / 4;
+            const valueHeight = (d.value / maxValue) * chartHeight;
+            const thresholdHeight = (d.threshold / maxValue) * chartHeight;
+            const yValue = margin.top + chartHeight - valueHeight;
+            const yThreshold = margin.top + chartHeight - thresholdHeight;
+
+            return `
+                <g>
+                    <!-- Threshold line -->
+                    <line x1="${x + barWidth/2}" y1="${yThreshold}" 
+                          x2="${x + barWidth/2}" y2="${margin.top + chartHeight}"
+                          stroke="${d.pass ? '#166534' : '#dc2626'}" 
+                          stroke-width="2" 
+                          stroke-dasharray="4,4" 
+                          opacity="0.6"/>
+                    <!-- Value bar -->
+                    <rect x="${x}" y="${yValue}" 
+                          width="${barWidth}" 
+                          height="${valueHeight}"
+                          fill="${d.pass ? '#22c55e' : '#ef4444'}"
+                          opacity="0.8"
+                          rx="2"/>
+                    <!-- Value label -->
+                    <text x="${x + barWidth/2}" y="${yValue - 5}" 
+                          text-anchor="middle" 
+                          font-size="10" 
+                          font-weight="600"
+                          fill="#1e293b">
+                        ${d.value.toFixed(1)}
+                    </text>
+                    <!-- Threshold label -->
+                    <text x="${x + barWidth/2}" y="${yThreshold - 5}" 
+                          text-anchor="middle" 
+                          font-size="9" 
+                          fill="#64748b">
+                        ${d.threshold}
+                    </text>
+                    <!-- Name label -->
+                    <text x="${x + barWidth/2}" y="${margin.top + chartHeight + 20}" 
+                          text-anchor="middle" 
+                          font-size="10" 
+                          fill="#475569"
+                          font-weight="500">
+                        ${d.name}
+                    </text>
+                </g>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+                <!-- Y-axis -->
+                <line x1="${margin.left}" y1="${margin.top}" 
+                      x2="${margin.left}" y2="${margin.top + chartHeight}" 
+                      stroke="#e2e8f0" stroke-width="1"/>
+                <!-- Y-axis labels -->
+                ${[0, 25, 50, 75, 100].map(val => {
+                    const y = margin.top + chartHeight - (val / 100) * chartHeight;
+                    return `
+                        <line x1="${margin.left - 5}" y1="${y}" x2="${margin.left}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>
+                        <text x="${margin.left - 10}" y="${y + 4}" text-anchor="end" font-size="9" fill="#64748b">${val}</text>
+                    `;
+                }).join('')}
+                <!-- Bars -->
+                ${bars}
+                <!-- X-axis label -->
+                <text x="${margin.left + chartWidth/2}" y="${height - 10}" 
+                      text-anchor="middle" font-size="10" fill="#64748b" font-weight="500">
+                    Regime Rules (Value vs Threshold)
+                </text>
+            </svg>
+        `;
+    }
+
+    renderSignalChart(signal) {
+        const container = document.getElementById('signal-chart');
+        if (!container) return;
+
+        const width = 300;
+        const height = 200;
+        const margin = { top: 20, right: 20, bottom: 40, left: 20 };
+
+        const signalType = signal.signal || 'FLAT';
+        const targetPosition = signal.target_position || 0;
+        const reasonJson = signal.reason_json || {};
+
+        // Create gauge-style visualization
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const radius = 60;
+
+        // Signal strength (0-100%)
+        const signalStrength = Math.abs(targetPosition * 100);
+        const angle = (signalStrength / 100) * Math.PI; // 0 to 180 degrees
+
+        let signalColor = '#64748b';
+        let signalText = 'FLAT';
+        if (signalType === 'LONG') {
+            signalColor = '#22c55e';
+            signalText = 'LONG';
+        } else if (signalType === 'SHORT') {
+            signalColor = '#ef4444';
+            signalText = 'SHORT';
+        }
+
+        // Draw gauge arc
+        const startAngle = Math.PI;
+        const endAngle = startAngle + angle;
+
+        const x1 = centerX + radius * Math.cos(startAngle);
+        const y1 = centerY + radius * Math.sin(startAngle);
+        const x2 = centerX + radius * Math.cos(endAngle);
+        const y2 = centerY + radius * Math.sin(endAngle);
+
+        const largeArc = angle > Math.PI ? 1 : 0;
+
+        container.innerHTML = `
+            <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+                <!-- Background arc -->
+                <path d="M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}"
+                      fill="none" stroke="#e2e8f0" stroke-width="12" stroke-linecap="round"/>
+                <!-- Signal arc -->
+                ${signalType !== 'FLAT' ? `
+                <path d="M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}"
+                      fill="none" stroke="${signalColor}" stroke-width="12" stroke-linecap="round"/>
+                ` : ''}
+                <!-- Center text -->
+                <text x="${centerX}" y="${centerY - 10}" 
+                      text-anchor="middle" 
+                      font-size="24" 
+                      font-weight="700"
+                      fill="${signalColor}">
+                    ${signalText}
+                </text>
+                <text x="${centerX}" y="${centerY + 15}" 
+                      text-anchor="middle" 
+                      font-size="12" 
+                      fill="#64748b">
+                    ${(targetPosition * 100).toFixed(1)}% NAV
+                </text>
+                <!-- Direction indicator -->
+                ${signalType === 'LONG' ? `
+                    <polygon points="${centerX},${centerY - 40} ${centerX - 8},${centerY - 25} ${centerX + 8},${centerY - 25}"
+                             fill="${signalColor}"/>
+                ` : signalType === 'SHORT' ? `
+                    <polygon points="${centerX},${centerY + 40} ${centerX - 8},${centerY + 25} ${centerX + 8},${centerY + 25}"
+                             fill="${signalColor}"/>
+                ` : ''}
+            </svg>
+        `;
+    }
+
+    renderFeaturesChart(features) {
+        const container = document.getElementById('features-chart');
+        if (!container) return;
+
+        const width = 300;
+        const height = 200;
+        const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        const featureData = [
+            { name: 'RV20%', value: features.rv20_pct || 0, threshold: 70 },
+            { name: 'ATR14%', value: features.atr14_pct || 0, threshold: 60 },
+            { name: 'IV%', value: features.iv_median_pct || 0, threshold: 60 }
+        ].filter(d => d.value > 0);
+
+        if (featureData.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #64748b; font-size: 0.75rem;">No feature data available</p>';
+            return;
+        }
+
+        const maxValue = 100;
+        const barWidth = chartWidth / featureData.length / 2;
+        const barSpacing = chartWidth / featureData.length;
+
+        const bars = featureData.map((d, i) => {
+            const x = margin.left + i * barSpacing + barSpacing / 4;
+            const valueHeight = (d.value / maxValue) * chartHeight;
+            const thresholdHeight = (d.threshold / maxValue) * chartHeight;
+            const yValue = margin.top + chartHeight - valueHeight;
+            const yThreshold = margin.top + chartHeight - thresholdHeight;
+            const pass = d.value >= d.threshold;
+
+            return `
+                <g>
+                    <!-- Threshold marker -->
+                    <line x1="${x}" y1="${yThreshold}" 
+                          x2="${x + barWidth}" y2="${yThreshold}"
+                          stroke="#f59e0b" 
+                          stroke-width="2" 
+                          stroke-dasharray="3,3"/>
+                    <!-- Value bar -->
+                    <rect x="${x}" y="${yValue}" 
+                          width="${barWidth}" 
+                          height="${valueHeight}"
+                          fill="${pass ? '#22c55e' : '#ef4444'}"
+                          opacity="0.8"
+                          rx="2"/>
+                    <!-- Value label -->
+                    <text x="${x + barWidth/2}" y="${yValue - 5}" 
+                          text-anchor="middle" 
+                          font-size="10" 
+                          font-weight="600"
+                          fill="#1e293b">
+                        ${d.value.toFixed(1)}%
+                    </text>
+                    <!-- Name label -->
+                    <text x="${x + barWidth/2}" y="${margin.top + chartHeight + 20}" 
+                          text-anchor="middle" 
+                          font-size="10" 
+                          fill="#475569"
+                          font-weight="500">
+                        ${d.name}
+                    </text>
+                </g>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+                <!-- Y-axis -->
+                <line x1="${margin.left}" y1="${margin.top}" 
+                      x2="${margin.left}" y2="${margin.top + chartHeight}" 
+                      stroke="#e2e8f0" stroke-width="1"/>
+                <!-- Y-axis labels -->
+                ${[0, 25, 50, 75, 100].map(val => {
+                    const y = margin.top + chartHeight - (val / 100) * chartHeight;
+                    return `
+                        <line x1="${margin.left - 5}" y1="${y}" x2="${margin.left}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>
+                        <text x="${margin.left - 10}" y="${y + 4}" text-anchor="end" font-size="9" fill="#64748b">${val}%</text>
+                    `;
+                }).join('')}
+                <!-- Bars -->
+                ${bars}
+                <!-- X-axis label -->
+                <text x="${margin.left + chartWidth/2}" y="${height - 10}" 
+                      text-anchor="middle" font-size="10" fill="#64748b" font-weight="500">
+                    Feature Percentiles
+                </text>
+            </svg>
         `;
     }
 
