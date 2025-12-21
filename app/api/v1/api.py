@@ -21,7 +21,8 @@ from .endpoints.consumeroptions import (
     chain_router, analytics_router as consumeroptions_analytics_router, 
     dashboard_router as consumeroptions_dashboard_router
 )
-from .endpoints import quantitative_analysis, websocket
+from .endpoints.consumeroptions import simulation as consumeroptions_simulation
+from .endpoints import quantitative_analysis, websocket, simulation
 
 # Create main API router
 api_router = APIRouter()
@@ -61,12 +62,16 @@ api_router.include_router(factor_analysis_router, prefix="/minigolfstrategy/fact
 api_router.include_router(chain_router, prefix="/consumeroptions/chain", tags=["consumeroptions_chain"])
 api_router.include_router(consumeroptions_analytics_router, prefix="/consumeroptions/analytics", tags=["consumeroptions_analytics"])
 api_router.include_router(consumeroptions_dashboard_router, prefix="/consumeroptions/dashboard", tags=["consumeroptions_dashboard"])
+api_router.include_router(consumeroptions_simulation.router, prefix="/consumeroptions", tags=["consumeroptions_simulation"])
 
 # Include Quantitative Analysis endpoints
 api_router.include_router(quantitative_analysis.router, prefix="/quantitative-analysis", tags=["quantitative_analysis"])
 
 # Include WebSocket endpoints
 api_router.include_router(websocket.router, tags=["websocket"])
+
+# Include Simulation endpoints
+api_router.include_router(simulation.router, prefix="/simulation", tags=["simulation"])
 
 # Add API version info
 @api_router.get("/")
@@ -110,7 +115,13 @@ async def api_info():
                 "dashboard": "/consumeroptions/dashboard"
             },
             "quantitative_analysis": "/quantitative-analysis",
-            "websocket": "/ws"
+            "websocket": "/ws",
+            "simulation": {
+                "explain": "/simulation/explain",
+                "regime": "/simulation/regime",
+                "diagnostics": "/simulation/diagnostics",
+                "pipeline": "/simulation/pipeline"
+            }
         }
     }
 

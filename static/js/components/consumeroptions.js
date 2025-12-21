@@ -64,8 +64,8 @@ class ConsumerOptionsReactDashboard {
             console.log(`Loading real data for ${this.currentTicker}...`);
             this.showLoading(true);
 
-            // Call the consumeroptions dashboard API
-            const apiUrl = `/api/v1/consumeroptions/dashboard/data/${this.currentTicker}?days=60`;
+            // Call the consumeroptions dashboard API with simulation data
+            const apiUrl = `/api/v1/consumeroptions/dashboard/data/${this.currentTicker}?days=60&include_simulation=true`;
             console.log(`Making API call to: ${apiUrl}`);
             
             const response = await fetch(apiUrl, {
@@ -192,6 +192,29 @@ class ConsumerOptionsReactDashboard {
         this.oiHeatmapData = data.oi_heatmap_data || {};
         this.deltaDistributionData = data.delta_distribution_data || {};
 
+        // Process simulation data
+        this.simulationData = data.simulation_data || null;
+        if (this.simulationData) {
+            console.log('Simulation data found:', this.simulationData);
+            // Parse JSON strings if they exist
+            if (this.simulationData.regime?.reasons && typeof this.simulationData.regime.reasons === 'string') {
+                try {
+                    this.simulationData.regime.reasons = JSON.parse(this.simulationData.regime.reasons);
+                } catch (e) {
+                    console.warn('Failed to parse regime reasons JSON:', e);
+                }
+            }
+            if (this.simulationData.signal?.reason_json && typeof this.simulationData.signal.reason_json === 'string') {
+                try {
+                    this.simulationData.signal.reason_json = JSON.parse(this.simulationData.signal.reason_json);
+                } catch (e) {
+                    console.warn('Failed to parse signal reason JSON:', e);
+                }
+            }
+        } else {
+            console.log('No simulation data in response');
+        }
+
         console.log('Processed API data:', {
             chainLength: this.chain.length,
             unusualCount: this.unusual.length,
@@ -199,7 +222,8 @@ class ConsumerOptionsReactDashboard {
             sampleContract: this.chain[0],
             sampleIVTerm: this.ivTerm[0],
             oiHeatmapData: this.oiHeatmapData,
-            deltaDistributionData: this.deltaDistributionData
+            deltaDistributionData: this.deltaDistributionData,
+            simulationData: this.simulationData
         });
 
         // Render the dashboard with the processed data
@@ -228,16 +252,23 @@ class ConsumerOptionsReactDashboard {
         this.unusual = [];
         this.oiHeatmapData = {};
         this.deltaDistributionData = {};
+        this.simulationData = null;
+    }
+
+    handleTickerChange() {
+        const input = document.getElementById('ticker-input');
+        if (input) {
+            const newTicker = input.value.trim().toUpperCase();
+            if (newTicker && newTicker !== this.currentTicker) {
+                this.currentTicker = newTicker;
+                this.loadRealData().then(() => this.render());
+            }
+        }
     }
 
     setupEventListeners() {
         // Use event delegation for dynamically created elements
         document.addEventListener('change', (e) => {
-            if (e.target.id === 'ticker-select') {
-                this.currentTicker = e.target.value;
-                this.loadRealData().then(() => this.render());
-            }
-            
             if (e.target.id === 'unusual-filter') {
                 this.onlyUnusual = e.target.checked;
                 this.renderChainTable();
@@ -270,6 +301,8 @@ class ConsumerOptionsReactDashboard {
             if (this.chain.length > 0 || this.ivTerm.length > 0 || this.underlying.length > 0) {
                 this.renderCharts();
             }
+            // Render simulation charts
+            this.renderSimulationCharts();
             this.setupTooltips();
         }, 200);
     }
@@ -307,24 +340,59 @@ class ConsumerOptionsReactDashboard {
                     gap: 12px;
                     flex-wrap: wrap;
                 ">
-                    <!-- Ticker Selector -->
-                    <select id="ticker-select" style="
-                        background: white;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 8px;
-                        padding: 10px 14px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        color: #1e293b;
-                        min-width: 80px;
-                        cursor: pointer;
-                        box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
-                        transition: all 0.2s;
-                    " onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 8px 0 rgb(59 130 246 / 0.15)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 2px 4px 0 rgb(0 0 0 / 0.06)'">
-                        ${this.sampleTickers.map(t => 
-                            `<option value="${t}" ${t === this.currentTicker ? 'selected' : ''}>${t}</option>`
-                        ).join('')}
-                    </select>
+                    <!-- Ticker Input with Default -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 14px; font-weight: 500; color: #475569;">Ticker:</label>
+                        <input 
+                            type="text" 
+                            id="ticker-input" 
+                            value="${this.currentTicker}" 
+                            placeholder="Enter ticker (e.g., COST, AAPL)"
+                            style="
+                                background: white;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 8px;
+                                padding: 10px 14px;
+                                font-size: 14px;
+                                font-weight: 600;
+                                color: #1e293b;
+                                min-width: 120px;
+                                max-width: 150px;
+                                box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
+                                transition: all 0.2s;
+                                text-transform: uppercase;
+                            " 
+                            onkeypress="if(event.key === 'Enter') { window.consumerOptionsDashboard.handleTickerChange(); }"
+                            onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 8px 0 rgb(59 130 246 / 0.15)'" 
+                            onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 2px 4px 0 rgb(0 0 0 / 0.06)'"
+                            onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 8px 0 rgb(59 130 246 / 0.15)'"
+                            onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 2px 4px 0 rgb(0 0 0 / 0.06)'"
+                        >
+                        <button 
+                            id="load-ticker-btn"
+                            onclick="window.consumerOptionsDashboard.handleTickerChange()"
+                            style="
+                                background: #3b82f6;
+                                border: 1px solid #3b82f6;
+                                border-radius: 8px;
+                                padding: 10px 16px;
+                                font-size: 14px;
+                                font-weight: 500;
+                                color: white;
+                                cursor: pointer;
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
+                                box-shadow: 0 2px 4px 0 rgb(59 130 246 / 0.25);
+                                transition: all 0.2s;
+                            " 
+                            onmouseover="this.style.backgroundColor='#2563eb'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px 0 rgb(59 130 246 / 0.35)'" 
+                            onmouseout="this.style.backgroundColor='#3b82f6'; this.style.transform='translateY(0px)'; this.style.boxShadow='0 2px 4px 0 rgb(59 130 246 / 0.25)'"
+                        >
+                            <i data-lucide="search" style="width: 16px; height: 16px;"></i>
+                            Load
+                        </button>
+                    </div>
                     
                     <!-- Export CSV Button -->
                     <button id="export-btn" style="
@@ -437,25 +505,510 @@ class ConsumerOptionsReactDashboard {
                     </div>
                 </div>
             </div>
+            ${this.getSimulationCardsHTML()}
+        `;
+    }
+
+    getSimulationCardsHTML() {
+        if (!this.simulationData || this.simulationData.error) {
+            return `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; margin-top: 1rem;">
+                    <div style="
+                        background: #f8fafc;
+                        border-radius: 12px;
+                        padding: 1rem;
+                        border: 1px solid #e2e8f0;
+                        grid-column: 1 / -1;
+                    ">
+                        <p style="font-size: 0.75rem; color: #64748b; margin: 0; text-align: center;">
+                            ${this.simulationData?.error ? 'Simulation data error: ' + this.simulationData.error : 'No simulation data available. Run the daily pipeline to generate signals.'}
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        const sim = this.simulationData;
+        const regime = sim.regime || {};
+        const signal = sim.signal || {};
+        const features = sim.features || {};
+        const portfolio = sim.portfolio || {};
+
+        const regimeOn = regime.on === true;
+        const signalType = signal.signal || 'N/A';
+        const signalColor = signalType === 'LONG' ? '#166534' : signalType === 'SHORT' ? '#dc2626' : '#64748b';
+        const signalBg = signalType === 'LONG' ? '#dcfce7' : signalType === 'SHORT' ? '#fee2e2' : '#f1f5f9';
+
+        return `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; margin-top: 1rem;">
+                <!-- Volatility Regime Chart -->
+                <div style="
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                ">
+                    <div style="padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                        <h3 style="font-size: 0.875rem; font-weight: 600; color: #1e293b; margin: 0 0 0.25rem 0;">Volatility Regime</h3>
+                        <p style="font-size: 0.625rem; color: #64748b; margin: 0; line-height: 1.4;">
+                            Shows if volatility conditions are met for trading. Green bars = above threshold (pass), Red = below (fail). 
+                            Regime is ON when all 3 rules pass. Green = trade, Red = wait.
+                        </p>
+                    </div>
+                    <div id="regime-chart" style="height: 200px; margin-bottom: 0.75rem;"></div>
+                    <div style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        padding: 0.5rem 0.75rem;
+                        border-radius: 8px;
+                        font-size: 0.875rem;
+                        font-weight: 600;
+                        ${regimeOn ? 'background: #dcfce7; color: #166534;' : 'background: #fee2e2; color: #dc2626;'}
+                    ">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: currentColor;"></span>
+                        ${regimeOn ? 'REGIME ON' : 'REGIME OFF'}
+                    </div>
+                </div>
+
+                <!-- Trading Signal Chart -->
+                <div style="
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                ">
+                    <div style="padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                        <h3 style="font-size: 0.875rem; font-weight: 600; color: #1e293b; margin: 0 0 0.25rem 0;">Trading Signal</h3>
+                        <p style="font-size: 0.625rem; color: #64748b; margin: 0; line-height: 1.4;">
+                            Current trading direction and position size. LONG = buy (green), SHORT = sell (red), FLAT = no position (gray). 
+                            Gauge shows position strength. Arrow indicates direction.
+                        </p>
+                    </div>
+                    <div id="signal-chart" style="height: 200px; margin-bottom: 0.75rem;"></div>
+                    <div style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        padding: 0.5rem 0.75rem;
+                        border-radius: 8px;
+                        font-size: 0.875rem;
+                        font-weight: 600;
+                        background: ${signalBg};
+                        color: ${signalColor};
+                    ">
+                        ${signalType}
+                        ${signal.target_position !== null && signal.target_position !== undefined ? 
+                            ` • ${(signal.target_position * 100).toFixed(1)}% NAV` : 
+                            ''
+                        }
+                    </div>
+                </div>
+
+                <!-- Key Features Chart -->
+                <div style="
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                ">
+                    <div style="padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1rem;">
+                        <h3 style="font-size: 0.875rem; font-weight: 600; color: #1e293b; margin: 0 0 0.25rem 0;">Key Features</h3>
+                        <p style="font-size: 0.625rem; color: #64748b; margin: 0; line-height: 1.4;">
+                            Percentile ranks of volatility metrics vs 2-year history. Higher = more volatile. 
+                            Green bars = above threshold (regime rule passes), Red = below. Used to determine regime state.
+                        </p>
+                    </div>
+                    <div id="features-chart" style="height: 200px; margin-bottom: 0.75rem;"></div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.625rem;">
+                        ${features.rv20_pct !== null ? `
+                            <div>
+                                <span style="color: #64748b;">RV20%:</span>
+                                <span style="color: #1e293b; font-weight: 600; margin-left: 0.25rem;">${features.rv20_pct.toFixed(1)}%</span>
+                            </div>
+                        ` : ''}
+                        ${features.atr14_pct !== null ? `
+                            <div>
+                                <span style="color: #64748b;">ATR14%:</span>
+                                <span style="color: #1e293b; font-weight: 600; margin-left: 0.25rem;">${features.atr14_pct.toFixed(1)}%</span>
+                            </div>
+                        ` : ''}
+                        ${features.iv_median_pct !== null ? `
+                            <div>
+                                <span style="color: #64748b;">IV%:</span>
+                                <span style="color: #1e293b; font-weight: 600; margin-left: 0.25rem;">${features.iv_median_pct.toFixed(1)}%</span>
+                            </div>
+                        ` : ''}
+                        ${features.iv_slope !== null ? `
+                            <div>
+                                <span style="color: #64748b;">IV Slope:</span>
+                                <span style="color: #1e293b; font-weight: 600; margin-left: 0.25rem;">${features.iv_slope.toFixed(3)}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderSimulationCharts() {
+        if (!this.simulationData || this.simulationData.error) {
+            return;
+        }
+
+        const sim = this.simulationData;
+        const regime = sim.regime || {};
+        const signal = sim.signal || {};
+        const features = sim.features || {};
+
+        // Render regime chart
+        this.renderRegimeChart(regime, features);
+        
+        // Render signal chart
+        this.renderSignalChart(signal);
+        
+        // Render features chart
+        this.renderFeaturesChart(features);
+    }
+
+    renderRegimeChart(regime, features) {
+        const container = document.getElementById('regime-chart');
+        if (!container) return;
+
+        const width = 300;
+        const height = 200;
+        const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        const regimeOn = regime.on === true;
+        // Try to get values from regime reasons first, then features
+        let rv20Value = null;
+        let atr14Value = null;
+        let ivValue = null;
+        
+        if (regime.reasons) {
+            const reasons = typeof regime.reasons === 'string' ? JSON.parse(regime.reasons) : regime.reasons;
+            rv20Value = reasons?.rules?.rv20_pct?.value ?? features.rv20_pct ?? null;
+            atr14Value = reasons?.rules?.atr14_pct?.value ?? features.atr14_pct ?? null;
+            ivValue = reasons?.rules?.iv_gate?.iv_median_pct?.value ?? features.iv_median_pct ?? null;
+        } else {
+            rv20Value = features.rv20_pct ?? null;
+            atr14Value = features.atr14_pct ?? null;
+            ivValue = features.iv_median_pct ?? null;
+        }
+        
+        // Use 0 for display if null (will show as 0.0 in chart)
+        const rv20Display = rv20Value ?? 0;
+        const atr14Display = atr14Value ?? 0;
+        const ivDisplay = ivValue ?? 0;
+
+        // Thresholds
+        const rv20Threshold = 70;
+        const atr14Threshold = 60;
+        const ivThreshold = 60;
+
+        // Create bar chart showing values vs thresholds
+        const barData = [
+            { name: 'RV20%', value: rv20Display, rawValue: rv20Value, threshold: rv20Threshold, pass: (rv20Value ?? 0) >= rv20Threshold, hasData: rv20Value !== null },
+            { name: 'ATR14%', value: atr14Display, rawValue: atr14Value, threshold: atr14Threshold, pass: (atr14Value ?? 0) >= atr14Threshold, hasData: atr14Value !== null },
+            { name: 'IV%', value: ivDisplay, rawValue: ivValue, threshold: ivThreshold, pass: (ivValue ?? 0) >= ivThreshold, hasData: ivValue !== null }
+        ];
+
+        const maxValue = Math.max(100, ...barData.map(d => Math.max(d.value, d.threshold)));
+
+        const barWidth = chartWidth / barData.length / 2;
+        const barSpacing = chartWidth / barData.length;
+
+        const bars = barData.map((d, i) => {
+            const x = margin.left + i * barSpacing + barSpacing / 4;
+            const valueHeight = (d.value / maxValue) * chartHeight;
+            const thresholdHeight = (d.threshold / maxValue) * chartHeight;
+            const yValue = margin.top + chartHeight - valueHeight;
+            const yThreshold = margin.top + chartHeight - thresholdHeight;
+
+            return `
+                <g>
+                    <!-- Threshold line -->
+                    <line x1="${x + barWidth/2}" y1="${yThreshold}" 
+                          x2="${x + barWidth/2}" y2="${margin.top + chartHeight}"
+                          stroke="${d.pass ? '#166534' : '#dc2626'}" 
+                          stroke-width="2" 
+                          stroke-dasharray="4,4" 
+                          opacity="0.6"/>
+                    <!-- Value bar -->
+                    <rect x="${x}" y="${yValue}" 
+                          width="${barWidth}" 
+                          height="${valueHeight}"
+                          fill="${d.pass ? '#22c55e' : '#ef4444'}"
+                          opacity="0.8"
+                          rx="2"/>
+                    <!-- Value label -->
+                    <text x="${x + barWidth/2}" y="${yValue - 5}" 
+                          text-anchor="middle" 
+                          font-size="10" 
+                          font-weight="600"
+                          fill="${d.hasData ? '#1e293b' : '#94a3b8'}"
+                          opacity="${d.hasData ? '1' : '0.6'}">
+                        ${d.hasData ? d.value.toFixed(1) : 'N/A'}
+                    </text>
+                    <!-- Threshold label -->
+                    <text x="${x + barWidth/2}" y="${yThreshold - 5}" 
+                          text-anchor="middle" 
+                          font-size="9" 
+                          fill="#64748b">
+                        ${d.threshold}
+                    </text>
+                    <!-- Name label -->
+                    <text x="${x + barWidth/2}" y="${margin.top + chartHeight + 20}" 
+                          text-anchor="middle" 
+                          font-size="10" 
+                          fill="#475569"
+                          font-weight="500">
+                        ${d.name}
+                    </text>
+                </g>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+                <!-- Y-axis -->
+                <line x1="${margin.left}" y1="${margin.top}" 
+                      x2="${margin.left}" y2="${margin.top + chartHeight}" 
+                      stroke="#e2e8f0" stroke-width="1"/>
+                <!-- Y-axis labels -->
+                ${[0, 25, 50, 75, 100].map(val => {
+                    const y = margin.top + chartHeight - (val / 100) * chartHeight;
+                    return `
+                        <line x1="${margin.left - 5}" y1="${y}" x2="${margin.left}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>
+                        <text x="${margin.left - 10}" y="${y + 4}" text-anchor="end" font-size="9" fill="#64748b">${val}</text>
+                    `;
+                }).join('')}
+                <!-- Bars -->
+                ${bars}
+                <!-- X-axis label -->
+                <text x="${margin.left + chartWidth/2}" y="${height - 10}" 
+                      text-anchor="middle" font-size="10" fill="#64748b" font-weight="500">
+                    Regime Rules (Value vs Threshold)
+                </text>
+            </svg>
+        `;
+    }
+
+    renderSignalChart(signal) {
+        const container = document.getElementById('signal-chart');
+        if (!container) return;
+
+        const width = 300;
+        const height = 200;
+        const margin = { top: 20, right: 20, bottom: 40, left: 20 };
+
+        const signalType = signal.signal || 'FLAT';
+        const targetPosition = signal.target_position || 0;
+        const reasonJson = signal.reason_json || {};
+
+        // Create gauge-style visualization
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const radius = 60;
+
+        // Signal strength (0-100%)
+        const signalStrength = Math.abs(targetPosition * 100);
+        const angle = (signalStrength / 100) * Math.PI; // 0 to 180 degrees
+
+        let signalColor = '#64748b';
+        let signalText = 'FLAT';
+        if (signalType === 'LONG') {
+            signalColor = '#22c55e';
+            signalText = 'LONG';
+        } else if (signalType === 'SHORT') {
+            signalColor = '#ef4444';
+            signalText = 'SHORT';
+        }
+
+        // Draw gauge arc
+        const startAngle = Math.PI;
+        const endAngle = startAngle + angle;
+
+        const x1 = centerX + radius * Math.cos(startAngle);
+        const y1 = centerY + radius * Math.sin(startAngle);
+        const x2 = centerX + radius * Math.cos(endAngle);
+        const y2 = centerY + radius * Math.sin(endAngle);
+
+        const largeArc = angle > Math.PI ? 1 : 0;
+
+        container.innerHTML = `
+            <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+                <!-- Background arc -->
+                <path d="M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}"
+                      fill="none" stroke="#e2e8f0" stroke-width="12" stroke-linecap="round"/>
+                <!-- Signal arc -->
+                ${signalType !== 'FLAT' ? `
+                <path d="M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}"
+                      fill="none" stroke="${signalColor}" stroke-width="12" stroke-linecap="round"/>
+                ` : ''}
+                <!-- Center text -->
+                <text x="${centerX}" y="${centerY - 10}" 
+                      text-anchor="middle" 
+                      font-size="24" 
+                      font-weight="700"
+                      fill="${signalColor}">
+                    ${signalText}
+                </text>
+                <text x="${centerX}" y="${centerY + 15}" 
+                      text-anchor="middle" 
+                      font-size="12" 
+                      fill="#64748b">
+                    ${(targetPosition * 100).toFixed(1)}% NAV
+                </text>
+                <!-- Direction indicator -->
+                ${signalType === 'LONG' ? `
+                    <polygon points="${centerX},${centerY - 40} ${centerX - 8},${centerY - 25} ${centerX + 8},${centerY - 25}"
+                             fill="${signalColor}"/>
+                ` : signalType === 'SHORT' ? `
+                    <polygon points="${centerX},${centerY + 40} ${centerX - 8},${centerY + 25} ${centerX + 8},${centerY + 25}"
+                             fill="${signalColor}"/>
+                ` : ''}
+            </svg>
+        `;
+    }
+
+    renderFeaturesChart(features) {
+        const container = document.getElementById('features-chart');
+        if (!container) return;
+
+        const width = 300;
+        const height = 200;
+        const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        const featureData = [
+            { name: 'RV20%', value: features.rv20_pct ?? 0, rawValue: features.rv20_pct, threshold: 70, hasData: features.rv20_pct !== null && features.rv20_pct !== undefined },
+            { name: 'ATR14%', value: features.atr14_pct ?? 0, rawValue: features.atr14_pct, threshold: 60, hasData: features.atr14_pct !== null && features.atr14_pct !== undefined },
+            { name: 'IV%', value: features.iv_median_pct ?? 0, rawValue: features.iv_median_pct, threshold: 60, hasData: features.iv_median_pct !== null && features.iv_median_pct !== undefined }
+        ];
+
+        // Show message if no data at all
+        const hasAnyData = featureData.some(d => d.hasData);
+        if (!hasAnyData) {
+            container.innerHTML = '<p style="text-align: center; color: #64748b; font-size: 0.75rem; padding: 2rem 1rem;">No percentile data available.<br/><span style="font-size: 0.625rem;">Need 2+ years of history to compute percentiles.</span></p>';
+            return;
+        }
+
+        const maxValue = 100;
+        const barWidth = chartWidth / featureData.length / 2;
+        const barSpacing = chartWidth / featureData.length;
+
+        const bars = featureData.map((d, i) => {
+            const x = margin.left + i * barSpacing + barSpacing / 4;
+            const valueHeight = (d.value / maxValue) * chartHeight;
+            const thresholdHeight = (d.threshold / maxValue) * chartHeight;
+            const yValue = margin.top + chartHeight - valueHeight;
+            const yThreshold = margin.top + chartHeight - thresholdHeight;
+            const pass = d.value >= d.threshold;
+
+            return `
+                <g>
+                    <!-- Threshold marker -->
+                    <line x1="${x}" y1="${yThreshold}" 
+                          x2="${x + barWidth}" y2="${yThreshold}"
+                          stroke="#f59e0b" 
+                          stroke-width="2" 
+                          stroke-dasharray="3,3"/>
+                    <!-- Value bar -->
+                    <rect x="${x}" y="${yValue}" 
+                          width="${barWidth}" 
+                          height="${valueHeight}"
+                          fill="${pass ? '#22c55e' : '#ef4444'}"
+                          opacity="0.8"
+                          rx="2"/>
+                    <!-- Value label -->
+                    <text x="${x + barWidth/2}" y="${yValue - 5}" 
+                          text-anchor="middle" 
+                          font-size="10" 
+                          font-weight="600"
+                          fill="${d.hasData ? '#1e293b' : '#94a3b8'}"
+                          opacity="${d.hasData ? '1' : '0.6'}">
+                        ${d.hasData ? d.value.toFixed(1) + '%' : 'N/A'}
+                    </text>
+                    <!-- Name label -->
+                    <text x="${x + barWidth/2}" y="${margin.top + chartHeight + 20}" 
+                          text-anchor="middle" 
+                          font-size="10" 
+                          fill="#475569"
+                          font-weight="500">
+                        ${d.name}
+                    </text>
+                </g>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+                <!-- Y-axis -->
+                <line x1="${margin.left}" y1="${margin.top}" 
+                      x2="${margin.left}" y2="${margin.top + chartHeight}" 
+                      stroke="#e2e8f0" stroke-width="1"/>
+                <!-- Y-axis labels -->
+                ${[0, 25, 50, 75, 100].map(val => {
+                    const y = margin.top + chartHeight - (val / 100) * chartHeight;
+                    return `
+                        <line x1="${margin.left - 5}" y1="${y}" x2="${margin.left}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>
+                        <text x="${margin.left - 10}" y="${y + 4}" text-anchor="end" font-size="9" fill="#64748b">${val}%</text>
+                    `;
+                }).join('')}
+                <!-- Bars -->
+                ${bars}
+                <!-- X-axis label -->
+                <text x="${margin.left + chartWidth/2}" y="${height - 10}" 
+                      text-anchor="middle" font-size="10" fill="#64748b" font-weight="500">
+                    Feature Percentiles
+                </text>
+            </svg>
         `;
     }
 
     getMainGridHTML(displayRows) {
         return `
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
-                <!-- Left Column: Option Chain Overview -->
-                <div style="
-                    background: white;
-                    border-radius: 12px;
-                    border: 1px solid #e2e8f0;
-                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-                    overflow: hidden;
-                ">
-                    <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0;">
-                        <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0;">Option Chain Overview</h3>
+                <!-- Left Column: Option Chain Overview + Explanation Table -->
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- Option Chain Overview -->
+                    <div style="
+                        background: white;
+                        border-radius: 12px;
+                        border: 1px solid #e2e8f0;
+                        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                        overflow: hidden;
+                    ">
+                        <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0;">Option Chain Overview</h3>
+                            <span style="font-size: 0.75rem; color: #64748b;">Showing ${displayRows.length} contracts (scroll to see more)</span>
+                        </div>
+                        <div style="overflow-x: auto; overflow-y: auto; max-height: 800px;">
+                            ${this.getChainTableHTML(displayRows)}
+                        </div>
                     </div>
-                    <div style="overflow-x: auto;">
-                        ${this.getChainTableHTML(displayRows)}
+                    
+                    <!-- Explanation Table Card -->
+                    <div style="
+                        background: white;
+                        border-radius: 12px;
+                        border: 1px solid #e2e8f0;
+                        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                        overflow: hidden;
+                    ">
+                        <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0;">
+                            <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0;">Column Reference Guide</h3>
+                        </div>
+                        <div style="overflow-x: auto; padding: 1rem;">
+                            ${this.getExplanationTableHTML()}
+                        </div>
                     </div>
                 </div>
 
@@ -663,7 +1216,7 @@ class ConsumerOptionsReactDashboard {
 
         return `
             <table style="width: 100%; border-collapse: collapse;">
-                <thead>
+                <thead style="position: sticky; top: 0; z-index: 10; background: #f8fafc;">
                     <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
                         <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.625rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Contract</th>
                         <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.625rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Expiry</th>
@@ -699,6 +1252,67 @@ class ConsumerOptionsReactDashboard {
                             <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">${r.day_oi || '—'}</td>
                         </tr>
                     `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    getExplanationTableHTML() {
+        return `
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                        <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.625rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Column / 列</th>
+                        <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.625rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Meaning / 含义</th>
+                        <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.625rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">What to Look For / 你该看什么</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Expiry</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Expiration date / 到期日</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Key time points market is watching / 市场关注的时间点</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Type</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Call / Put / 看涨 / 看跌</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Betting on up or down / 押涨还是押跌</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Strike</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Strike price / 行权价</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Key price levels market is focused on / 市场重点位置</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">IV</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Implied volatility per contract / 单合约 IV</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Which price levels are being bid up / 哪些价位被抬价</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Δ (Delta)</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Directional exposure / 方向暴露</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">How much it behaves like stock / 像不像股票</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Γ (Gamma)</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Accelerator / 加速器</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Will it "suddenly surge" / 会不会"突然猛"</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Θ (Theta)</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Time decay / 时间流血</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Does holding it hurt / 拿着疼不疼</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Vega</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">IV sensitivity / IV 敏感度</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Betting on volatility / 赌不赌波动</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Vol / OI</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Volume / Open Interest / 成交 / 存量</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">New money vs old positions / 新钱 vs 老仓</td>
+                    </tr>
                 </tbody>
             </table>
         `;

@@ -29,19 +29,21 @@ class DashboardDataRequest(BaseModel):
 class TopMoversRequest(BaseModel):
     tickers: Optional[List[str]] = Field(None, description="List of tickers to analyze")
 
-@router.post("/data", response_model=DashboardResponse)
+@router.post("/data")
 async def get_dashboard_data(
     request: DashboardDataRequest,
+    include_simulation: bool = Query(default=True, description="Include simulation data (regime, signals)"),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
-    """Get complete dashboard data for specified ticker"""
+    """Get complete dashboard data for specified ticker, optionally including simulation features"""
     try:
         dashboard_service = ConsumerOptionsDashboardService()
         
         result = await dashboard_service.get_dashboard_data(
             focus_ticker=request.focus_ticker.upper(),
             tickers=[t.upper() for t in request.tickers] if request.tickers else None,
-            date_range_days=request.date_range_days
+            date_range_days=request.date_range_days,
+            include_simulation=include_simulation
         )
         
         await usage_service.track_request(
@@ -127,19 +129,21 @@ async def get_historical_chain_overview(
     finally:
         await dashboard_service.close()
 
-@router.get("/data/{ticker}", response_model=DashboardResponse)
+@router.get("/data/{ticker}")
 async def get_dashboard_data_simple(
     ticker: str,
     days: int = Query(default=60, description="Days of historical data"),
+    include_simulation: bool = Query(default=True, description="Include simulation data"),
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
-    """Get dashboard data for single ticker (simplified endpoint)"""
+    """Get dashboard data for single ticker (simplified endpoint), optionally including simulation features"""
     try:
         dashboard_service = ConsumerOptionsDashboardService()
         
         result = await dashboard_service.get_dashboard_data(
             focus_ticker=ticker.upper(),
-            date_range_days=days
+            date_range_days=days,
+            include_simulation=include_simulation
         )
         
         await usage_service.track_request(
@@ -160,7 +164,7 @@ async def get_dashboard_data_simple(
         )
         # Return empty response instead of raising error to show empty state
         from app.models.options_models import DashboardResponse, ChainSnapshotResponse, CallPutRatios
-        return DashboardResponse(
+        empty_response = DashboardResponse(
             focus_ticker=ticker.upper(),
             timestamp=datetime.now(),
             chain_data=ChainSnapshotResponse(
@@ -188,6 +192,18 @@ async def get_dashboard_data_simple(
             delta_distribution_data={},
             underlying_data=[]
         )
+        
+        # Add simulation data if requested
+        response_dict = empty_response.dict() if hasattr(empty_response, 'dict') else empty_response.model_dump() if hasattr(empty_response, 'model_dump') else {}
+        if include_simulation:
+            try:
+                simulation_data = await dashboard_service.get_simulation_data(ticker.upper())
+                response_dict['simulation_data'] = simulation_data
+            except Exception as sim_error:
+                logger.warning(f"Could not fetch simulation data: {str(sim_error)}")
+                response_dict['simulation_data'] = None
+        
+        return response_dict
 
 @router.get("/historical-chain-overview/{ticker}")
 async def get_historical_chain_overview(
