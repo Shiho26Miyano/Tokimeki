@@ -196,6 +196,21 @@ class ConsumerOptionsReactDashboard {
         this.simulationData = data.simulation_data || null;
         if (this.simulationData) {
             console.log('Simulation data found:', this.simulationData);
+            // Parse JSON strings if they exist
+            if (this.simulationData.regime?.reasons && typeof this.simulationData.regime.reasons === 'string') {
+                try {
+                    this.simulationData.regime.reasons = JSON.parse(this.simulationData.regime.reasons);
+                } catch (e) {
+                    console.warn('Failed to parse regime reasons JSON:', e);
+                }
+            }
+            if (this.simulationData.signal?.reason_json && typeof this.simulationData.signal.reason_json === 'string') {
+                try {
+                    this.simulationData.signal.reason_json = JSON.parse(this.simulationData.signal.reason_json);
+                } catch (e) {
+                    console.warn('Failed to parse signal reason JSON:', e);
+                }
+            }
         } else {
             console.log('No simulation data in response');
         }
@@ -670,9 +685,26 @@ class ConsumerOptionsReactDashboard {
         const chartHeight = height - margin.top - margin.bottom;
 
         const regimeOn = regime.on === true;
-        const rv20Value = regime.reasons?.rules?.rv20_pct?.value || features.rv20_pct || 0;
-        const atr14Value = regime.reasons?.rules?.atr14_pct?.value || features.atr14_pct || 0;
-        const ivValue = regime.reasons?.rules?.iv_gate?.iv_median_pct?.value || features.iv_median_pct || 0;
+        // Try to get values from regime reasons first, then features
+        let rv20Value = null;
+        let atr14Value = null;
+        let ivValue = null;
+        
+        if (regime.reasons) {
+            const reasons = typeof regime.reasons === 'string' ? JSON.parse(regime.reasons) : regime.reasons;
+            rv20Value = reasons?.rules?.rv20_pct?.value ?? features.rv20_pct ?? null;
+            atr14Value = reasons?.rules?.atr14_pct?.value ?? features.atr14_pct ?? null;
+            ivValue = reasons?.rules?.iv_gate?.iv_median_pct?.value ?? features.iv_median_pct ?? null;
+        } else {
+            rv20Value = features.rv20_pct ?? null;
+            atr14Value = features.atr14_pct ?? null;
+            ivValue = features.iv_median_pct ?? null;
+        }
+        
+        // Use 0 for display if null (will show as 0.0 in chart)
+        const rv20Display = rv20Value ?? 0;
+        const atr14Display = atr14Value ?? 0;
+        const ivDisplay = ivValue ?? 0;
 
         // Thresholds
         const rv20Threshold = 70;
@@ -681,9 +713,9 @@ class ConsumerOptionsReactDashboard {
 
         // Create bar chart showing values vs thresholds
         const barData = [
-            { name: 'RV20%', value: rv20Value, threshold: rv20Threshold, pass: rv20Value >= rv20Threshold },
-            { name: 'ATR14%', value: atr14Value, threshold: atr14Threshold, pass: atr14Value >= atr14Threshold },
-            { name: 'IV%', value: ivValue, threshold: ivThreshold, pass: ivValue >= ivThreshold }
+            { name: 'RV20%', value: rv20Display, rawValue: rv20Value, threshold: rv20Threshold, pass: (rv20Value ?? 0) >= rv20Threshold, hasData: rv20Value !== null },
+            { name: 'ATR14%', value: atr14Display, rawValue: atr14Value, threshold: atr14Threshold, pass: (atr14Value ?? 0) >= atr14Threshold, hasData: atr14Value !== null },
+            { name: 'IV%', value: ivDisplay, rawValue: ivValue, threshold: ivThreshold, pass: (ivValue ?? 0) >= ivThreshold, hasData: ivValue !== null }
         ];
 
         const maxValue = Math.max(100, ...barData.map(d => Math.max(d.value, d.threshold)));
@@ -719,8 +751,9 @@ class ConsumerOptionsReactDashboard {
                           text-anchor="middle" 
                           font-size="10" 
                           font-weight="600"
-                          fill="#1e293b">
-                        ${d.value.toFixed(1)}
+                          fill="${d.hasData ? '#1e293b' : '#94a3b8'}"
+                          opacity="${d.hasData ? '1' : '0.6'}">
+                        ${d.hasData ? d.value.toFixed(1) : 'N/A'}
                     </text>
                     <!-- Threshold label -->
                     <text x="${x + barWidth/2}" y="${yThreshold - 5}" 
@@ -855,13 +888,15 @@ class ConsumerOptionsReactDashboard {
         const chartHeight = height - margin.top - margin.bottom;
 
         const featureData = [
-            { name: 'RV20%', value: features.rv20_pct || 0, threshold: 70 },
-            { name: 'ATR14%', value: features.atr14_pct || 0, threshold: 60 },
-            { name: 'IV%', value: features.iv_median_pct || 0, threshold: 60 }
-        ].filter(d => d.value > 0);
+            { name: 'RV20%', value: features.rv20_pct ?? 0, rawValue: features.rv20_pct, threshold: 70, hasData: features.rv20_pct !== null && features.rv20_pct !== undefined },
+            { name: 'ATR14%', value: features.atr14_pct ?? 0, rawValue: features.atr14_pct, threshold: 60, hasData: features.atr14_pct !== null && features.atr14_pct !== undefined },
+            { name: 'IV%', value: features.iv_median_pct ?? 0, rawValue: features.iv_median_pct, threshold: 60, hasData: features.iv_median_pct !== null && features.iv_median_pct !== undefined }
+        ];
 
-        if (featureData.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: #64748b; font-size: 0.75rem;">No feature data available</p>';
+        // Show message if no data at all
+        const hasAnyData = featureData.some(d => d.hasData);
+        if (!hasAnyData) {
+            container.innerHTML = '<p style="text-align: center; color: #64748b; font-size: 0.75rem; padding: 2rem 1rem;">No percentile data available.<br/><span style="font-size: 0.625rem;">Need 2+ years of history to compute percentiles.</span></p>';
             return;
         }
 
@@ -897,8 +932,9 @@ class ConsumerOptionsReactDashboard {
                           text-anchor="middle" 
                           font-size="10" 
                           font-weight="600"
-                          fill="#1e293b">
-                        ${d.value.toFixed(1)}%
+                          fill="${d.hasData ? '#1e293b' : '#94a3b8'}"
+                          opacity="${d.hasData ? '1' : '0.6'}">
+                        ${d.hasData ? d.value.toFixed(1) + '%' : 'N/A'}
                     </text>
                     <!-- Name label -->
                     <text x="${x + barWidth/2}" y="${margin.top + chartHeight + 20}" 
