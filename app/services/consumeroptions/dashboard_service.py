@@ -16,6 +16,14 @@ from .polygon_service import ConsumerOptionsPolygonService
 from .analytics_service import ConsumerOptionsAnalyticsService
 from .chain_service import ConsumerOptionsChainService
 
+# Import simulation services for integration
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
+from app.models.database import get_db
+from app.models.simulation_models import (
+    SignalsDaily, RegimeStates, FeaturesDaily, PortfolioDaily
+)
+
 logger = logging.getLogger(__name__)
 
 class ConsumerOptionsDashboardService:
@@ -29,9 +37,104 @@ class ConsumerOptionsDashboardService:
         # Default tickers for consumer options
         self.default_tickers = ["COST", "WMT", "TGT", "AMZN", "AAPL"]
     
+    async def get_simulation_data(self, ticker: str, target_date: date = None) -> Dict[str, Any]:
+        """
+        Get simulation data for a ticker (regime state, signals, features)
+        
+        Args:
+            ticker: Stock ticker
+            target_date: Date to get data for (defaults to today)
+            
+        Returns:
+            Dictionary with simulation data
+        """
+        if target_date is None:
+            target_date = date.today()
+        
+        try:
+            db: Session = next(get_db())
+            
+            # Get latest signal
+            signal = db.query(SignalsDaily).filter(
+                and_(
+                    SignalsDaily.symbol == ticker.upper(),
+                    SignalsDaily.date <= target_date,
+                    SignalsDaily.strategy_id == "vol_regime_v1"
+                )
+            ).order_by(SignalsDaily.date.desc()).first()
+            
+            # Get regime state
+            regime = db.query(RegimeStates).filter(
+                and_(
+                    RegimeStates.symbol == ticker.upper(),
+                    RegimeStates.date <= target_date,
+                    RegimeStates.strategy_id == "vol_regime_v1"
+                )
+            ).order_by(RegimeStates.date.desc()).first()
+            
+            # Get latest features
+            features = db.query(FeaturesDaily).filter(
+                and_(
+                    FeaturesDaily.symbol == ticker.upper(),
+                    FeaturesDaily.date <= target_date
+                )
+            ).order_by(FeaturesDaily.date.desc()).first()
+            
+            # Get portfolio if available
+            portfolio = db.query(PortfolioDaily).filter(
+                and_(
+                    PortfolioDaily.strategy_id == "vol_regime_v1",
+                    PortfolioDaily.date <= target_date
+                )
+            ).order_by(PortfolioDaily.date.desc()).first()
+            
+            db.close()
+            
+            return {
+                'ticker': ticker.upper(),
+                'date': target_date.isoformat(),
+                'signal': {
+                    'signal': signal.signal if signal else None,
+                    'target_position': signal.target_position if signal else None,
+                    'reason_json': signal.reason_json if signal else None,
+                    'date': signal.date.isoformat() if signal else None
+                },
+                'regime': {
+                    'on': regime.regime_on if regime else None,
+                    'reasons': regime.reasons_json if regime else None,
+                    'date': regime.date.isoformat() if regime else None
+                },
+                'features': {
+                    'rv20': features.rv20 if features else None,
+                    'rv60': features.rv60 if features else None,
+                    'atr14': features.atr14 if features else None,
+                    'rv20_pct': features.rv20_pct if features else None,
+                    'atr14_pct': features.atr14_pct if features else None,
+                    'iv_median_pct': features.iv_median_pct if features else None,
+                    'iv_slope': features.iv_slope if features else None,
+                    'cp_vol_ratio': features.cp_vol_ratio if features else None,
+                    'cp_oi_ratio': features.cp_oi_ratio if features else None,
+                    'date': features.date.isoformat() if features else None
+                },
+                'portfolio': {
+                    'nav': portfolio.nav if portfolio else None,
+                    'daily_pnl': portfolio.daily_pnl if portfolio else None,
+                    'drawdown': portfolio.drawdown if portfolio else None,
+                    'date': portfolio.date.isoformat() if portfolio else None
+                }
+            }
+        except Exception as e:
+            logger.error(f"Error getting simulation data for {ticker}: {str(e)}")
+            return {
+                'ticker': ticker.upper(),
+                'date': target_date.isoformat(),
+                'error': str(e)
+            }
+    
     async def get_dashboard_data(self, focus_ticker: str, 
                                tickers: List[str] = None,
-                               date_range_days: int = 60) -> DashboardResponse:
+                               date_range_days: int = 60,
+                               include_simulation: bool = True) -> DashboardResponse:
         """
         Get complete dashboard data for specified ticker and timeframe
         
@@ -97,7 +200,16 @@ class ConsumerOptionsDashboardService:
             
             call_put_ratios, iv_term, unusual_activity, oi_heatmap_data, delta_distribution_data = analytics_result
             
-            return DashboardResponse(
+            # Get simulation data if requested
+            simulation_data = None
+            if include_simulation:
+                try:
+                    simulation_data = await self.get_simulation_data(focus_ticker)
+                except Exception as e:
+                    logger.warning(f"Could not fetch simulation data: {str(e)}")
+            
+            # Create response
+            response = DashboardResponse(
                 focus_ticker=focus_ticker,
                 timestamp=datetime.now(),
                 chain_data=chain_data,
@@ -108,6 +220,12 @@ class ConsumerOptionsDashboardService:
                 delta_distribution_data=delta_distribution_data,
                 underlying_data=underlying_data
             )
+            
+            # Add simulation data to response (using dict to add extra field)
+            response_dict = response.dict() if hasattr(response, 'dict') else response.model_dump() if hasattr(response, 'model_dump') else {}
+            response_dict['simulation_data'] = simulation_data
+            
+            return response_dict
             
         except Exception as e:
             logger.error(f"Error generating dashboard data: {str(e)}")

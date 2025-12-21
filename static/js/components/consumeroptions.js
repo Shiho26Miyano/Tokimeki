@@ -64,8 +64,8 @@ class ConsumerOptionsReactDashboard {
             console.log(`Loading real data for ${this.currentTicker}...`);
             this.showLoading(true);
 
-            // Call the consumeroptions dashboard API
-            const apiUrl = `/api/v1/consumeroptions/dashboard/data/${this.currentTicker}?days=60`;
+            // Call the consumeroptions dashboard API with simulation data
+            const apiUrl = `/api/v1/consumeroptions/dashboard/data/${this.currentTicker}?days=60&include_simulation=true`;
             console.log(`Making API call to: ${apiUrl}`);
             
             const response = await fetch(apiUrl, {
@@ -192,6 +192,14 @@ class ConsumerOptionsReactDashboard {
         this.oiHeatmapData = data.oi_heatmap_data || {};
         this.deltaDistributionData = data.delta_distribution_data || {};
 
+        // Process simulation data
+        this.simulationData = data.simulation_data || null;
+        if (this.simulationData) {
+            console.log('Simulation data found:', this.simulationData);
+        } else {
+            console.log('No simulation data in response');
+        }
+
         console.log('Processed API data:', {
             chainLength: this.chain.length,
             unusualCount: this.unusual.length,
@@ -199,7 +207,8 @@ class ConsumerOptionsReactDashboard {
             sampleContract: this.chain[0],
             sampleIVTerm: this.ivTerm[0],
             oiHeatmapData: this.oiHeatmapData,
-            deltaDistributionData: this.deltaDistributionData
+            deltaDistributionData: this.deltaDistributionData,
+            simulationData: this.simulationData
         });
 
         // Render the dashboard with the processed data
@@ -228,16 +237,23 @@ class ConsumerOptionsReactDashboard {
         this.unusual = [];
         this.oiHeatmapData = {};
         this.deltaDistributionData = {};
+        this.simulationData = null;
+    }
+
+    handleTickerChange() {
+        const input = document.getElementById('ticker-input');
+        if (input) {
+            const newTicker = input.value.trim().toUpperCase();
+            if (newTicker && newTicker !== this.currentTicker) {
+                this.currentTicker = newTicker;
+                this.loadRealData().then(() => this.render());
+            }
+        }
     }
 
     setupEventListeners() {
         // Use event delegation for dynamically created elements
         document.addEventListener('change', (e) => {
-            if (e.target.id === 'ticker-select') {
-                this.currentTicker = e.target.value;
-                this.loadRealData().then(() => this.render());
-            }
-            
             if (e.target.id === 'unusual-filter') {
                 this.onlyUnusual = e.target.checked;
                 this.renderChainTable();
@@ -307,24 +323,59 @@ class ConsumerOptionsReactDashboard {
                     gap: 12px;
                     flex-wrap: wrap;
                 ">
-                    <!-- Ticker Selector -->
-                    <select id="ticker-select" style="
-                        background: white;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 8px;
-                        padding: 10px 14px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        color: #1e293b;
-                        min-width: 80px;
-                        cursor: pointer;
-                        box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
-                        transition: all 0.2s;
-                    " onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 8px 0 rgb(59 130 246 / 0.15)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 2px 4px 0 rgb(0 0 0 / 0.06)'">
-                        ${this.sampleTickers.map(t => 
-                            `<option value="${t}" ${t === this.currentTicker ? 'selected' : ''}>${t}</option>`
-                        ).join('')}
-                    </select>
+                    <!-- Ticker Input with Default -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 14px; font-weight: 500; color: #475569;">Ticker:</label>
+                        <input 
+                            type="text" 
+                            id="ticker-input" 
+                            value="${this.currentTicker}" 
+                            placeholder="Enter ticker (e.g., COST, AAPL)"
+                            style="
+                                background: white;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 8px;
+                                padding: 10px 14px;
+                                font-size: 14px;
+                                font-weight: 600;
+                                color: #1e293b;
+                                min-width: 120px;
+                                max-width: 150px;
+                                box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
+                                transition: all 0.2s;
+                                text-transform: uppercase;
+                            " 
+                            onkeypress="if(event.key === 'Enter') { window.consumerOptionsDashboard.handleTickerChange(); }"
+                            onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 8px 0 rgb(59 130 246 / 0.15)'" 
+                            onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 2px 4px 0 rgb(0 0 0 / 0.06)'"
+                            onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 8px 0 rgb(59 130 246 / 0.15)'"
+                            onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 2px 4px 0 rgb(0 0 0 / 0.06)'"
+                        >
+                        <button 
+                            id="load-ticker-btn"
+                            onclick="window.consumerOptionsDashboard.handleTickerChange()"
+                            style="
+                                background: #3b82f6;
+                                border: 1px solid #3b82f6;
+                                border-radius: 8px;
+                                padding: 10px 16px;
+                                font-size: 14px;
+                                font-weight: 500;
+                                color: white;
+                                cursor: pointer;
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
+                                box-shadow: 0 2px 4px 0 rgb(59 130 246 / 0.25);
+                                transition: all 0.2s;
+                            " 
+                            onmouseover="this.style.backgroundColor='#2563eb'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px 0 rgb(59 130 246 / 0.35)'" 
+                            onmouseout="this.style.backgroundColor='#3b82f6'; this.style.transform='translateY(0px)'; this.style.boxShadow='0 2px 4px 0 rgb(59 130 246 / 0.25)'"
+                        >
+                            <i data-lucide="search" style="width: 16px; height: 16px;"></i>
+                            Load
+                        </button>
+                    </div>
                     
                     <!-- Export CSV Button -->
                     <button id="export-btn" style="
@@ -437,25 +488,207 @@ class ConsumerOptionsReactDashboard {
                     </div>
                 </div>
             </div>
+            ${this.getSimulationCardsHTML()}
+        `;
+    }
+
+    getSimulationCardsHTML() {
+        if (!this.simulationData || this.simulationData.error) {
+            return `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; margin-top: 1rem;">
+                    <div style="
+                        background: #f8fafc;
+                        border-radius: 12px;
+                        padding: 1rem;
+                        border: 1px solid #e2e8f0;
+                        grid-column: 1 / -1;
+                    ">
+                        <p style="font-size: 0.75rem; color: #64748b; margin: 0; text-align: center;">
+                            ${this.simulationData?.error ? 'Simulation data error: ' + this.simulationData.error : 'No simulation data available. Run the daily pipeline to generate signals.'}
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        const sim = this.simulationData;
+        const regime = sim.regime || {};
+        const signal = sim.signal || {};
+        const features = sim.features || {};
+        const portfolio = sim.portfolio || {};
+
+        const regimeOn = regime.on === true;
+        const signalType = signal.signal || 'N/A';
+        const signalColor = signalType === 'LONG' ? '#166534' : signalType === 'SHORT' ? '#dc2626' : '#64748b';
+        const signalBg = signalType === 'LONG' ? '#dcfce7' : signalType === 'SHORT' ? '#fee2e2' : '#f1f5f9';
+
+        return `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; margin-top: 1rem;">
+                <!-- Regime State Card -->
+                <div style="
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                ">
+                    <h3 style="font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.5rem;">Volatility Regime</h3>
+                    <div style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        padding: 0.5rem 0.75rem;
+                        border-radius: 8px;
+                        font-size: 0.875rem;
+                        font-weight: 600;
+                        margin-bottom: 0.5rem;
+                        ${regimeOn ? 'background: #dcfce7; color: #166534;' : 'background: #fee2e2; color: #dc2626;'}
+                    ">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: currentColor;"></span>
+                        ${regimeOn ? 'ON' : 'OFF'}
+                    </div>
+                    ${regime.date ? `<p style="font-size: 0.625rem; color: #64748b; margin: 0;">Date: ${regime.date}</p>` : ''}
+                </div>
+
+                <!-- Trading Signal Card -->
+                <div style="
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                ">
+                    <h3 style="font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.5rem;">Trading Signal</h3>
+                    <div style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        padding: 0.5rem 0.75rem;
+                        border-radius: 8px;
+                        font-size: 0.875rem;
+                        font-weight: 600;
+                        margin-bottom: 0.5rem;
+                        background: ${signalBg};
+                        color: ${signalColor};
+                    ">
+                        ${signalType}
+                    </div>
+                    ${signal.target_position !== null && signal.target_position !== undefined ? 
+                        `<p style="font-size: 0.625rem; color: #64748b; margin: 0;">Target: ${(signal.target_position * 100).toFixed(1)}% NAV</p>` : 
+                        ''
+                    }
+                    ${signal.date ? `<p style="font-size: 0.625rem; color: #64748b; margin: 0.25rem 0 0 0;">Date: ${signal.date}</p>` : ''}
+                </div>
+
+                <!-- Features Card -->
+                <div style="
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                ">
+                    <h3 style="font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.5rem;">Key Features</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.625rem;">
+                        ${features.rv20_pct !== null ? `
+                            <div>
+                                <span style="color: #64748b;">RV20%:</span>
+                                <span style="color: #1e293b; font-weight: 600; margin-left: 0.25rem;">${features.rv20_pct.toFixed(1)}%</span>
+                            </div>
+                        ` : ''}
+                        ${features.atr14_pct !== null ? `
+                            <div>
+                                <span style="color: #64748b;">ATR14%:</span>
+                                <span style="color: #1e293b; font-weight: 600; margin-left: 0.25rem;">${features.atr14_pct.toFixed(1)}%</span>
+                            </div>
+                        ` : ''}
+                        ${features.iv_median_pct !== null ? `
+                            <div>
+                                <span style="color: #64748b;">IV%:</span>
+                                <span style="color: #1e293b; font-weight: 600; margin-left: 0.25rem;">${features.iv_median_pct.toFixed(1)}%</span>
+                            </div>
+                        ` : ''}
+                        ${features.iv_slope !== null ? `
+                            <div>
+                                <span style="color: #64748b;">IV Slope:</span>
+                                <span style="color: #1e293b; font-weight: 600; margin-left: 0.25rem;">${features.iv_slope.toFixed(3)}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                    ${features.date ? `<p style="font-size: 0.625rem; color: #64748b; margin: 0.5rem 0 0 0;">Date: ${features.date}</p>` : ''}
+                </div>
+
+                <!-- Portfolio Card -->
+                ${portfolio.nav !== null ? `
+                <div style="
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                ">
+                    <h3 style="font-size: 0.75rem; font-weight: 500; color: #64748b; margin-bottom: 0.5rem;">Portfolio</h3>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">
+                        $${portfolio.nav.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    </div>
+                    ${portfolio.daily_pnl !== null ? `
+                        <div style="
+                            font-size: 0.75rem;
+                            font-weight: 600;
+                            color: ${portfolio.daily_pnl >= 0 ? '#166534' : '#dc2626'};
+                            margin-bottom: 0.25rem;
+                        ">
+                            Daily P&L: ${portfolio.daily_pnl >= 0 ? '+' : ''}$${portfolio.daily_pnl.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        </div>
+                    ` : ''}
+                    ${portfolio.drawdown !== null ? `
+                        <div style="font-size: 0.625rem; color: #64748b;">
+                            Drawdown: ${(portfolio.drawdown * 100).toFixed(2)}%
+                        </div>
+                    ` : ''}
+                    ${portfolio.date ? `<p style="font-size: 0.625rem; color: #64748b; margin: 0.5rem 0 0 0;">Date: ${portfolio.date}</p>` : ''}
+                </div>
+                ` : ''}
+            </div>
         `;
     }
 
     getMainGridHTML(displayRows) {
         return `
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
-                <!-- Left Column: Option Chain Overview -->
-                <div style="
-                    background: white;
-                    border-radius: 12px;
-                    border: 1px solid #e2e8f0;
-                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-                    overflow: hidden;
-                ">
-                    <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0;">
-                        <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0;">Option Chain Overview</h3>
+                <!-- Left Column: Option Chain Overview + Explanation Table -->
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- Option Chain Overview -->
+                    <div style="
+                        background: white;
+                        border-radius: 12px;
+                        border: 1px solid #e2e8f0;
+                        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                        overflow: hidden;
+                    ">
+                        <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0;">Option Chain Overview</h3>
+                            <span style="font-size: 0.75rem; color: #64748b;">Showing ${displayRows.length} contracts (scroll to see more)</span>
+                        </div>
+                        <div style="overflow-x: auto; overflow-y: auto; max-height: 800px;">
+                            ${this.getChainTableHTML(displayRows)}
+                        </div>
                     </div>
-                    <div style="overflow-x: auto;">
-                        ${this.getChainTableHTML(displayRows)}
+                    
+                    <!-- Explanation Table Card -->
+                    <div style="
+                        background: white;
+                        border-radius: 12px;
+                        border: 1px solid #e2e8f0;
+                        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                        overflow: hidden;
+                    ">
+                        <div style="padding: 1rem; border-bottom: 1px solid #e2e8f0;">
+                            <h3 style="font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0;">Column Reference Guide</h3>
+                        </div>
+                        <div style="overflow-x: auto; padding: 1rem;">
+                            ${this.getExplanationTableHTML()}
+                        </div>
                     </div>
                 </div>
 
@@ -663,7 +896,7 @@ class ConsumerOptionsReactDashboard {
 
         return `
             <table style="width: 100%; border-collapse: collapse;">
-                <thead>
+                <thead style="position: sticky; top: 0; z-index: 10; background: #f8fafc;">
                     <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
                         <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.625rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Contract</th>
                         <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.625rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Expiry</th>
@@ -699,6 +932,67 @@ class ConsumerOptionsReactDashboard {
                             <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">${r.day_oi || '—'}</td>
                         </tr>
                     `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    getExplanationTableHTML() {
+        return `
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                        <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.625rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Column / 列</th>
+                        <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.625rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Meaning / 含义</th>
+                        <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.625rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">What to Look For / 你该看什么</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Expiry</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Expiration date / 到期日</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Key time points market is watching / 市场关注的时间点</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Type</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Call / Put / 看涨 / 看跌</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Betting on up or down / 押涨还是押跌</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Strike</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Strike price / 行权价</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Key price levels market is focused on / 市场重点位置</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">IV</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Implied volatility per contract / 单合约 IV</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Which price levels are being bid up / 哪些价位被抬价</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Δ (Delta)</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Directional exposure / 方向暴露</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">How much it behaves like stock / 像不像股票</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Γ (Gamma)</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Accelerator / 加速器</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Will it "suddenly surge" / 会不会"突然猛"</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Θ (Theta)</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Time decay / 时间流血</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Does holding it hurt / 拿着疼不疼</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Vega</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">IV sensitivity / IV 敏感度</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Betting on volatility / 赌不赌波动</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #1e293b; font-weight: 500;">Vol / OI</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">Volume / Open Interest / 成交 / 存量</td>
+                        <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #475569;">New money vs old positions / 新钱 vs 老仓</td>
+                    </tr>
                 </tbody>
             </table>
         `;
