@@ -22,7 +22,7 @@ from .endpoints.consumeroptions import (
     dashboard_router as consumeroptions_dashboard_router
 )
 from .endpoints.consumeroptions import simulation as consumeroptions_simulation
-from .endpoints import quantitative_analysis, websocket, simulation
+from .endpoints import quantitative_analysis, websocket, simulation, etf
 
 # Create main API router
 api_router = APIRouter()
@@ -63,6 +63,9 @@ api_router.include_router(chain_router, prefix="/consumeroptions/chain", tags=["
 api_router.include_router(consumeroptions_analytics_router, prefix="/consumeroptions/analytics", tags=["consumeroptions_analytics"])
 api_router.include_router(consumeroptions_dashboard_router, prefix="/consumeroptions/dashboard", tags=["consumeroptions_dashboard"])
 api_router.include_router(consumeroptions_simulation.router, prefix="/consumeroptions", tags=["consumeroptions_simulation"])
+
+# Include ETF Dashboard endpoints
+api_router.include_router(etf.router, prefix="/etf", tags=["etf"])
 
 # Include Quantitative Analysis endpoints
 api_router.include_router(quantitative_analysis.router, prefix="/quantitative-analysis", tags=["quantitative_analysis"])
@@ -113,6 +116,14 @@ async def api_info():
                 "chain": "/consumeroptions/chain",
                 "analytics": "/consumeroptions/analytics",
                 "dashboard": "/consumeroptions/dashboard"
+            },
+            "etf": {
+                "dashboard": "/etf/dashboard",
+                "info": "/etf/info",
+                "holdings": "/etf/holdings",
+                "comparison": "/etf/comparison",
+                "risk_metrics": "/etf/risk-metrics",
+                "technical_indicators": "/etf/technical-indicators"
             },
             "quantitative_analysis": "/quantitative-analysis",
             "websocket": "/ws",

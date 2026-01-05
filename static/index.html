@@ -532,7 +532,10 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="consumeroptions-tab" data-bs-toggle="pill" data-bs-target="#consumeroptions-content" role="tab" aria-controls="consumeroptions-content" aria-selected="true">📊 Consumer Options</a>
+                        <a class="nav-link active" id="etf-dashboard-tab" data-bs-toggle="pill" data-bs-target="#etf-dashboard-content" role="tab" aria-controls="etf-dashboard-content" aria-selected="true">📈 ETF Dashboard</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="consumeroptions-tab" data-bs-toggle="pill" data-bs-target="#consumeroptions-content" role="tab" aria-controls="consumeroptions-content" aria-selected="false">📊 Consumer Options</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="rag-bi-tab" data-bs-toggle="pill" data-bs-target="#rag-bi-content" role="tab" aria-controls="rag-bi-content" aria-selected="false">📚 RAG Business Intelligence</a>
@@ -861,8 +864,15 @@
                         </div>
                     </div>
 
+                    <!-- ETF Dashboard Content -->
+                    <div class="tab-pane fade show active" id="etf-dashboard-content" role="tabpanel" aria-labelledby="etf-dashboard-tab">
+                        <div id="etf-dashboard" style="min-height: 500px;">
+                            <!-- ETF Dashboard will render here -->
+                        </div>
+                    </div>
+
                     <!-- Consumer Options Content -->
-                    <div class="tab-pane fade show active" id="consumeroptions-content" role="tabpanel" aria-labelledby="consumeroptions-tab">
+                    <div class="tab-pane fade" id="consumeroptions-content" role="tabpanel" aria-labelledby="consumeroptions-tab">
                         <div id="consumeroptions-dashboard" style="min-height: 500px;">
                             <!-- Consumer Options Dashboard will render here -->
                         </div>
@@ -1872,6 +1882,8 @@
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- Chart.js for ETF Dashboard charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
     <!-- date-fns removed - was causing require() error -->
@@ -1879,6 +1891,9 @@
     
     <!-- Consumer Options Dashboard Component -->
     <script src="/static/js/components/consumeroptions.js"></script>
+    
+    <!-- ETF Dashboard Component (Multi-ETF Comparison) -->
+    <script src="/static/js/components/etf-dashboard-multi.js"></script>
     
     <!-- AAPL Analysis Dashboard Component -->
     <!-- Load AAPL Dashboard components -->
@@ -4972,6 +4987,47 @@ Recommendation: ${currentAnalysis.recommendation}`;
                 window.consumerOptionsDashboard = new ConsumerOptionsReactDashboard();
             } else {
                 console.error('ConsumerOptionsReactDashboard class not found. Make sure the JS file is loaded.');
+            }
+        });
+    </script>
+
+    <!-- ETF Dashboard Initialization (Default Page) -->
+    <script>
+        // Initialize ETF Dashboard when DOM is loaded (default page)
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📈 ETF Dashboard Loading (Multi-ETF Comparison)...');
+            
+            // Wait for Chart.js to load
+            function initDashboard() {
+                if (typeof Chart === 'undefined') {
+                    console.warn('Chart.js not loaded yet, waiting...');
+                    setTimeout(initDashboard, 100);
+                    return;
+                }
+                
+                // Initialize immediately since it's the default page
+                if (typeof ETFDashboardMulti !== 'undefined') {
+                    window.etfDashboard = new ETFDashboardMulti();
+                    console.log('✅ ETF Dashboard (Multi-ETF) initialized');
+                } else {
+                    console.error('ETFDashboardMulti class not found. Make sure the JS file is loaded.');
+                }
+            }
+            
+            initDashboard();
+            
+            // Also listen for tab switch in case user navigates away and comes back
+            const etfTab = document.getElementById('etf-dashboard-tab');
+            if (etfTab) {
+                etfTab.addEventListener('shown.bs.tab', function() {
+                    console.log('ETF tab shown, reloading dashboard...');
+                    if (window.etfDashboard) {
+                        // Reload data if dashboard already exists
+                        window.etfDashboard.loadAllETFs().then(() => window.etfDashboard.render());
+                    } else if (typeof ETFDashboardMulti !== 'undefined') {
+                        window.etfDashboard = new ETFDashboardMulti();
+                    }
+                });
             }
         });
     </script>
