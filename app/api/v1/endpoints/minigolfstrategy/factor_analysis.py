@@ -253,14 +253,39 @@ async def analyze_course_timing(
         else:
             target_dt = datetime.now()
         
-        # Get course details
-        course_data = await golf_course_client.get_course_details(course_id)
-        
-        if "error" in course_data:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Course not found: {course_data['error']}"
-            )
+        # Check if this is a mock course ID
+        course_data = None
+        if course_id.startswith("mock_"):
+            # Get mock course data from recommendations
+            mock_recommendations = _generate_mock_recommendations(None, 10)
+            mock_course = next((rec for rec in mock_recommendations if rec["course_id"] == course_id), None)
+            
+            if mock_course:
+                # Convert mock recommendation format to course_data format expected by analyzer
+                course_data = {
+                    "id": mock_course["course_id"],
+                    "name": mock_course["course_name"],
+                    "club_name": mock_course["club_name"],
+                    "location": mock_course["location"],
+                    "par": 72,  # Default par
+                    "yardage": 6800,  # Default yardage
+                    "slope_rating": 130,  # Default slope rating
+                    "course_rating": 72.0  # Default course rating
+                }
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Mock course not found: {course_id}"
+                )
+        else:
+            # Get course details from external API
+            course_data = await golf_course_client.get_course_details(course_id)
+            
+            if "error" in course_data:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"Course not found: {course_data['error']}"
+                )
         
         # Perform factor analysis
         analysis = await golf_factor_analyzer.analyze_course_timing(
@@ -273,8 +298,8 @@ async def analyze_course_timing(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error analyzing course timing: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Error analyzing course timing: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.get("/courses/top-recommendations")
 async def get_top_recommendations(

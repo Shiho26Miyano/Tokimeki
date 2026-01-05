@@ -194,7 +194,11 @@ class ConsumerOptionsPolygonService:
             return None
     
     def _get_cached_data(self, cache_key: str) -> Optional[Any]:
-        """Get cached data if not expired"""
+        """Get cached data if not expired - DISABLED for live data"""
+        # Disable caching for live/real-time data to ensure freshness
+        # For snapshot endpoints, always fetch fresh data
+        if 'snapshot' in cache_key.lower():
+            return None
         if cache_key in self.cache:
             timestamp, data = self.cache[cache_key]
             if time.time() - timestamp < self.cache_ttl:
@@ -603,27 +607,48 @@ class ConsumerOptionsPolygonService:
             return None
     
     async def get_option_chain_snapshot(self, underlying: str) -> List[OptionContract]:
-        """Get option chain snapshot for underlying ticker using RESTClient.list_snapshot_options_chain - SIMPLIFIED"""
+        """Get LIVE option chain snapshot for underlying ticker using RESTClient.list_snapshot_options_chain - REAL-TIME DATA"""
         try:
-            logger.info(f"Fetching option chain snapshot for {underlying} using RESTClient.list_snapshot_options_chain")
+            if not self.rest_client:
+                logger.error(f"RESTClient not initialized for {underlying}. Check POLYGON_API_KEY.")
+                return []
+            
+            logger.info(f"Fetching LIVE option chain snapshot for {underlying} using RESTClient.list_snapshot_options_chain (real-time data)")
             
             def fetch_options_chain():
                 """Fetch options chain using RESTClient (synchronous)"""
                 options_chain = []
                 try:
+                    if not self.rest_client:
+                        logger.error("RESTClient is None - cannot fetch options chain")
+                        return []
+                    
                     # Fetch all contracts - no limit to get all expiry dates
-                    for contract_data in self.rest_client.list_snapshot_options_chain(
+                    logger.info(f"Calling list_snapshot_options_chain for {underlying.upper()}")
+                    contract_iterator = self.rest_client.list_snapshot_options_chain(
                         underlying.upper(),
                         params={
                             "order": "asc",
                             "limit": 250,  # Fetch 250 at a time (as per user's example)
                             "sort": "ticker",
                         }
-                    ):
+                    )
+                    
+                    contract_count = 0
+                    for contract_data in contract_iterator:
                         options_chain.append(contract_data)
-                        # No cap - fetch all available contracts
+                        contract_count += 1
+                        # Safety limit to prevent infinite loops
+                        if contract_count >= 10000:
+                            logger.warning(f"Reached safety limit of 10,000 contracts for {underlying}")
+                            break
                     
                     logger.info(f"Fetched {len(options_chain)} contracts from Polygon API for {underlying}")
+                    if len(options_chain) == 0:
+                        logger.warning(f"No contracts returned from Polygon API for {underlying}. This may indicate:")
+                        logger.warning(f"  1. The ticker has no options available")
+                        logger.warning(f"  2. Polygon API subscription doesn't include options data")
+                        logger.warning(f"  3. API rate limit or error occurred")
                     return options_chain
                 except Exception as e:
                     logger.error(f"Error in RESTClient.list_snapshot_options_chain for {underlying}: {str(e)}", exc_info=True)
@@ -739,11 +764,22 @@ class ConsumerOptionsPolygonService:
     async def get_underlying_daily_bars(self, ticker: str, start_date: str, end_date: str) -> List[UnderlyingData]:
         """Get daily bars for underlying stock using Polygon RESTClient"""
         try:
+            if not self.rest_client:
+                logger.error(f"RESTClient not initialized for {ticker}. Check POLYGON_API_KEY.")
+                return []
+            
+            logger.info(f"Fetching daily bars for {ticker} from {start_date} to {end_date}")
+            
             # Run synchronous RESTClient call in thread pool to maintain async interface
             def fetch_aggs():
                 aggs = []
                 try:
-                    for agg in self.rest_client.list_aggs(
+                    if not self.rest_client:
+                        logger.error("RESTClient is None - cannot fetch daily bars")
+                        return []
+                    
+                    logger.info(f"Calling list_aggs for {ticker.upper()} from {start_date} to {end_date}")
+                    agg_iterator = self.rest_client.list_aggs(
                         ticker.upper(),
                         1,  # multiplier
                         "day",  # timespan
@@ -752,20 +788,40 @@ class ConsumerOptionsPolygonService:
                         adjusted="true",
                         sort="asc",
                         limit=5000
-                    ):
+                    )
+                    
+                    agg_count = 0
+                    for agg in agg_iterator:
                         aggs.append(agg)
+                        agg_count += 1
+                        # Safety limit
+                        if agg_count >= 5000:
+                            logger.warning(f"Reached limit of 5000 aggregates for {ticker}")
+                            break
+                    
+                    logger.info(f"Fetched {len(aggs)} aggregates from Polygon API for {ticker}")
+                    if len(aggs) == 0:
+                        logger.warning(f"No aggregates returned from Polygon API for {ticker}. This may indicate:")
+                        logger.warning(f"  1. The date range is invalid or outside available data")
+                        logger.warning(f"  2. Polygon API subscription doesn't include historical stock data")
+                        logger.warning(f"  3. Ticker symbol is invalid or delisted")
                     return aggs
                 except Exception as e:
-                    logger.error(f"Error in RESTClient.list_aggs for {ticker}: {str(e)}")
+                    logger.error(f"Error in RESTClient.list_aggs for {ticker}: {str(e)}", exc_info=True)
                     raise
             
             # Execute in thread pool
             loop = asyncio.get_event_loop()
             aggs = await loop.run_in_executor(self.executor, fetch_aggs)
             
-            logger.info(f"Retrieved {len(aggs)} aggregates for {ticker}")
+            if not aggs:
+                logger.warning(f"No aggregates returned for {ticker}")
+                return []
             
+            logger.info(f"Processing {len(aggs)} aggregates for {ticker}")
             bars = []
+            skipped_count = 0
+            
             for agg in aggs:
                 try:
                     # Convert timestamp to date
@@ -784,15 +840,83 @@ class ConsumerOptionsPolygonService:
                     bars.append(bar)
                     
                 except Exception as e:
-                    logger.warning(f"Error parsing bar data: {str(e)}")
+                    logger.warning(f"Error parsing bar data for {ticker}: {str(e)}")
+                    skipped_count += 1
                     continue
             
-            logger.info(f"Retrieved {len(bars)} daily bars for {ticker}")
+            logger.info(f"Successfully processed {len(bars)} daily bars for {ticker} (skipped {skipped_count})")
             return bars
             
         except Exception as e:
-            logger.error(f"Error fetching daily bars for {ticker}: {str(e)}")
-            raise PolygonAPIError(f"Failed to fetch daily bars: {str(e)}")
+            logger.error(f"Error fetching daily bars for {ticker}: {str(e)}", exc_info=True)
+            # Return empty list instead of raising to allow dashboard to render with other data
+            return []
+    
+    async def get_underlying_snapshot(self, ticker: str) -> Optional[Dict[str, Any]]:
+        """Get LIVE snapshot data for underlying stock (real-time price, volume, etc.)"""
+        try:
+            logger.info(f"Fetching LIVE snapshot for {ticker} using RESTClient.get_snapshot_ticker")
+            
+            def fetch_snapshot():
+                """Fetch snapshot using RESTClient (synchronous)"""
+                try:
+                    snapshot = self.rest_client.get_snapshot_ticker(ticker.upper())
+                    return snapshot
+                except Exception as e:
+                    logger.error(f"Error in RESTClient.get_snapshot_ticker for {ticker}: {str(e)}", exc_info=True)
+                    raise
+            
+            # Execute in thread pool to maintain async interface
+            loop = asyncio.get_event_loop()
+            snapshot = await loop.run_in_executor(self.executor, fetch_snapshot)
+            
+            if not snapshot:
+                logger.warning(f"No snapshot data returned from Polygon API for {ticker}")
+                return None
+            
+            # Extract current price and volume from snapshot
+            current_price = None
+            current_volume = None
+            day_change = None
+            day_change_percent = None
+            
+            # Get day data
+            if hasattr(snapshot, 'day') and snapshot.day:
+                day_data = snapshot.day
+                if hasattr(day_data, 'close') and day_data.close:
+                    current_price = float(day_data.close)
+                if hasattr(day_data, 'volume') and day_data.volume:
+                    current_volume = int(day_data.volume)
+                if hasattr(day_data, 'open') and day_data.open and current_price:
+                    day_change = current_price - float(day_data.open)
+                    day_change_percent = (day_change / float(day_data.open) * 100) if day_data.open > 0 else None
+            
+            # Get last trade if day data not available
+            if not current_price and hasattr(snapshot, 'last_trade') and snapshot.last_trade:
+                last_trade = snapshot.last_trade
+                if hasattr(last_trade, 'price') and last_trade.price:
+                    current_price = float(last_trade.price)
+            
+            # Get last quote if still no price
+            if not current_price and hasattr(snapshot, 'last_quote') and snapshot.last_quote:
+                quote = snapshot.last_quote
+                if hasattr(quote, 'last_ask_price') and quote.last_ask_price:
+                    current_price = float(quote.last_ask_price)
+                elif hasattr(quote, 'last_bid_price') and quote.last_bid_price:
+                    current_price = float(quote.last_bid_price)
+            
+            return {
+                'ticker': ticker.upper(),
+                'current_price': current_price,
+                'current_volume': current_volume,
+                'day_change': day_change,
+                'day_change_percent': day_change_percent,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching snapshot for {ticker}: {str(e)}", exc_info=True)
+            return None
     
     async def get_contract_minute_bars(self, contract: str, start_date: str, end_date: str) -> List[ContractBars]:
         """Get 1-minute bars for specific option contract using Polygon RESTClient"""

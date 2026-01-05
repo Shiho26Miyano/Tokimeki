@@ -30,18 +30,28 @@ def get_aapl_analysis_service() -> AAPLAnalysisService:
     """Dependency to get AAPL Analysis service instance"""
     global _aapl_analysis_service
     if _aapl_analysis_service is None:
-        api_key = os.getenv("POLYGON_API_KEY")
-        if not api_key:
-            logger.warning("POLYGON_API_KEY not set - using mock data for AAPL analysis")
-            # Use a dummy API key for mock data
-            api_key = "mock_key"
-        config = PolygonConfig(
-            api_key=api_key,
-            max_retries=3,
-            retry_delay=1.0,
-            timeout=30.0
-        )
-        _aapl_analysis_service = AAPLAnalysisService(config)
+        try:
+            api_key = os.getenv("POLYGON_API_KEY")
+            if not api_key:
+                logger.warning("POLYGON_API_KEY not set - using mock data for AAPL analysis")
+                # Use a dummy API key for mock data
+                api_key = "mock_key"
+            config = PolygonConfig(
+                api_key=api_key,
+                max_retries=3,
+                retry_delay=1.0,
+                timeout=30.0
+            )
+            logger.info(f"Initializing AAPLAnalysisService with API key: {'***' if api_key != 'mock_key' else 'mock_key'}")
+            _aapl_analysis_service = AAPLAnalysisService(config)
+            logger.info("AAPLAnalysisService initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize AAPLAnalysisService: {e}", exc_info=True)
+            raise
+    
+    if _aapl_analysis_service is None:
+        raise ValueError("AAPLAnalysisService failed to initialize")
+    
     return _aapl_analysis_service
 
 
@@ -63,13 +73,33 @@ async def get_stock_prices(
         if (end_date - start_date).days > 365 * 10:  # 10 years max
             raise HTTPException(status_code=400, detail="Date range too large (max 10 years)")
         
+        # Validate that end_date is not in the future
+        today = date.today()
+        if end_date > today:
+            logger.warning(f"end_date {end_date} is in the future, adjusting to {today}")
+            end_date = today
+            if start_date >= end_date:
+                raise HTTPException(status_code=400, detail="start_date must be before today")
+        
+        # Ensure service is initialized
+        if analysis_service is None:
+            logger.error("AAPLAnalysisService is None - service not initialized")
+            raise HTTPException(status_code=500, detail="Service not initialized. Please check POLYGON_API_KEY configuration.")
+        
+        if analysis_service.polygon_service is None:
+            logger.error("PolygonService is None - service not initialized")
+            raise HTTPException(status_code=500, detail="Polygon service not initialized")
+        
         result = await analysis_service.polygon_service.get_stock_prices(ticker, start_date, end_date)
         
         return result
         
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        logger.error(f"Error getting stock prices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error getting stock prices for {ticker}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get stock prices: {str(e)}")
 
 
 @router.get("/options/contracts/{ticker}", response_model=OptionChainResponse)
