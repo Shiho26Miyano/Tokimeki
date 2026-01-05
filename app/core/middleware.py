@@ -7,19 +7,23 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 import time
 import logging
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
 def setup_middleware(app):
     """Setup all middleware for the FastAPI app"""
     
-    # CORS middleware
+    # CORS middleware (hardened)
+    configured_origins = settings.cors_origins or ["*"]
+    wildcard = "*" in configured_origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization"],
+        allow_origins=configured_origins,
+        # Per CORS spec, credentials must be disabled when using wildcard origins
+        allow_credentials=False if wildcard else True,
+        allow_methods=settings.cors_methods or ["GET", "POST", "OPTIONS"],
+        allow_headers=settings.cors_headers or ["Content-Type", "Authorization"],
     )
     
     # Rate limiter

@@ -21,8 +21,16 @@ class AsyncCacheService:
     
     def generate_cache_key(self, *args, **kwargs) -> str:
         """Generate a unique cache key from function arguments"""
-        key_data = str(args) + str(sorted(kwargs.items()))
-        return hashlib.md5(key_data.encode()).hexdigest()
+        try:
+            key_payload = {
+                "args": [repr(arg) for arg in args],
+                "kwargs": {key: repr(kwargs[key]) for key in sorted(kwargs.keys())}
+            }
+            serialized = json.dumps(key_payload, sort_keys=True, separators=(",", ":"))
+        except Exception:
+            # Fallback to non-JSON deterministic representation
+            serialized = repr((tuple(repr(a) for a in args), tuple(sorted((k, repr(v)) for k, v in kwargs.items()))))
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
     
     async def get(self, key: str) -> Optional[Any]:
         """Get value from cache asynchronously"""
@@ -121,20 +129,33 @@ def async_cached_response(ttl: int = None, key_prefix: str = ""):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Generate cache key
-            cache_key = f"{key_prefix}:{func.__name__}:{hashlib.md5(str(args) + str(kwargs).encode()).hexdigest()}"
-            
+            # Determine cache service if present
+            cache_service = getattr(wrapper, "cache_service", None)
+
+            # Build deterministic cache key
+            try:
+                key_payload = {
+                    "args": [repr(arg) for arg in args],
+                    "kwargs": {key: repr(kwargs[key]) for key in sorted(kwargs.keys())}
+                }
+                serialized = json.dumps(key_payload, sort_keys=True, separators=(",", ":"))
+            except Exception:
+                serialized = repr((tuple(repr(a) for a in args), tuple(sorted((k, repr(v)) for k, v in kwargs.items()))))
+            cache_key_suffix = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+            cache_key = f"{key_prefix}:{func.__name__}:{cache_key_suffix}"
+
+            # If no cache service configured, just execute function
+            if not cache_service:
+                return await func(*args, **kwargs)
+
             # Try to get from cache
-            cached_result = await wrapper.cache_service.get(cache_key)
+            cached_result = await cache_service.get(cache_key)
             if cached_result is not None:
                 return cached_result
-            
-            # Execute function
+
+            # Execute function and store in cache
             result = await func(*args, **kwargs)
-            
-            # Cache result
-            await wrapper.cache_service.set(cache_key, result, ttl or wrapper.cache_service.default_ttl)
-            
+            await cache_service.set(cache_key, result, ttl or cache_service.default_ttl)
             return result
         
         # Add cache service attribute
