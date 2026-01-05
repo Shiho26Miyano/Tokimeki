@@ -11,7 +11,13 @@ from typing import List, Dict, Optional, Any
 from concurrent.futures import ThreadPoolExecutor
 import httpx
 from functools import wraps
-from polygon import RESTClient
+
+try:
+    from polygon import RESTClient
+    POLYGON_AVAILABLE = True
+except ImportError:
+    RESTClient = None
+    POLYGON_AVAILABLE = False
 
 from app.models.options_models import (
     OptionContract, UnderlyingData, ContractBars, ContractType
@@ -102,6 +108,9 @@ class ConsumerOptionsPolygonService:
         # Ensure we're not using mock data
         if self.api_key == "mock_key" or self.api_key.startswith("mock"):
             raise ValueError("Mock data is not allowed for Consumer Options. Please set a valid POLYGON_API_KEY")
+        
+        if not POLYGON_AVAILABLE:
+            raise ValueError("polygon-api-client package not installed. Install with: pip install polygon-api-client")
         
         # Initialize Polygon RESTClient
         try:
