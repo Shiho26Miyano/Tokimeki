@@ -29,7 +29,10 @@ Tokimeki/
 │   │   ├── database.py             # Database configuration
 │   │   ├── golf_models.py          # Mini golf strategy models
 │   │   ├── trading_models.py       # Trading system models
-│   │   └── aapl_analysis_models.py # AAPL analysis data models
+│   │   ├── aapl_analysis_models.py # AAPL analysis data models
+│   │   ├── etf_models.py           # ETF dashboard models
+│   │   ├── options_models.py       # Options chain models
+│   │   └── simulation_models.py    # Simulation data models
 │   ├── services/                   # Business logic services
 │   │   ├── ai_service.py           # AI integration (OpenRouter)
 │   │   ├── brpc_service.py         # High-performance BRPC service
@@ -42,6 +45,17 @@ Tokimeki/
 │   │   │   ├── backtest_service.py # AAPL strategy backtesting
 │   │   │   ├── data_pipeline_service.py # Data processing pipeline
 │   │   │   └── polygon_service.py  # Polygon.io market data integration
+│   │   ├── consumeroptions/        # Consumer Options Dashboard services
+│   │   │   ├── analytics_service.py # Options analytics and ratios
+│   │   │   ├── chain_service.py    # Options chain processing
+│   │   │   ├── dashboard_service.py # Dashboard orchestration
+│   │   │   └── polygon_service.py  # Live options data from Polygon
+│   │   ├── etf/                    # ETF Dashboard services
+│   │   │   ├── analytics_service.py # Risk metrics and technical indicators
+│   │   │   ├── dashboard_service.py # Multi-ETF comparison
+│   │   │   ├── polygon_service.py  # Polygon.io ETF data
+│   │   │   ├── search_service.py   # ETF ticker search
+│   │   │   └── yfinance_service.py # Yahoo Finance fallback
 │   │   ├── futureexploratorium/    # Futures Exploratorium services
 │   │   │   ├── analytics_service.py
 │   │   │   ├── core_service.py
@@ -60,12 +74,18 @@ Tokimeki/
 │   │   │   ├── mlflow_service.py
 │   │   │   ├── vectorbt_service.py
 │   │   │   └── qflib_service.py
-│   │   └── minigolfstrategy/       # Mini Golf Strategy services
-│   │       ├── core_service.py
-│   │       ├── strategy_service.py
-│   │       ├── factor_analysis_service.py
-│   │       └── clients/
-│   │           └── golfcourse_api.py
+│   │   ├── minigolfstrategy/       # Mini Golf Strategy services
+│   │   │   ├── core_service.py
+│   │   │   ├── strategy_service.py
+│   │   │   ├── factor_analysis_service.py
+│   │   │   └── clients/
+│   │   │       └── golfcourse_api.py
+│   │   └── simulation/             # Simulation services
+│   │       ├── data_ingestion_service.py
+│   │       ├── feature_service.py
+│   │       ├── pipeline_service.py
+│   │       ├── simulation_service.py
+│   │       └── strategy_service.py
 │   └── api/                        # REST API endpoints
 │       ├── deps.py                 # API dependencies
 │       └── v1/                     # API version 1
@@ -80,6 +100,13 @@ Tokimeki/
 │               ├── websocket.py    # Real-time data streaming
 │               ├── quantitative_analysis.py
 │               ├── aapl_analysis.py # AAPL stock vs options analysis API
+│               ├── simulation.py   # Simulation endpoints
+│               ├── etf.py          # ETF Dashboard API
+│               ├── consumeroptions/ # Consumer Options API
+│               │   ├── chain.py
+│               │   ├── analytics.py
+│               │   ├── dashboard.py
+│               │   └── simulation.py
 │               ├── futurequant/    # FutureQuant trading API
 │               │   ├── data.py
 │               │   ├── features.py
@@ -99,8 +126,13 @@ Tokimeki/
 │                   ├── strategy.py
 │                   └── factor_analysis.py
 ├── data/                           # Data storage
-│   └── databases/
+│   ├── cache/                      # Cache databases
+│   └── databases/                  # Application databases
 │       └── futurequant_trader.db
+├── docs/                           # Documentation
+│   └── ETF_DATA_SOURCES.md         # ETF data source documentation
+├── jobs/                           # Scheduled jobs
+│   └── daily_run.py                # Daily data processing tasks
 ├── deployment/                     # Deployment configuration
 │   ├── docker-compose.yml
 │   ├── Dockerfile
@@ -109,12 +141,15 @@ Tokimeki/
 │   ├── cleanup_old_models.py
 │   ├── demo_paper_trading.py
 │   ├── init_database.py
-│   └── init_golf_database.py
+│   ├── init_golf_database.py
+│   ├── init_simulation_db.py
+│   └── generate_simulation_data.py
 └── tests/                          # Test suite
     ├── core/
     ├── features/
     ├── futurequant/
     ├── market_data/
+    ├── simulation/
     └── strategies/
 ```
 
@@ -125,7 +160,6 @@ static/
 ├── index.html                      # Main application interface
 ├── main.js                         # Core JavaScript functionality
 ├── favicon.ico                     # Site icon
-├── validate_js.py                  # JavaScript validation utility
 ├── css/                           # Modular CSS files
 │   ├── main.css                   # Base styles and typography
 │   ├── components.css             # Component-specific styles
@@ -141,6 +175,9 @@ static/
 │   │   └── component-loader.js    # Dynamic component loading
 │   └── components/                # Component modules
 │       ├── navigation.js          # Navigation component
+│       ├── etf-dashboard-multi.js # Multi-ETF comparison dashboard
+│       ├── consumeroptions.js     # Consumer options sentiment dashboard
+│       ├── aapl-weekly-tracker.js # AAPL weekly investment tracker
 │       ├── futures-exploratorium.js
 │       ├── futurequant-dashboard.js
 │       ├── minigolf-strategy.js
@@ -151,36 +188,61 @@ static/
 │       ├── volatility-explorer.js
 │       └── hf-signal-tool.js
 ├── components/                    # HTML component templates
+│   ├── etf-dashboard.html
+│   ├── consumeroptions.html
 │   ├── minigolf-strategy.html
 │   └── futurequant-dashboard.html
-├── img/                           # Images and icons
-│   ├── cute.png
-│   ├── demo.png
-│   ├── handsome.png
-│   └── lionPixel.png
-└── futures-exploratorium-react/   # React components
-    └── package.json
+└── img/                           # Images and icons
+    ├── cute.png
+    ├── demo.png
+    ├── handsome.png
+    └── lionPixel.png
 ```
 
 ## 📚 Learning Modules
 
-### 1. **AAPL Stock vs Options Analysis**
-- Interactive comparison tool with strategy selector dropdown
+### 1. **ETF Dashboard**
+- Multi-ETF comparison with live data from Polygon.io
+- Risk metrics (volatility, Sharpe ratio, max drawdown)
+- Technical indicators (RSI, MACD, moving averages)
+- Holdings analysis and sector distribution
+- Composite scoring and ranking system
+- Real-time price data with fallback to yfinance
+
+### 2. **Consumer Options Dashboard**
+- Real-time options chain analysis with live Polygon.io data
+- Volatility regime indicators and trading signals
+- Call/Put ratios and unusual activity detection
+- IV term structure visualization
+- Greeks analysis (Delta, Gamma, Theta, Vega)
+- Underlying price tracking with technical indicators
+
+### 3. **AAPL Stock vs Options Analysis**
+- Interactive comparison tool with strategy selector
 - Backtesting simulations with historical data
 - Visual P&L tracking and educational metrics
+- Weekly investment tracker (DCA vs Options strategies)
 
-### 2. **Quantitative Finance (FutureQuant)**
+### 4. **Quantitative Finance (FutureQuant)**
 - Paper trading simulator and backtesting framework
 - Machine learning experiments and risk analysis tools
 - Performance dashboards and feature engineering
+- Model tracking with MLflow
 
-### 3. **Market Intelligence (FutureExploratorium)**
+### 5. **Market Intelligence (FutureExploratorium)**
 - Event analysis and strategy development tools
 - Market data visualization and analytics dashboard
+- Real-time market intelligence
 
-### 4. **Academic Research Tools**
+### 6. **Simulation Services**
+- Strategy simulation and backtesting framework
+- Walk-forward analysis and performance metrics
+- Feature engineering and data pipeline
+
+### 7. **Academic Research Tools**
 - AI-powered research assistant with RAG system
 - Market data APIs and statistical analysis tools
+- Document analysis and vector search
 
 ## 🔧 Technical Stack
 
@@ -191,6 +253,11 @@ static/
 - **httpx** - Async HTTP client
 - **Pydantic** - Data validation
 
+### Data Sources
+- **Polygon.io** - Primary source for live market data (stocks, options, ETFs)
+- **yfinance** - Fallback source for historical ETF data
+- **Data prioritization**: Polygon.io → yfinance (with automatic fallback)
+
 ### AI/ML
 - **OpenRouter** - AI model access
 - **LangChain** - RAG system
@@ -199,7 +266,7 @@ static/
 - **VectorBT** - Quantitative analysis
 - **MLflow** - Model tracking
 
-### Data
+### Data Processing
 - **yfinance** - Market data
 - **pandas/numpy** - Data processing
 - **FAISS** - Vector search
@@ -208,15 +275,17 @@ static/
 ### Frontend
 - **Vanilla JavaScript** - No framework dependencies
 - **Bootstrap 5** - UI framework
-- **D3.js** - Data visualization
+- **Chart.js** - Data visualization (ETF Dashboard)
+- **D3.js** - Advanced data visualization
 - **Modular architecture** - Component-based design
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.11+
-- Redis server (optional)
-- OpenRouter API key
+- Redis server (optional, for caching)
+- Polygon.io API key (for live market data)
+- OpenRouter API key (for AI features)
 
 ### Installation
 
@@ -239,18 +308,24 @@ pip install -r requirements.txt
 
 4. **Configure environment**
 ```bash
-# Edit config.py and set your API keys
-OPENROUTER_API_KEY = "your_openrouter_api_key_here"
+# Set environment variables or edit config.py
+export POLYGON_API_KEY="your_polygon_api_key"
+export OPENROUTER_API_KEY="your_openrouter_api_key"
+export REDIS_URL="redis://localhost:6379"  # Optional
 ```
 
 5. **Initialize database**
 ```bash
 python3 scripts/init_database.py
+python3 scripts/init_golf_database.py  # Optional
+python3 scripts/init_simulation_db.py  # Optional
 ```
 
 6. **Start application**
 ```bash
 python3 main.py
+# or
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 7. **Open browser**
@@ -268,6 +343,26 @@ http://localhost:8000
 - **Sentiment Analysis**: `/api/v1/sentiment` - Text sentiment
 - **System Monitoring**: `/api/v1/monitoring` - Performance metrics
 - **WebSocket**: `/ws` - Real-time data streaming
+
+### ETF Dashboard
+- **Dashboard Data**: `/api/v1/etf/dashboard/data` - Multi-ETF comparison
+- **ETF Info**: `/api/v1/etf/info/{symbol}` - Basic ETF information
+- **Holdings**: `/api/v1/etf/holdings/{symbol}` - ETF holdings data
+- **Comparison**: `/api/v1/etf/comparison` - Compare multiple ETFs
+- **Risk Metrics**: `/api/v1/etf/risk-metrics/{symbol}` - Risk analysis
+- **Technical Indicators**: `/api/v1/etf/technical-indicators/{symbol}` - Technical analysis
+- **Search**: `/api/v1/etf/search` - Search ETF tickers
+
+### Consumer Options Dashboard
+- **Chain Data**: `/api/v1/consumeroptions/chain` - Options chain data
+- **Analytics**: `/api/v1/consumeroptions/analytics` - Call/Put ratios, IV analysis
+- **Dashboard**: `/api/v1/consumeroptions/dashboard/data/{ticker}` - Complete dashboard data
+- **Simulation**: `/api/v1/consumeroptions/simulation` - Volatility regime and signals
+
+### AAPL Analysis
+- **Stock Prices**: `/api/v1/aapl-analysis/prices/{ticker}` - Historical price data
+- **Option Contracts**: `/api/v1/aapl-analysis/options/contracts/{ticker}` - Options chain
+- **Backtests**: `/api/v1/aapl-analysis/backtest/*` - Strategy backtesting
 
 ### FutureQuant Trading
 - **Data**: `/api/v1/futurequant/data` - Market data ingestion
@@ -290,19 +385,31 @@ http://localhost:8000
 - **Courses**: `/api/v1/minigolfstrategy/courses` - Course search
 - **Factor Analysis**: `/api/v1/minigolfstrategy/factor-analysis` - Conditions
 
+### Simulation
+- **Simulation**: `/api/v1/simulation/*` - Strategy simulation endpoints
+
 ## 🔧 Configuration
 
 ### Environment Variables
 ```bash
-OPENROUTER_API_KEY=your_api_key_here
+# Required
+POLYGON_API_KEY=your_polygon_api_key_here
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Optional
 REDIS_URL=redis://localhost:6379
 CACHE_TTL=300
 RATE_LIMIT_PER_HOUR=50
 RATE_LIMIT_PER_DAY=200
 DEBUG=false
 HOST=0.0.0.0
-PORT=8080
+PORT=8000
 ```
+
+### Data Sources
+- **Primary**: Polygon.io (live market data for stocks, options, ETFs)
+- **Fallback**: yfinance (historical ETF data when Polygon unavailable)
+- **Caching**: Redis (optional, for performance optimization)
 
 ### AI Models Supported
 - **Mistral Small**: Primary AI model for analysis
@@ -345,6 +452,7 @@ pytest tests/
 pytest tests/core/
 pytest tests/futurequant/
 pytest tests/features/
+pytest tests/simulation/
 ```
 
 ### Frontend Testing
@@ -364,15 +472,21 @@ The frontend uses a modular architecture:
 
 ### Adding New Components
 1. Create component class in `static/js/components/`
-2. Create HTML template in `static/components/`
+2. Create HTML template in `static/components/` (if needed)
 3. Add component styles to `static/css/components.css`
-4. Register component in `static/js/app.js`
+4. Register component in `static/js/app.js` or `static/index.html`
 
 ### Backend Development
 - **Service Layer Pattern**: Business logic in services
 - **Dependency Injection**: Clean separation of concerns
 - **Async/Await**: Non-blocking I/O throughout
 - **Error Handling**: Comprehensive exception management
+- **Data Source Prioritization**: Polygon.io → yfinance fallback
+
+### Data Source Integration
+- **Polygon.io**: Primary source for live data (real-time snapshots, no caching for live endpoints)
+- **yfinance**: Fallback for historical data and when Polygon unavailable
+- **Error Handling**: Graceful degradation with fallback mechanisms
 
 ## 📄 License
 
@@ -382,11 +496,12 @@ MIT License
 
 - FastAPI & Uvicorn
 - OpenRouter AI Models
+- Polygon.io for live market data
 - Redis & httpx
 - yfinance & scikit-learn
 - LangChain & FAISS
 - PyTorch & Transformers
-- Bootstrap & D3.js
+- Bootstrap, Chart.js & D3.js
 
 ## 📞 Support
 
@@ -394,3 +509,4 @@ For issues and questions:
 - Check the API documentation at `/docs` when running
 - Review the test interface at `/static/test-refactored.html`
 - Examine logs for detailed error information
+- See `docs/ETF_DATA_SOURCES.md` for ETF data source details

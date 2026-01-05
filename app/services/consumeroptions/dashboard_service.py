@@ -159,11 +159,12 @@ class ConsumerOptionsDashboardService:
             end_date = date.today()
             start_date = end_date - timedelta(days=date_range_days)
             
-            # Fetch data concurrently with error handling
+            # Fetch LIVE data concurrently with error handling
+            # Note: get_option_chain_snapshot uses real-time snapshot API (no caching)
             tasks = [
-                self._get_chain_data(focus_ticker),
+                self._get_chain_data(focus_ticker),  # Uses live snapshot API
                 self._get_underlying_data(focus_ticker, start_date.isoformat(), end_date.isoformat()),
-                self._get_analytics_data(focus_ticker)
+                self._get_analytics_data(focus_ticker)  # Uses live snapshot API
             ]
             
             # Use return_exceptions=True to handle individual task failures gracefully
@@ -200,6 +201,15 @@ class ConsumerOptionsDashboardService:
             
             call_put_ratios, iv_term, unusual_activity, oi_heatmap_data, delta_distribution_data = analytics_result
             
+            # Get LIVE underlying snapshot (real-time price)
+            underlying_snapshot = None
+            try:
+                underlying_snapshot = await self.polygon_service.get_underlying_snapshot(focus_ticker)
+                if underlying_snapshot:
+                    logger.info(f"Retrieved LIVE snapshot for {focus_ticker}: price=${underlying_snapshot.get('current_price')}")
+            except Exception as e:
+                logger.warning(f"Could not fetch live underlying snapshot: {str(e)}")
+            
             # Get simulation data if requested
             simulation_data = None
             if include_simulation:
@@ -221,9 +231,11 @@ class ConsumerOptionsDashboardService:
                 underlying_data=underlying_data
             )
             
-            # Add simulation data to response (using dict to add extra field)
+            # Add simulation data and live snapshot to response (using dict to add extra fields)
             response_dict = response.dict() if hasattr(response, 'dict') else response.model_dump() if hasattr(response, 'model_dump') else {}
             response_dict['simulation_data'] = simulation_data
+            response_dict['underlying_snapshot'] = underlying_snapshot  # Add live price data
+            response_dict['data_source'] = 'polygon_live'  # Indicate live data source
             
             return response_dict
             
@@ -355,13 +367,23 @@ class ConsumerOptionsDashboardService:
     async def _get_underlying_data(self, ticker: str, start_date: str, end_date: str) -> List[UnderlyingData]:
         """Get underlying stock data with technical indicators"""
         try:
+            logger.info(f"Fetching underlying data for {ticker} from {start_date} to {end_date}")
             bars = await self.polygon_service.get_underlying_daily_bars(ticker, start_date, end_date)
+            logger.info(f"Retrieved {len(bars)} raw bars for {ticker}")
+            
             if not bars:
-                logger.warning(f"No underlying data found for {ticker} from {start_date} to {end_date}")
+                logger.warning(f"No underlying data found for {ticker} from {start_date} to {end_date}. This may indicate:")
+                logger.warning(f"  1. Polygon API subscription doesn't include historical stock data")
+                logger.warning(f"  2. Date range is invalid or too large")
+                logger.warning(f"  3. Ticker symbol is invalid")
                 return []
-            return self.analytics_service.calculate_technical_indicators(bars)
+            
+            # Calculate technical indicators
+            bars_with_indicators = self.analytics_service.calculate_technical_indicators(bars)
+            logger.info(f"Processed {len(bars_with_indicators)} bars with technical indicators for {ticker}")
+            return bars_with_indicators
         except Exception as e:
-            logger.error(f"Error getting underlying data for {ticker}: {str(e)}")
+            logger.error(f"Error getting underlying data for {ticker}: {str(e)}", exc_info=True)
             # Return empty list instead of raising error
             return []
     

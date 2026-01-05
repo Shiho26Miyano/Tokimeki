@@ -20,11 +20,16 @@ class AAPLWeeklyTracker extends React.Component {
     constructor(props) {
         super(props);
         
+        // Calculate default dates (1 year ago to today)
+        const today = new Date();
+        const oneYearAgo = new Date(today);
+        oneYearAgo.setFullYear(today.getFullYear() - 1);
+        
         this.state = {
             // Investment parameters
             weeklyAmount: 1000,
-            startDate: '2024-09-28',
-            endDate: '2025-09-28',
+            startDate: oneYearAgo.toISOString().split('T')[0],
+            endDate: today.toISOString().split('T')[0],
             
             // Data
             weeklyData: [],
@@ -52,8 +57,15 @@ class AAPLWeeklyTracker extends React.Component {
     
     componentDidMount() {
         console.log('AAPL Weekly Tracker mounted');
-        this.loadWeeklyData();
-        this.loadOptionsData(); // Load both datasets
+        console.log('Initial strategy:', this.state.selectedStrategy);
+        console.log('Weekly amount:', this.state.weeklyAmount);
+        
+        // Load data based on selected strategy
+        if (this.state.selectedStrategy === 'options') {
+            this.loadOptionsData();
+        } else {
+            this.loadWeeklyData();
+        }
     }
     
     async loadWeeklyData() {
@@ -191,11 +203,25 @@ class AAPLWeeklyTracker extends React.Component {
         this.setState({ loading: true, error: null });
         
         try {
-            // Mock options data for demonstration
-            // In a real implementation, this would call your options API
+            // Generate mock options data based on weekly investment amount
             const mockOptionsData = this.generateMockOptionsData();
             
+            if (mockOptionsData.length === 0) {
+                console.warn('No options trades generated. Check date range.');
+                this.setState({
+                    optionsData: [],
+                    totalOptionTrades: 0,
+                    totalOptionPnL: 0,
+                    optionWinRate: 0,
+                    loading: false
+                });
+                return;
+            }
+            
             const optionsSummary = this.calculateOptionsSummary(mockOptionsData);
+            
+            console.log('Options summary:', optionsSummary);
+            console.log('Options data sample:', mockOptionsData.slice(0, 3));
             
             this.setState({
                 optionsData: mockOptionsData,
@@ -214,38 +240,53 @@ class AAPLWeeklyTracker extends React.Component {
     }
     
     generateMockOptionsData() {
-        // Generate mock weekly options trades
+        // Generate mock weekly options trades based on weekly investment amount
         const trades = [];
-        const startDate = new Date(this.state.startDate);
-        const endDate = new Date(this.state.endDate);
+        const { weeklyAmount, startDate, endDate } = this.state;
+        const start = new Date(startDate);
+        const end = new Date(endDate);
         
-        let currentDate = new Date(startDate);
+        // Find first Tuesday (same as stock investment strategy)
+        let currentDate = new Date(start);
+        while (currentDate.getDay() !== 2) { // 2 = Tuesday
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
         let tradeId = 1;
         
-        while (currentDate <= endDate) {
-            // Skip weekends
-            if (currentDate.getDay() !== 0 && currentDate.getDay() !== 6) {
-                const isWin = Math.random() > 0.4; // 60% win rate
-                const pnl = isWin 
-                    ? Math.random() * 200 + 50   // Win: $50-$250
-                    : -(Math.random() * 150 + 25); // Loss: -$25 to -$175
-                
-                trades.push({
-                    id: tradeId++,
-                    date: currentDate.toISOString().split('T')[0],
-                    type: Math.random() > 0.5 ? 'CALL' : 'PUT',
-                    strike: 220 + Math.random() * 60, // Strike between $220-$280
-                    premium: Math.abs(pnl) / 10,
-                    pnl: pnl,
-                    isWin: isWin,
-                    contracts: 1
-                });
-            }
+        // Generate one trade per week (every Tuesday)
+        while (currentDate <= end) {
+            const isWin = Math.random() > 0.4; // 60% win rate
             
-            // Move to next week
+            // Calculate P&L based on weekly investment amount
+            // Options typically have higher volatility, so P&L can range from -100% to +300% of investment
+            const pnlMultiplier = isWin 
+                ? Math.random() * 2.0 + 0.5   // Win: 50% to 250% return
+                : -(Math.random() * 0.8 + 0.2); // Loss: -20% to -100% of investment
+            
+            const pnl = weeklyAmount * pnlMultiplier;
+            const premium = Math.abs(pnl) * 0.1; // Premium is roughly 10% of absolute P&L
+            
+            // Generate realistic strike price (around current stock price ± 20%)
+            const baseStrike = 220; // Approximate AAPL price
+            const strike = baseStrike + (Math.random() - 0.5) * 40; // ±$20 range
+            
+            trades.push({
+                id: tradeId++,
+                date: currentDate.toISOString().split('T')[0],
+                type: Math.random() > 0.5 ? 'CALL' : 'PUT',
+                strike: Math.round(strike * 100) / 100, // Round to 2 decimals
+                premium: Math.round(premium * 100) / 100,
+                pnl: Math.round(pnl * 100) / 100,
+                isWin: isWin,
+                contracts: Math.ceil(weeklyAmount / premium) || 1 // Calculate contracts based on premium
+            });
+            
+            // Move to next Tuesday
             currentDate.setDate(currentDate.getDate() + 7);
         }
         
+        console.log(`Generated ${trades.length} mock options trades for weekly investment of $${weeklyAmount}`);
         return trades;
     }
     
@@ -552,7 +593,14 @@ class AAPLWeeklyTracker extends React.Component {
                     ]),
                     React.createElement('button', {
                         className: 'btn btn-primary',
-                        onClick: this.loadWeeklyData
+                        onClick: () => {
+                            // Reload data when weekly amount changes
+                            if (this.state.selectedStrategy === 'stock') {
+                                this.loadWeeklyData();
+                            } else {
+                                this.loadOptionsData();
+                            }
+                        }
                     }, 'Update')
                 ])
             ]),

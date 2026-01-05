@@ -4218,7 +4218,7 @@
                 container.innerHTML = '<p class="text-muted">No courses found. Try a different search term.</p>';
             } else {
                 container.innerHTML = courses.map(course => `
-                    <div class="card mb-2" onclick="selectCourse('${course.id}', '${course.name}', '${course.club_name}')" style="border-left: 5px solid #7fb069; transition: all 0.3s ease; cursor: pointer; user-select: none;">
+                    <div class="card mb-2" style="border-left: 5px solid #7fb069; transition: all 0.3s ease; user-select: none;">
                         <div class="card-body">
                             <div class="row align-items-center">
                                 <div class="col-md-8">
@@ -4230,7 +4230,11 @@
                                     </p>
                                 </div>
                                 <div class="col-md-4 text-md-end">
-                                    <button class="btn btn-outline-primary btn-sm" style="border: 2px solid #2c5530; color: #2c5530; border-radius: 25px;">
+                                    <button class="btn btn-outline-primary btn-sm analyze-btn" 
+                                            data-course-id="${course.id}" 
+                                            data-course-name="${course.name}" 
+                                            data-club-name="${course.club_name}"
+                                            style="border: 2px solid #2c5530; color: #2c5530; border-radius: 25px; cursor: pointer;">
                                         <i class="fas fa-chart-line me-1"></i>Analyze
                                     </button>
                                 </div>
@@ -4238,6 +4242,20 @@
                         </div>
                     </div>
                 `).join('');
+                
+                // Add event listeners to all Analyze buttons in search results
+                container.querySelectorAll('.analyze-btn').forEach(btn => {
+                    btn.addEventListener('click', async function(e) {
+                        e.stopPropagation(); // Prevent any parent click events
+                        const courseId = this.getAttribute('data-course-id');
+                        const courseName = this.getAttribute('data-course-name');
+                        const clubName = this.getAttribute('data-club-name');
+                        
+                        if (courseId) {
+                            await selectCourse(courseId, courseName, clubName);
+                        }
+                    });
+                });
             }
             
             resultsDiv.style.display = 'block';
@@ -4540,7 +4558,7 @@
             }
 
             container.innerHTML = recommendations.map((rec, index) => `
-                <div class="card mb-3" onclick="selectCourse('${rec.course_id}', '${rec.course_name}', '${rec.club_name}')" style="border-left: 5px solid #7fb069; transition: all 0.3s ease; cursor: pointer;">
+                <div class="card mb-3" style="border-left: 5px solid #7fb069; transition: all 0.3s ease;">
                     <div class="card-body">
                         <div class="row align-items-center">
                             <div class="col-md-1">
@@ -4563,7 +4581,11 @@
                                 </div>
                             </div>
                             <div class="col-md-2 text-md-end">
-                                <button class="btn btn-outline-primary btn-sm" style="border: 2px solid #2c5530; color: #2c5530; border-radius: 25px;">
+                                <button class="btn btn-outline-primary btn-sm analyze-btn" 
+                                        data-course-id="${rec.course_id}" 
+                                        data-course-name="${rec.course_name}" 
+                                        data-club-name="${rec.club_name}"
+                                        style="border: 2px solid #2c5530; color: #2c5530; border-radius: 25px; cursor: pointer;">
                                     <i class="fas fa-chart-line me-1"></i>Analyze
                                 </button>
                             </div>
@@ -4574,6 +4596,20 @@
                     </div>
                 </div>
             `).join('');
+            
+            // Add event listeners to all Analyze buttons
+            container.querySelectorAll('.analyze-btn').forEach(btn => {
+                btn.addEventListener('click', async function(e) {
+                    e.stopPropagation(); // Prevent any parent click events
+                    const courseId = this.getAttribute('data-course-id');
+                    const courseName = this.getAttribute('data-course-name');
+                    const clubName = this.getAttribute('data-club-name');
+                    
+                    if (courseId) {
+                        await selectCourse(courseId, courseName, clubName);
+                    }
+                });
+            });
         }
 
         // Get weather forecast
