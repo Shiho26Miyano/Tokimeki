@@ -11,6 +11,7 @@
     <meta name="last-modified" content="2025-01-17">
     <title>Tokimeki - AI-Powered Investment Analysis Platform | CaddieAlpha™ Golf Strategy</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
@@ -43,6 +44,32 @@
             font-size: 1rem;
         }
         body { font-family: Inter, Roboto, Arial, sans-serif; background: #fff; color: #222; }
+        
+        /* Decision Reflection Component Styles */
+        .ring-2 {
+            box-shadow: 0 0 0 2px #1a1a1a;
+        }
+        .ring-neutral-900 {
+            box-shadow: 0 0 0 2px #1a1a1a;
+        }
+        .bg-white\/70 {
+            background-color: rgba(255, 255, 255, 0.7);
+        }
+        .backdrop-blur {
+            backdrop-filter: blur(8px);
+        }
+        .text-neutral-500 {
+            color: #737373;
+        }
+        .text-neutral-600 {
+            color: #525252;
+        }
+        .bg-neutral-50 {
+            background-color: #fafafa;
+        }
+        .rounded-2xl {
+            border-radius: 1rem;
+        }
         .container { max-width: 900px; margin: 0 auto; padding-top: 2.5rem; }
         .letsplay-row img { width: 60px; height: 60px; object-fit: cover; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.13); margin-bottom: 4px; }
         .letsplay-row h1 { font-size: 1.5rem; color: #183153; letter-spacing: 0.5px; margin: 0; font-weight: 700; }
@@ -532,7 +559,10 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="etf-dashboard-tab" data-bs-toggle="pill" data-bs-target="#etf-dashboard-content" role="tab" aria-controls="etf-dashboard-content" aria-selected="true">📈 ETF Dashboard</a>
+                        <a class="nav-link active" id="decision-reflection-tab" data-bs-toggle="pill" data-bs-target="#decision-reflection-content" role="tab" aria-controls="decision-reflection-content" aria-selected="true">🔥 Decision Reflection</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="etf-dashboard-tab" data-bs-toggle="pill" data-bs-target="#etf-dashboard-content" role="tab" aria-controls="etf-dashboard-content" aria-selected="false">📈 ETF Dashboard</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="consumeroptions-tab" data-bs-toggle="pill" data-bs-target="#consumeroptions-content" role="tab" aria-controls="consumeroptions-content" aria-selected="false">📊 Consumer Options</a>
@@ -576,6 +606,13 @@
 
             <div class="col-md-10 py-4">
                 <div class="tab-content" id="main-tab-content">
+                    <!-- Decision Reflection Content - Full Page -->
+                    <div class="tab-pane fade show active" id="decision-reflection-content" role="tabpanel" aria-labelledby="decision-reflection-tab" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; overflow-y: auto; background: #fafafa; z-index: 1000;">
+                        <div id="decision-reflection-dashboard" style="width: 100%; min-height: 100vh;">
+                            <!-- Decision Reflection Dashboard will render here -->
+                        </div>
+                    </div>
+                    
                     <div class="tab-pane fade" id="futures-exploratorium-content" role="tabpanel" aria-labelledby="futures-exploratorium-tab">
                         <div id="futures-exploratorium-root"></div>
                     </div>
@@ -865,7 +902,7 @@
                     </div>
 
                     <!-- ETF Dashboard Content -->
-                    <div class="tab-pane fade show active" id="etf-dashboard-content" role="tabpanel" aria-labelledby="etf-dashboard-tab">
+                    <div class="tab-pane fade" id="etf-dashboard-content" role="tabpanel" aria-labelledby="etf-dashboard-tab">
                         <div id="etf-dashboard" style="min-height: 500px;">
                             <!-- ETF Dashboard will render here -->
                         </div>
@@ -1888,6 +1925,9 @@
     <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
     <!-- date-fns removed - was causing require() error -->
             <script src="/static/main.js?v=20250117&t=1704067200&nocache=true&cb=1704067200"></script>
+    
+    <!-- Decision Reflection Dashboard Component -->
+    <script src="/static/js/components/decision-reflection.js"></script>
     
     <!-- Consumer Options Dashboard Component -->
     <script src="/static/js/components/consumeroptions.js"></script>
@@ -5010,6 +5050,50 @@ Recommendation: ${currentAnalysis.recommendation}`;
             
             // Make renderAAPLDashboard globally accessible for manual retry
             window.renderAAPLDashboard = renderAAPLDashboard;
+        });
+    </script>
+
+    <!-- Decision Reflection Dashboard Initialization -->
+    <script>
+        // Initialize Decision Reflection Dashboard when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔥 Decision Reflection Dashboard Loading...');
+            
+            // Wait for Chart.js to load
+            function initDecisionReflection() {
+                if (typeof Chart === 'undefined') {
+                    console.warn('Chart.js not loaded yet, waiting...');
+                    setTimeout(initDecisionReflection, 100);
+                    return;
+                }
+                
+                // Initialize immediately since it's the default page
+                if (typeof DecisionReflectionDashboard !== 'undefined') {
+                    window.decisionReflectionDashboard = new DecisionReflectionDashboard();
+                    console.log('✅ Decision Reflection Dashboard initialized');
+                } else {
+                    console.error('DecisionReflectionDashboard class not found. Make sure the JS file is loaded.');
+                }
+            }
+            
+            initDecisionReflection();
+            
+            // Also listen for tab switch in case user navigates away and comes back
+            const decisionReflectionTab = document.getElementById('decision-reflection-tab');
+            if (decisionReflectionTab) {
+                decisionReflectionTab.addEventListener('shown.bs.tab', function() {
+                    console.log('Decision Reflection tab shown, reloading dashboard...');
+                    if (window.decisionReflectionDashboard) {
+                        // Reload data if dashboard already exists
+                        window.decisionReflectionDashboard.loadTrajectoryData().then(() => {
+                            window.decisionReflectionDashboard.updateCharts();
+                            window.decisionReflectionDashboard.updateScore();
+                        });
+                    } else if (typeof DecisionReflectionDashboard !== 'undefined') {
+                        window.decisionReflectionDashboard = new DecisionReflectionDashboard();
+                    }
+                });
+            }
         });
     </script>
 
