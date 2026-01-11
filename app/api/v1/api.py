@@ -22,7 +22,7 @@ from .endpoints.consumeroptions import (
     dashboard_router as consumeroptions_dashboard_router
 )
 from .endpoints.consumeroptions import simulation as consumeroptions_simulation
-from .endpoints import quantitative_analysis, websocket, simulation, etf
+from .endpoints import quantitative_analysis, websocket, simulation, etf, decision_reflection
 
 # Create main API router
 api_router = APIRouter()
@@ -75,6 +75,9 @@ api_router.include_router(websocket.router, tags=["websocket"])
 
 # Include Simulation endpoints
 api_router.include_router(simulation.router, prefix="/simulation", tags=["simulation"])
+
+# Include Decision Reflection endpoints
+api_router.include_router(decision_reflection.router, prefix="/decision-reflection", tags=["decision_reflection"])
 
 # Add API version info
 @api_router.get("/")
@@ -132,6 +135,9 @@ async def api_info():
                 "regime": "/simulation/regime",
                 "diagnostics": "/simulation/diagnostics",
                 "pipeline": "/simulation/pipeline"
+            },
+            "decision_reflection": {
+                "trajectory": "/decision-reflection/trajectory"
             }
         }
     }
