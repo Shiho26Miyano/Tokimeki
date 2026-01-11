@@ -8,37 +8,46 @@ class DecisionReflectionDashboard {
     constructor() {
         console.log('DecisionReflectionDashboard constructor called');
         
-        // Preset scenarios
+        // Preset scenarios with PnL impact
         this.presets = [
             {
                 id: "macro_event",
                 label: "Macro event misplay",
                 angerThought: "CPI spiked, I panicked and flipped positions at the worst time.",
+                pnlLoss: -12500,
+                pnlImpact: "Panic exit cost $12,500. If held per plan, would have recovered +$8,200.",
                 value: "Macro interpretation & timing",
                 trigger: "Reacted to headline instead of plan",
                 goal: "Trade macro releases only with predefined scenarios",
                 nextStep: "Write CPI scenario matrix before next release",
                 boundary: "No position changes within first 5 minutes post-release",
+                potentialRecovery: 8200,
             },
             {
                 id: "earnings",
                 label: "Earnings overreaction",
                 angerThought: "Stock beat earnings but I exited too early out of fear.",
+                pnlLoss: -6800,
+                pnlImpact: "Early exit left $6,800 on table. Stock continued +12% over next 3 days.",
                 value: "Conviction & process trust",
                 trigger: "Fear of giving back gains",
                 goal: "Hold through earnings when thesis intact",
                 nextStep: "Define earnings hold rules in playbook",
                 boundary: "No discretionary exit without thesis break",
+                potentialRecovery: 6800,
             },
             {
                 id: "drawdown",
                 label: "Drawdown spiral",
                 angerThought: "After two losses, I revenge traded and doubled the drawdown.",
+                pnlLoss: -18500,
+                pnlImpact: "Revenge trading turned -$8,200 into -$18,500. Stopped trading would have limited to -$8,200.",
                 value: "Risk control & emotional discipline",
                 trigger: "Loss-induced urgency",
                 goal: "Stop trading after max daily loss",
                 nextStep: "Set hard daily loss limit in platform",
                 boundary: "No trades after hitting daily max loss",
+                potentialRecovery: 10300,
             },
         ];
         
@@ -48,11 +57,14 @@ class DecisionReflectionDashboard {
         this.preset = this.presets.find(p => p.id === this.presetId) || this.presets[0];
         
         this.angerThought = this.preset.angerThought;
+        this.pnlLoss = this.preset.pnlLoss;
+        this.pnlImpact = this.preset.pnlImpact;
         this.value = this.preset.value;
         this.trigger = this.preset.trigger;
         this.goal = this.preset.goal;
         this.nextStep = this.preset.nextStep;
         this.boundary = this.preset.boundary;
+        this.potentialRecovery = this.preset.potentialRecovery;
         
         this.step = 1;
         this.mode = "with"; // "with" | "without"
@@ -63,11 +75,19 @@ class DecisionReflectionDashboard {
         this.trajectoryChart = null;
         this.recoveryChart = null;
         
+        // Event handler references for cleanup
+        this.stepButtonHandler = null;
+        this.stepButtonHandlers = {}; // Store direct button handlers
+        
         this.init();
     }
     
     clamp(n, a, b) {
         return Math.max(a, Math.min(b, n));
+    }
+    
+    formatCurrency(amount) {
+        return Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
     
     scoreLabel(n) {
@@ -187,6 +207,135 @@ class DecisionReflectionDashboard {
     }
     
     setupEventListeners() {
+        // Use both event delegation AND direct listeners for step buttons - more reliable
+        if (this.container) {
+            // Remove old delegation listener if it exists
+            if (this.stepButtonHandler) {
+                this.container.removeEventListener('click', this.stepButtonHandler);
+            }
+            
+            // Create delegation handler as backup - improved to handle all cases
+            this.stepButtonHandler = (e) => {
+                // Check if click is on a step button or its child
+                let target = e.target;
+                let buttonElement = null;
+                
+                // Walk up the DOM tree to find the button
+                while (target && target !== this.container && target !== document.body) {
+                    // Check if this element is a button with step- ID
+                    if (target.tagName === 'BUTTON' && target.id && target.id.startsWith('step-')) {
+                        buttonElement = target;
+                        break;
+                    }
+                    // Also check if it has the step- ID even if not a button
+                    if (target.id && target.id.startsWith('step-')) {
+                        buttonElement = target;
+                        break;
+                    }
+                    target = target.parentElement;
+                }
+                
+                if (buttonElement) {
+                    const stepId = buttonElement.id;
+                    const stepNum = parseInt(stepId.replace('step-', ''), 10);
+                        if (stepNum >= 1 && stepNum <= 3) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log(`Step ${stepNum} button clicked (delegation), current step before: ${this.step}`);
+                            this.step = stepNum;
+                            console.log(`Step set to: ${this.step}`);
+                            
+                            // Use requestAnimationFrame to ensure DOM updates happen
+                            requestAnimationFrame(() => {
+                                this.updateStepButtons();
+                                this.updateStepContent();
+                                console.log(`After update, step is: ${this.step}`);
+                                
+                                // Double-check after a tiny delay
+                                setTimeout(() => {
+                                    const btn = this.container.querySelector(`#step-${stepNum}`);
+                                    if (btn) {
+                                        const hasDark = btn.classList.contains('btn-dark');
+                                        console.log(`Step ${stepNum} button has btn-dark class: ${hasDark}`);
+                                        if (!hasDark) {
+                                            console.warn(`Step ${stepNum} button missing btn-dark class, fixing...`);
+                                            btn.classList.remove('btn-light');
+                                            btn.classList.add('btn-dark');
+                                        }
+                                    }
+                                }, 50);
+                            });
+                            return;
+                        }
+                }
+            };
+            
+            // Attach delegation to container
+            this.container.addEventListener('click', this.stepButtonHandler);
+            
+            // Also attach direct listeners to each step button for extra reliability
+            // Use a function to attach listeners that can be called immediately and retried if needed
+            const attachStepButtonListeners = () => {
+                [1, 2, 3].forEach(stepNum => {
+                    const btn = this.container.querySelector(`#step-${stepNum}`);
+                    if (btn) {
+                        // Remove old listener if it exists
+                        if (this.stepButtonHandlers && this.stepButtonHandlers[stepNum]) {
+                            btn.removeEventListener('click', this.stepButtonHandlers[stepNum]);
+                        }
+                        
+                        // Create new handler function
+                        if (!this.stepButtonHandlers) {
+                            this.stepButtonHandlers = {};
+                        }
+                        
+                        this.stepButtonHandlers[stepNum] = (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log(`Step ${stepNum} button clicked (direct), current step before: ${this.step}`);
+                            this.step = stepNum;
+                            console.log(`Step set to: ${this.step}`);
+                            
+                            // Use requestAnimationFrame to ensure DOM updates happen
+                            requestAnimationFrame(() => {
+                                this.updateStepButtons();
+                                this.updateStepContent();
+                                console.log(`After update, step is: ${this.step}`);
+                                
+                                // Double-check after a tiny delay
+                                setTimeout(() => {
+                                    const btn = this.container.querySelector(`#step-${stepNum}`);
+                                    if (btn) {
+                                        const hasDark = btn.classList.contains('btn-dark');
+                                        console.log(`Step ${stepNum} button has btn-dark class: ${hasDark}`);
+                                        if (!hasDark) {
+                                            console.warn(`Step ${stepNum} button missing btn-dark class, fixing...`);
+                                            btn.classList.remove('btn-light');
+                                            btn.classList.add('btn-dark');
+                                        }
+                                    }
+                                }, 50);
+                            });
+                        };
+                        
+                        // Attach listener
+                        btn.addEventListener('click', this.stepButtonHandlers[stepNum]);
+                        console.log(`Direct listener attached to step-${stepNum}`);
+                    } else {
+                        console.warn(`Step button #step-${stepNum} not found, will retry...`);
+                    }
+                });
+            };
+            
+            // Try immediately
+            attachStepButtonListeners();
+            
+            // Also try after a short delay in case DOM isn't ready
+            setTimeout(attachStepButtonListeners, 150);
+            
+            console.log('Step button event listeners attached (delegation + direct)');
+        }
+        
         // Intensity slider
         const intensitySlider = this.container.querySelector('#intensity-slider');
         if (intensitySlider) {
@@ -234,23 +383,13 @@ class DecisionReflectionDashboard {
             }
         });
         
-        // Step buttons
-        [1, 2, 3].forEach(stepNum => {
-            const btn = this.container.querySelector(`#step-${stepNum}`);
-            if (btn) {
-                btn.addEventListener('click', () => {
-                    this.step = stepNum;
-                    this.updateStepButtons();
-                });
-            }
-        });
-        
         // Next button
         const nextBtn = this.container.querySelector('#next-btn');
         if (nextBtn) {
             nextBtn.addEventListener('click', () => {
                 this.step = this.clamp(this.step + 1, 1, 3);
                 this.updateStepButtons();
+                this.updateStepContent();
             });
         }
         
@@ -262,6 +401,7 @@ class DecisionReflectionDashboard {
                 this.step = 1;
                 this.updateModeButtons();
                 this.updateStepButtons();
+                this.updateStepContent();
                 this.loadTrajectoryData().then(() => {
                     this.updateCharts();
                     this.updateScore();
@@ -277,16 +417,25 @@ class DecisionReflectionDashboard {
                 this.step = 3;
                 this.updateModeButtons();
                 this.updateStepButtons();
+                this.updateStepContent();
             });
         }
         
         // Form inputs
-        const inputs = ['angerThought', 'value', 'trigger', 'goal', 'nextStep', 'boundary'];
+        const inputs = ['angerThought', 'pnlLoss', 'pnlImpact', 'value', 'trigger', 'goal', 'nextStep', 'boundary', 'potentialRecovery'];
         inputs.forEach(field => {
             const input = this.container.querySelector(`#input-${field}`);
             if (input) {
                 input.addEventListener('input', (e) => {
-                    this[field] = e.target.value;
+                    if (field === 'pnlLoss' || field === 'potentialRecovery') {
+                        this[field] = parseFloat(e.target.value) || 0;
+                        this.updatePnLDisplays();
+                    } else {
+                        this[field] = e.target.value;
+                        if (field === 'pnlImpact') {
+                            this.updatePnLDisplays();
+                        }
+                    }
                     this.updateSummary();
                 });
             }
@@ -298,11 +447,14 @@ class DecisionReflectionDashboard {
         this.presetId = presetId;
         this.preset = preset;
         this.angerThought = preset.angerThought;
+        this.pnlLoss = preset.pnlLoss;
+        this.pnlImpact = preset.pnlImpact;
         this.value = preset.value;
         this.trigger = preset.trigger;
         this.goal = preset.goal;
         this.nextStep = preset.nextStep;
         this.boundary = preset.boundary;
+        this.potentialRecovery = preset.potentialRecovery;
         this.step = 1;
         
         this.updatePresetButtons();
@@ -352,30 +504,53 @@ class DecisionReflectionDashboard {
     }
     
     updateStepButtons() {
+        console.log(`updateStepButtons called, current step: ${this.step}`);
         [1, 2, 3].forEach(stepNum => {
             const btn = this.container.querySelector(`#step-${stepNum}`);
             if (btn) {
                 if (stepNum === this.step) {
                     btn.classList.remove('btn-light');
                     btn.classList.add('btn-dark');
+                    console.log(`Step ${stepNum} button set to active (btn-dark)`);
                 } else {
                     btn.classList.remove('btn-dark');
                     btn.classList.add('btn-light');
+                    console.log(`Step ${stepNum} button set to inactive (btn-light)`);
                 }
+            } else {
+                console.warn(`Step button #step-${stepNum} not found`);
             }
         });
-        
+    }
+    
+    updateStepContent() {
+        console.log(`updateStepContent called, current step: ${this.step}`);
         // Update step content visibility - highlight active step
         [1, 2, 3].forEach(stepNum => {
             const stepContent = this.container.querySelector(`#step-content-${stepNum}`);
             if (stepContent) {
-                if (stepNum === this.step) {
-                    stepContent.classList.add('ring-2');
-                    stepContent.classList.add('ring-neutral-900');
+                const isActive = stepNum === this.step;
+                
+                // Update active class
+                if (isActive) {
+                    stepContent.classList.add('step-card-active');
+                    // Apply active styles - prominent highlight
+                    stepContent.style.border = '3px solid #1a1a1a';
+                    stepContent.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 2px rgba(26, 26, 26, 0.1)';
+                    stepContent.style.background = 'rgba(255, 255, 255, 0.95)';
+                    stepContent.style.transform = 'scale(1.02)';
+                    console.log(`Step ${stepNum} content set to active (highlighted)`);
                 } else {
-                    stepContent.classList.remove('ring-2');
-                    stepContent.classList.remove('ring-neutral-900');
+                    stepContent.classList.remove('step-card-active');
+                    // Apply inactive styles - normal appearance
+                    stepContent.style.border = '1px solid #e5e5e5';
+                    stepContent.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                    stepContent.style.background = 'rgba(255, 255, 255, 0.7)';
+                    stepContent.style.transform = 'scale(1)';
+                    console.log(`Step ${stepNum} content set to inactive (normal)`);
                 }
+            } else {
+                console.warn(`Step content #step-content-${stepNum} not found`);
             }
         });
     }
@@ -383,19 +558,42 @@ class DecisionReflectionDashboard {
     updateFormInputs() {
         const inputs = {
             'angerThought': this.angerThought,
+            'pnlLoss': this.pnlLoss,
+            'pnlImpact': this.pnlImpact,
             'value': this.value,
             'trigger': this.trigger,
             'goal': this.goal,
             'nextStep': this.nextStep,
-            'boundary': this.boundary
+            'boundary': this.boundary,
+            'potentialRecovery': this.potentialRecovery
         };
         
         Object.entries(inputs).forEach(([field, value]) => {
             const input = this.container.querySelector(`#input-${field}`);
             if (input) {
-                input.value = value;
+                input.value = value || '';
             }
         });
+        
+        // Update PnL displays
+        this.updatePnLDisplays();
+    }
+    
+    updatePnLDisplays() {
+        const pnlLossDisplay = this.container.querySelector('#pnl-loss-display');
+        if (pnlLossDisplay) {
+            pnlLossDisplay.textContent = `$${this.formatCurrency(this.pnlLoss || 0)}`;
+        }
+        
+        const pnlImpactDisplay = this.container.querySelector('#pnl-impact-display');
+        if (pnlImpactDisplay) {
+            pnlImpactDisplay.textContent = this.pnlImpact || 'Enter PnL impact details';
+        }
+        
+        const pnlRecoveryDisplay = this.container.querySelector('#pnl-recovery-display');
+        if (pnlRecoveryDisplay) {
+            pnlRecoveryDisplay.textContent = `+$${this.formatCurrency(this.potentialRecovery || 0)}`;
+        }
     }
     
     updateScore() {
@@ -440,14 +638,41 @@ class DecisionReflectionDashboard {
     }
     
     updateCharts() {
-        this.renderTrajectoryChart();
-        this.renderRecoveryChart();
+        // Wait for Chart.js to be available
+        const checkAndRender = () => {
+            if (typeof Chart === 'undefined') {
+                console.warn('Chart.js not yet loaded, waiting...');
+                setTimeout(checkAndRender, 100);
+                return;
+            }
+            
+            // Verify data exists
+            if (!this.data || this.data.length === 0) {
+                console.warn('No data available for charts');
+                return;
+            }
+            
+            this.renderTrajectoryChart();
+            this.renderRecoveryChart();
+        };
+        
+        checkAndRender();
     }
     
     renderTrajectoryChart() {
-        const canvas = this.container.querySelector('#trajectory-chart');
-        if (!canvas || typeof Chart === 'undefined') {
-            console.warn('Trajectory chart canvas or Chart.js not available');
+        const canvas = this.container?.querySelector('#trajectory-chart');
+        if (!canvas) {
+            console.warn('Trajectory chart canvas not found');
+            return;
+        }
+        
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js not available for trajectory chart');
+            return;
+        }
+        
+        if (!this.data || this.data.length === 0) {
+            console.warn('No data available for trajectory chart');
             return;
         }
         
@@ -456,77 +681,113 @@ class DecisionReflectionDashboard {
         // Destroy existing chart
         if (this.trajectoryChart) {
             this.trajectoryChart.destroy();
+            this.trajectoryChart = null;
         }
         
         const focusKey = `${this.mode}_focus`;
         const ruminationKey = `${this.mode}_rumination`;
         const effortKey = `${this.mode}_effort`;
         
-        this.trajectoryChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: this.data.map(d => d.day),
-                datasets: [
-                    {
-                        label: 'Decision Clarity (plan adherence)',
-                        data: this.data.map(d => d[focusKey]),
-                        borderColor: '#16a34a',
-                        backgroundColor: 'rgba(22, 163, 74, 0.1)',
-                        tension: 0.4,
-                        borderWidth: 3,
-                        pointRadius: 0,
-                    },
-                    {
-                        label: 'Error Carryover (revenge risk)',
-                        data: this.data.map(d => d[ruminationKey]),
-                        borderColor: '#dc2626',
-                        borderDash: [6, 4],
-                        backgroundColor: 'rgba(220, 38, 38, 0.1)',
-                        tension: 0.4,
-                        borderWidth: 3,
-                        pointRadius: 0,
-                    },
-                    {
-                        label: 'Discipline (rule execution)',
-                        data: this.data.map(d => d[effortKey]),
-                        borderColor: '#2563eb',
-                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                        tension: 0.4,
-                        borderWidth: 3,
-                        pointRadius: 0,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                    },
+        try {
+            this.trajectoryChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: this.data.map(d => String(d.day)),
+                    datasets: [
+                        {
+                            label: 'Decision Clarity (plan adherence)',
+                            data: this.data.map(d => Number(d[focusKey]) || 0),
+                            borderColor: '#16a34a',
+                            backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 0,
+                        },
+                        {
+                            label: 'Error Carryover (revenge risk)',
+                            data: this.data.map(d => Number(d[ruminationKey]) || 0),
+                            borderColor: '#dc2626',
+                            borderDash: [6, 4],
+                            backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 0,
+                        },
+                        {
+                            label: 'Discipline (rule execution)',
+                            data: this.data.map(d => Number(d[effortKey]) || 0),
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 0,
+                        },
+                    ],
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        ticks: {
-                            stepSize: 20,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 10
+                                },
+                                boxWidth: 12,
+                                padding: 8
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            ticks: {
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                stepSize: 20,
+                                font: {
+                                    size: 10
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
                         },
                     },
                 },
-            },
-        });
+            });
+        } catch (error) {
+            console.error('Error rendering trajectory chart:', error);
+        }
     }
     
     renderRecoveryChart() {
-        const canvas = this.container.querySelector('#recovery-chart');
-        if (!canvas || typeof Chart === 'undefined') {
-            console.warn('Recovery chart canvas or Chart.js not available');
+        const canvas = this.container?.querySelector('#recovery-chart');
+        if (!canvas) {
+            console.warn('Recovery chart canvas not found');
+            return;
+        }
+        
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js not available for recovery chart');
+            return;
+        }
+        
+        if (!this.data || this.data.length === 0) {
+            console.warn('No data available for recovery chart');
             return;
         }
         
@@ -535,50 +796,69 @@ class DecisionReflectionDashboard {
         // Destroy existing chart
         if (this.recoveryChart) {
             this.recoveryChart.destroy();
+            this.recoveryChart = null;
         }
         
         const recoveryKey = `${this.mode}_recovery`;
         
-        this.recoveryChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: this.data.map(d => d.day),
-                datasets: [
-                    {
-                        label: 'Recovery',
-                        data: this.data.map(d => d[recoveryKey]),
-                        borderColor: '#2563eb',
-                        backgroundColor: 'rgba(37, 99, 235, 0.35)',
-                        tension: 0.4,
-                        borderWidth: 2,
-                        fill: true,
-                        pointRadius: 0,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false,
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                    },
+        try {
+            this.recoveryChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: this.data.map(d => String(d.day)),
+                    datasets: [
+                        {
+                            label: 'Recovery',
+                            data: this.data.map(d => Number(d[recoveryKey]) || 0),
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.35)',
+                            tension: 0.4,
+                            borderWidth: 2,
+                            fill: true,
+                            pointRadius: 0,
+                        },
+                    ],
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        ticks: {
-                            stepSize: 20,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false,
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            ticks: {
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                stepSize: 20,
+                                font: {
+                                    size: 10
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
                         },
                     },
                 },
-            },
-        });
+            });
+        } catch (error) {
+            console.error('Error rendering recovery chart:', error);
+        }
     }
     
     render() {
@@ -641,6 +921,42 @@ class DecisionReflectionDashboard {
                                             >
                                                 Ignore
                                             </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PnL Impact Section -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="rounded-2xl border bg-white p-4 shadow-sm" style="border-radius: 1rem; background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%); border-left: 4px solid #dc2626;">
+                                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+                                    <div style="flex: 1;">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <i class="fas fa-dollar-sign text-danger" style="font-size: 1.2rem;"></i>
+                                            <h3 class="h5 fw-bold mb-0" style="font-size: 1.1rem; color: #1a1a1a;">PnL Impact: How This Event Hit Your Bottom Line</h3>
+                                        </div>
+                                        <div class="d-flex flex-column flex-md-row gap-3 align-items-start">
+                                            <div class="flex-fill">
+                                                <div class="text-xs fw-semibold text-muted mb-1" style="font-size: 0.7rem;">Actual Loss from This Event</div>
+                                                <div class="h4 fw-bold text-danger mb-2" id="pnl-loss-display" style="font-size: 1.5rem;">
+                                                    $${this.formatCurrency(this.pnlLoss || 0)}
+                                                </div>
+                                                <div class="text-xs text-muted mb-2" style="font-size: 0.75rem; line-height: 1.4;" id="pnl-impact-display">
+                                                    ${this.pnlImpact || 'Enter PnL impact details'}
+                                                </div>
+                                            </div>
+                                            <div class="flex-fill">
+                                                <div class="text-xs fw-semibold text-muted mb-1" style="font-size: 0.7rem;">Potential Recovery with Principle</div>
+                                                <div class="h4 fw-bold text-success mb-2" id="pnl-recovery-display" style="font-size: 1.5rem;">
+                                                    +$${this.formatCurrency(this.potentialRecovery || 0)}
+                                                </div>
+                                                <div class="text-xs text-muted" style="font-size: 0.75rem; line-height: 1.4;">
+                                                    Estimated value of applying the extracted principle to prevent similar losses
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -767,9 +1083,10 @@ class DecisionReflectionDashboard {
                             <div class="d-flex gap-2" style="flex-shrink: 0;">
                                 ${[1, 2, 3].map(n => `
                                     <button 
+                                        type="button"
                                         id="step-${n}"
                                         class="btn rounded-pill border shadow-sm ${n === this.step ? 'btn-dark' : 'btn-light'}"
-                                        style="padding: 0.4rem 0.9rem; font-size: 0.8rem; font-weight: 500;"
+                                        style="padding: 0.4rem 0.9rem; font-size: 0.8rem; font-weight: 500; cursor: pointer;"
                                     >
                                         Step ${n}
                                     </button>
@@ -841,37 +1158,59 @@ class DecisionReflectionDashboard {
         this.updateFormInputs();
         
         // Re-attach event listeners after DOM is updated
-        // Use a small delay to ensure DOM is fully rendered
+        // Use a delay to ensure DOM is fully rendered and Chart.js is loaded
         setTimeout(() => {
             this.setupEventListeners();
-            this.updateCharts();
             this.updateScore();
             this.updateModeButtons();
             this.updatePresetButtons();
             this.updateStepButtons();
-        }, 50);
+            this.updateStepContent();
+            
+            // Retry step button listeners after a longer delay to ensure they're attached
+            setTimeout(() => {
+                [1, 2, 3].forEach(stepNum => {
+                    const btn = this.container.querySelector(`#step-${stepNum}`);
+                    if (btn && (!this.stepButtonHandlers || !this.stepButtonHandlers[stepNum])) {
+                        console.log(`Retrying to attach listener to step-${stepNum}`);
+                        if (!this.stepButtonHandlers) {
+                            this.stepButtonHandlers = {};
+                        }
+                        this.stepButtonHandlers[stepNum] = (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log(`Step ${stepNum} button clicked (retry handler)`);
+                            this.step = stepNum;
+                            this.updateStepButtons();
+                            this.updateStepContent();
+                        };
+                        btn.addEventListener('click', this.stepButtonHandlers[stepNum]);
+                    }
+                });
+            }, 200);
+            
+            // Update charts with a slightly longer delay to ensure Chart.js is ready
+            setTimeout(() => {
+                this.updateCharts();
+            }, 100);
+        }, 100);
     }
     
     renderStep(stepNum) {
         const isActive = stepNum === this.step;
-        const activeClass = isActive ? 'ring-2 ring-neutral-900' : '';
+        const activeClass = isActive ? 'step-card-active' : '';
         
         if (stepNum === 1) {
             return `
                 <div class="col-12 col-md-4">
-                    <div class="rounded-2xl border bg-white/70 p-4 shadow-sm backdrop-blur ${activeClass}" style="border-radius: 0.75rem; background: rgba(255,255,255,0.7);" id="step-content-${stepNum}">
+                    <div class="rounded-2xl border bg-white/70 p-4 shadow-sm backdrop-blur ${activeClass}" style="border-radius: 0.75rem; background: rgba(255,255,255,0.7); transition: all 0.3s ease;" id="step-content-${stepNum}">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <div class="d-flex align-items-center gap-2">
                                 <div class="d-flex h-9 w-9 align-items-center justify-content-center rounded-xl border bg-white shadow-sm" style="width: 32px; height: 32px;">
                                     <span class="small fw-semibold" style="font-size: 0.75rem;">1</span>
                                 </div>
-                                <div class="text-base fw-semibold" style="font-size: 0.875rem;">Describe the trading or investment event (facts only)</div>
+                                <div class="text-base fw-semibold" style="font-size: 0.875rem;">Describe the event & PnL impact</div>
                             </div>
-                            ${isActive ? `
-                                <span class="badge bg-primary text-white px-3 py-1 rounded-pill">
-                                    <i class="fas fa-sparkles"></i> Active
-                                </span>
-                            ` : ''}
                         </div>
                         <div class="text-xs fw-semibold text-neutral-500 mb-1" style="font-size: 0.7rem;">What market event occurred and what decision did you make</div>
                         <textarea 
@@ -881,8 +1220,37 @@ class DecisionReflectionDashboard {
                             style="font-size: 0.8rem; padding: 0.6rem; border-radius: 0.75rem;"
                             placeholder="What happened in the market, and what action did you take? No judgment, just facts."
                         >${this.angerThought}</textarea>
+                        
+                        <div class="mb-2">
+                            <div class="text-xs fw-semibold text-neutral-500 mb-1" style="font-size: 0.7rem;">
+                                <i class="fas fa-dollar-sign text-danger"></i> PnL Loss ($)
+                            </div>
+                            <input 
+                                id="input-pnlLoss"
+                                type="number"
+                                step="100"
+                                class="form-control rounded-2xl border bg-white p-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                                style="font-size: 0.8rem; padding: 0.6rem; border-radius: 0.75rem;"
+                                placeholder="e.g., -12500"
+                                value="${this.pnlLoss || ''}"
+                            />
+                        </div>
+                        
+                        <div class="mb-2">
+                            <div class="text-xs fw-semibold text-neutral-500 mb-1" style="font-size: 0.7rem;">
+                                <i class="fas fa-info-circle"></i> PnL Impact Description
+                            </div>
+                            <textarea 
+                                id="input-pnlImpact"
+                                rows="2"
+                                class="form-control rounded-2xl border bg-white p-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                                style="font-size: 0.8rem; padding: 0.6rem; border-radius: 0.75rem;"
+                                placeholder="Describe how this event impacted your PnL (e.g., 'Panic exit cost $12,500. If held per plan, would have recovered +$8,200.')"
+                            >${this.pnlImpact || ''}</textarea>
+                        </div>
+                        
                         <div class="mt-2 text-xs text-neutral-600" style="font-size: 0.7rem;">
-                            Rule: describe observable facts only. No blame, no excuses.
+                            Rule: describe observable facts only. No blame, no excuses. Quantify the financial impact.
                         </div>
                     </div>
                 </div>
@@ -890,7 +1258,7 @@ class DecisionReflectionDashboard {
         } else if (stepNum === 2) {
             return `
                 <div class="col-12 col-md-4">
-                    <div class="rounded-2xl border bg-white/70 p-4 shadow-sm backdrop-blur ${activeClass}" style="border-radius: 0.75rem; background: rgba(255,255,255,0.7);" id="step-content-${stepNum}">
+                    <div class="rounded-2xl border bg-white/70 p-4 shadow-sm backdrop-blur ${activeClass}" style="border-radius: 0.75rem; background: rgba(255,255,255,0.7); transition: all 0.3s ease;" id="step-content-${stepNum}">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <div class="d-flex align-items-center gap-2">
                                 <div class="d-flex h-9 w-9 align-items-center justify-content-center rounded-xl border bg-white shadow-sm" style="width: 32px; height: 32px;">
@@ -898,11 +1266,6 @@ class DecisionReflectionDashboard {
                                 </div>
                                 <div class="text-base fw-semibold" style="font-size: 0.875rem;">Diagnose the decision failure</div>
                             </div>
-                            ${isActive ? `
-                                <span class="d-inline-flex align-items-center gap-1 rounded-full border bg-white px-2 py-1 text-xs fw-medium shadow-sm" style="font-size: 0.65rem;">
-                                    <i class="fas fa-sparkles" style="font-size: 0.7rem;"></i> Active
-                                </span>
-                            ` : ''}
                         </div>
                         <div class="d-flex flex-column gap-2">
                             <div>
@@ -937,7 +1300,7 @@ class DecisionReflectionDashboard {
         } else {
             return `
                 <div class="col-12 col-md-4">
-                    <div class="rounded-2xl border bg-white/70 p-4 shadow-sm backdrop-blur ${activeClass}" style="border-radius: 0.75rem; background: rgba(255,255,255,0.7);" id="step-content-${stepNum}">
+                    <div class="rounded-2xl border bg-white/70 p-4 shadow-sm backdrop-blur ${activeClass}" style="border-radius: 0.75rem; background: rgba(255,255,255,0.7); transition: all 0.3s ease;" id="step-content-${stepNum}">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <div class="d-flex align-items-center gap-2">
                                 <div class="d-flex h-9 w-9 align-items-center justify-content-center rounded-xl border bg-white shadow-sm" style="width: 32px; height: 32px;">
@@ -945,11 +1308,6 @@ class DecisionReflectionDashboard {
                                 </div>
                                 <div class="text-base fw-semibold" style="font-size: 0.875rem;">Extract a trading principle</div>
                             </div>
-                            ${isActive ? `
-                                <span class="d-inline-flex align-items-center gap-1 rounded-full border bg-white px-2 py-1 text-xs fw-medium shadow-sm" style="font-size: 0.65rem;">
-                                    <i class="fas fa-sparkles" style="font-size: 0.7rem;"></i> Active
-                                </span>
-                            ` : ''}
                         </div>
                         <div class="d-flex flex-column gap-2">
                             <div>
@@ -985,6 +1343,23 @@ class DecisionReflectionDashboard {
                                     value="${this.boundary}"
                                 />
                             </div>
+                            <div>
+                                <div class="text-xs fw-semibold text-neutral-500 mb-1" style="font-size: 0.7rem;">
+                                    <i class="fas fa-chart-line text-success"></i> Potential Recovery Value ($)
+                                </div>
+                                <input 
+                                    id="input-potentialRecovery"
+                                    type="number"
+                                    step="100"
+                                    class="form-control rounded-2xl border bg-white p-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                                    style="font-size: 0.8rem; padding: 0.6rem; border-radius: 0.75rem;"
+                                    placeholder="Estimated value of applying this principle"
+                                    value="${this.potentialRecovery || ''}"
+                                />
+                                <div class="text-xs text-muted mt-1" style="font-size: 0.65rem;">
+                                    How much PnL could be recovered/prevented by applying this principle?
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -993,7 +1368,19 @@ class DecisionReflectionDashboard {
     }
     
     getSummaryHTML() {
+        const netImpact = (this.potentialRecovery || 0) + (this.pnlLoss || 0);
         return `
+            <div class="d-flex align-items-start gap-2 mb-2 p-2 rounded" style="background: #fff5f5; border-left: 3px solid #dc2626;">
+                <i class="fas fa-dollar-sign text-danger" style="margin-top: 2px; font-size: 0.75rem;"></i>
+                <div style="font-size: 0.8rem;">
+                    <div class="fw-semibold mb-1">PnL Impact:</div>
+                    <div class="text-danger fw-bold">Loss: $${this.formatCurrency(this.pnlLoss || 0)}</div>
+                    <div class="text-success fw-bold">Recovery Potential: +$${this.formatCurrency(this.potentialRecovery || 0)}</div>
+                    ${netImpact > 0 ? `
+                        <div class="text-success mt-1 fw-semibold">Net Improvement: +$${this.formatCurrency(netImpact)}</div>
+                    ` : ''}
+                </div>
+            </div>
             <div class="d-flex align-items-start gap-2 mb-1">
                 <i class="fas fa-check-circle" style="margin-top: 2px; font-size: 0.75rem;"></i>
                 <span style="font-size: 0.8rem;">
