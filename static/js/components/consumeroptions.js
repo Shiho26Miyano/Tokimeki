@@ -171,6 +171,12 @@ class ConsumerOptionsReactDashboard {
         // Process underlying data
         this.underlying = data.underlying_data || [];
         console.log(`Processing ${this.underlying.length} underlying data points`);
+        if (this.underlying.length > 0) {
+            console.log('Sample underlying data point:', this.underlying[0]);
+            console.log('Data source:', data.data_source || 'unknown');
+        } else {
+            console.warn('No underlying data received from API. Check server logs for details.');
+        }
         
         // Process LIVE underlying snapshot (real-time price)
         this.underlyingSnapshot = data.underlying_snapshot || null;
@@ -1074,9 +1080,16 @@ class ConsumerOptionsReactDashboard {
         // Create SVG chart
         const width = container.clientWidth || 300;
         const height = 220;
-        const margin = { top: 20, right: 30, bottom: 40, left: 50 };
+        // Increase bottom margin to accommodate rotated labels
+        const margin = { top: 20, right: 30, bottom: 60, left: 50 };
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = height - margin.top - margin.bottom;
+        
+        // Calculate rotation angle and spacing to prevent overlap
+        const labelRotation = -45; // Rotate labels 45 degrees counter-clockwise
+        const minLabelSpacing = 40; // Minimum pixels between labels
+        const labelStep = Math.max(1, Math.ceil((chartWidth / chartData.length) < minLabelSpacing ? 
+            Math.ceil(chartData.length / Math.floor(chartWidth / minLabelSpacing)) : 1));
 
         // Calculate scales
         const maxIV = Math.max(...chartData.map(d => d.iv));
@@ -1127,14 +1140,25 @@ class ConsumerOptionsReactDashboard {
                     `;
                 }).join('')}
                 
-                <!-- X-axis labels -->
-                ${chartData.map((d, i) => `
-                    <text x="${margin.left + (i / (chartData.length - 1)) * chartWidth}" 
-                          y="${height - 10}" 
-                          text-anchor="middle" font-size="10" fill="#64748b">
-                        ${d.expiry}
-                    </text>
-                `).join('')}
+                <!-- X-axis labels (rotated to prevent overlap) -->
+                ${chartData.map((d, i) => {
+                    // Only show every Nth label if spacing is too tight
+                    if (i % labelStep !== 0 && i !== chartData.length - 1) {
+                        return '';
+                    }
+                    const x = margin.left + (i / Math.max(1, chartData.length - 1)) * chartWidth;
+                    const y = height - 15; // Position above bottom
+                    return `
+                        <text x="${x}" 
+                              y="${y}" 
+                              text-anchor="end" 
+                              font-size="10" 
+                              fill="#64748b"
+                              transform="rotate(${labelRotation} ${x} ${y})">
+                            ${d.expiry}
+                        </text>
+                    `;
+                }).filter(label => label !== '').join('')}
                 
                 <!-- Line chart -->
                 <g transform="translate(${margin.left}, ${margin.top})">
@@ -1174,11 +1198,11 @@ class ConsumerOptionsReactDashboard {
                     <p style="font-size: 0.875rem; margin-bottom: 0.5rem;">
                         ${hasAnyData 
                             ? `Only ${this.underlying.length} data point(s) available. Need at least 2 to render chart.`
-                            : 'No underlying price data available from Polygon API.'
+                            : 'No underlying price data available. Tried Polygon API and yfinance fallback.'
                         }
                     </p>
                     <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">
-                        This may be due to API subscription limits or data availability for ${this.currentTicker}.
+                        This may be due to API subscription limits, data availability, or network issues for ${this.currentTicker}.
                     </p>
                 </div>
             `;
@@ -1194,7 +1218,8 @@ class ConsumerOptionsReactDashboard {
         // Create SVG area chart
         const width = container.clientWidth || 300;
         const height = 220;
-        const margin = { top: 20, right: 30, bottom: 40, left: 50 };
+        // Increase bottom margin to accommodate rotated labels
+        const margin = { top: 20, right: 30, bottom: 60, left: 50 };
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = height - margin.top - margin.bottom;
 
@@ -1251,24 +1276,31 @@ class ConsumerOptionsReactDashboard {
                     `;
                 }).join('')}
                 
-                <!-- X-axis labels -->
+                <!-- X-axis labels (rotated to prevent overlap) -->
                 ${recent.map((d, i) => {
-                    if (i % Math.ceil(recent.length / 5) === 0) { // Show every 5th label
-                        const x = margin.left + (i / (recent.length - 1)) * chartWidth;
+                    const labelInterval = Math.ceil(recent.length / 5); // Show every 5th label
+                    if (i % labelInterval === 0 || i === recent.length - 1) {
+                        const x = margin.left + (i / Math.max(1, recent.length - 1)) * chartWidth;
                         // Generate date based on index (recent data is last 30 days)
                         const daysAgo = recent.length - 1 - i;
                         const date = new Date();
                         date.setDate(date.getDate() - daysAgo);
                         const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        const labelRotation = -45; // Rotate labels to prevent overlap
+                        const y = height - 15; // Position above bottom
                         return `
-                            <text x="${x}" y="${height - 10}" 
-                                  text-anchor="middle" font-size="10" fill="#64748b">
+                            <text x="${x}" 
+                                  y="${y}" 
+                                  text-anchor="end" 
+                                  font-size="10" 
+                                  fill="#64748b"
+                                  transform="rotate(${labelRotation} ${x} ${y})">
                                 ${dateStr}
                             </text>
                         `;
                     }
                     return '';
-                }).join('')}
+                }).filter(label => label !== '').join('')}
                 
                 <!-- Area chart -->
                 <g transform="translate(${margin.left}, ${margin.top})">

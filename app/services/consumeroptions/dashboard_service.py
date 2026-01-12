@@ -6,6 +6,14 @@ import logging
 import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime, date, timedelta
+from concurrent.futures import ThreadPoolExecutor
+import yfinance as yf
+import pandas as pd
+import warnings
+
+# Suppress yfinance warnings
+warnings.filterwarnings("ignore", message=".*404.*")
+warnings.filterwarnings("ignore", category=UserWarning)
 
 from app.models.options_models import (
     DashboardResponse, ChainSnapshotResponse, CallPutRatios, 
@@ -33,6 +41,9 @@ class ConsumerOptionsDashboardService:
         self.polygon_service = ConsumerOptionsPolygonService()
         self.analytics_service = ConsumerOptionsAnalyticsService()
         self.chain_service = ConsumerOptionsChainService()
+        
+        # Thread pool executor for yfinance fallback
+        self.executor = ThreadPoolExecutor(max_workers=4)
         
         # Default tickers for consumer options
         self.default_tickers = ["COST", "WMT", "TGT", "AMZN", "AAPL"]
@@ -231,11 +242,35 @@ class ConsumerOptionsDashboardService:
                 underlying_data=underlying_data
             )
             
-            # Add simulation data and live snapshot to response (using dict to add extra fields)
-            response_dict = response.dict() if hasattr(response, 'dict') else response.model_dump() if hasattr(response, 'model_dump') else {}
+            # Convert to dict with proper serialization of nested models
+            if hasattr(response, 'model_dump'):
+                response_dict = response.model_dump(mode='json')
+            elif hasattr(response, 'dict'):
+                response_dict = response.dict()
+            else:
+                response_dict = {}
+            
+            # Ensure underlying_data is properly serialized (list of dicts)
+            if underlying_data and len(underlying_data) > 0:
+                logger.info(f"Serializing {len(underlying_data)} underlying data points for {focus_ticker}")
+                if isinstance(underlying_data[0], UnderlyingData):
+                    response_dict['underlying_data'] = [
+                        item.dict() if hasattr(item, 'dict') else item.model_dump(mode='json') if hasattr(item, 'model_dump') else item
+                        for item in underlying_data
+                    ]
+                    logger.info(f"Successfully serialized {len(response_dict.get('underlying_data', []))} underlying data points")
+                else:
+                    # Already dicts, just use them
+                    response_dict['underlying_data'] = underlying_data
+                    logger.info(f"Underlying data already in dict format, {len(underlying_data)} points")
+            else:
+                logger.warning(f"No underlying_data to serialize for {focus_ticker} (empty list or None)")
+                response_dict['underlying_data'] = []
+            
+            # Add simulation data and live snapshot to response
             response_dict['simulation_data'] = simulation_data
             response_dict['underlying_snapshot'] = underlying_snapshot  # Add live price data
-            response_dict['data_source'] = 'polygon_live'  # Indicate live data source
+            response_dict['data_source'] = 'polygon_live' if underlying_snapshot else ('yfinance' if underlying_data else 'none')
             
             return response_dict
             
@@ -365,18 +400,30 @@ class ConsumerOptionsDashboardService:
             )
     
     async def _get_underlying_data(self, ticker: str, start_date: str, end_date: str) -> List[UnderlyingData]:
-        """Get underlying stock data with technical indicators"""
+        """Get underlying stock data with technical indicators, with yfinance fallback"""
         try:
             logger.info(f"Fetching underlying data for {ticker} from {start_date} to {end_date}")
-            bars = await self.polygon_service.get_underlying_daily_bars(ticker, start_date, end_date)
-            logger.info(f"Retrieved {len(bars)} raw bars for {ticker}")
             
+            # Try Polygon first
+            bars = await self.polygon_service.get_underlying_daily_bars(ticker, start_date, end_date)
+            logger.info(f"Retrieved {len(bars)} raw bars from Polygon for {ticker}")
+            
+            # If Polygon fails or returns no data, try yfinance fallback
             if not bars:
-                logger.warning(f"No underlying data found for {ticker} from {start_date} to {end_date}. This may indicate:")
-                logger.warning(f"  1. Polygon API subscription doesn't include historical stock data")
-                logger.warning(f"  2. Date range is invalid or too large")
-                logger.warning(f"  3. Ticker symbol is invalid")
-                return []
+                logger.warning(f"No underlying data from Polygon for {ticker}, trying yfinance fallback")
+                try:
+                    bars = await self._get_underlying_data_yfinance(ticker, start_date, end_date)
+                    if bars:
+                        logger.info(f"Retrieved {len(bars)} bars from yfinance fallback for {ticker}")
+                    else:
+                        logger.warning(f"No underlying data found for {ticker} from {start_date} to {end_date}. This may indicate:")
+                        logger.warning(f"  1. Polygon API subscription doesn't include historical stock data")
+                        logger.warning(f"  2. Date range is invalid or too large")
+                        logger.warning(f"  3. Ticker symbol is invalid")
+                        return []
+                except Exception as yf_error:
+                    logger.error(f"yfinance fallback also failed for {ticker}: {str(yf_error)}")
+                    return []
             
             # Calculate technical indicators
             bars_with_indicators = self.analytics_service.calculate_technical_indicators(bars)
@@ -384,7 +431,118 @@ class ConsumerOptionsDashboardService:
             return bars_with_indicators
         except Exception as e:
             logger.error(f"Error getting underlying data for {ticker}: {str(e)}", exc_info=True)
-            # Return empty list instead of raising error
+            # Try yfinance fallback as last resort
+            try:
+                logger.info(f"Attempting yfinance fallback for {ticker}")
+                bars = await self._get_underlying_data_yfinance(ticker, start_date, end_date)
+                if bars:
+                    bars_with_indicators = self.analytics_service.calculate_technical_indicators(bars)
+                    logger.info(f"Successfully retrieved {len(bars_with_indicators)} bars from yfinance fallback")
+                    return bars_with_indicators
+            except Exception as yf_error:
+                logger.error(f"yfinance fallback failed: {str(yf_error)}")
+            return []
+    
+    async def _get_underlying_data_yfinance(self, ticker: str, start_date: str, end_date: str) -> List[UnderlyingData]:
+        """Get underlying stock data from yfinance as fallback"""
+        try:
+            logger.info(f"Fetching yfinance data for {ticker} from {start_date} to {end_date}")
+            loop = asyncio.get_event_loop()
+            ticker_obj = await loop.run_in_executor(
+                self.executor,
+                lambda: yf.Ticker(ticker.upper())
+            )
+            
+            # Suppress yfinance warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                
+                def fetch_history():
+                    try:
+                        # yfinance expects dates in YYYY-MM-DD format
+                        # Also add 1 day to end_date to make it inclusive
+                        from datetime import datetime, timedelta
+                        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                        end_inclusive = (end_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+                        logger.debug(f"Fetching yfinance history: start={start_date}, end={end_inclusive}")
+                        hist = ticker_obj.history(start=start_date, end=end_inclusive)
+                        logger.debug(f"yfinance returned {len(hist)} rows")
+                        return hist
+                    except Exception as e:
+                        logger.error(f"Error in yfinance fetch_history: {str(e)}")
+                        if "404" in str(e) or "not found" in str(e).lower():
+                            return pd.DataFrame()
+                        raise
+                
+                hist = await loop.run_in_executor(self.executor, fetch_history)
+            
+            if hist is None or hist.empty:
+                logger.debug(f"No historical data available from yfinance for {ticker}")
+                return []
+            
+            bars = []
+            for date_idx, row in hist.iterrows():
+                try:
+                    # Convert index to date
+                    if isinstance(date_idx, pd.Timestamp):
+                        bar_date = date_idx.date()
+                    else:
+                        bar_date = date_idx
+                    
+                    # Extract and validate price data
+                    open_price = float(row['Open']) if pd.notna(row['Open']) and row['Open'] > 0 else None
+                    high_price = float(row['High']) if pd.notna(row['High']) and row['High'] > 0 else None
+                    low_price = float(row['Low']) if pd.notna(row['Low']) and row['Low'] > 0 else None
+                    close_price = float(row['Close']) if pd.notna(row['Close']) and row['Close'] > 0 else None
+                    
+                    # Skip if missing critical data
+                    if not all([open_price, high_price, low_price, close_price]):
+                        logger.debug(f"Skipping bar for {ticker} on {bar_date}: missing price data")
+                        continue
+                    
+                    # Ensure high >= low, and both are within reasonable range of open/close
+                    if high_price < low_price:
+                        logger.warning(f"Invalid high/low for {ticker} on {bar_date}: high={high_price}, low={low_price}, swapping")
+                        high_price, low_price = low_price, high_price
+                    
+                    # Ensure high >= max(open, close) and low <= min(open, close)
+                    max_price = max(open_price, close_price)
+                    min_price = min(open_price, close_price)
+                    
+                    if high_price < max_price:
+                        logger.debug(f"Adjusting high for {ticker} on {bar_date}: {high_price} -> {max_price}")
+                        high_price = max_price
+                    
+                    if low_price > min_price:
+                        logger.debug(f"Adjusting low for {ticker} on {bar_date}: {low_price} -> {min_price}")
+                        low_price = min_price
+                    
+                    bar = UnderlyingData(
+                        ticker=ticker.upper(),
+                        bar_date=bar_date,
+                        open=open_price,
+                        high=high_price,
+                        low=low_price,
+                        close=close_price,
+                        volume=int(row['Volume']) if pd.notna(row['Volume']) else 0
+                    )
+                    
+                    bars.append(bar)
+                    
+                except Exception as e:
+                    logger.warning(f"Error processing row for {ticker}: {str(e)}")
+                    continue
+            
+            logger.info(f"Retrieved {len(bars)} historical bars from yfinance for {ticker}")
+            return bars
+            
+        except Exception as e:
+            error_msg = str(e)
+            # 404 errors are common and can be ignored
+            if "404" in error_msg or "not found" in error_msg.lower():
+                logger.debug(f"Stock {ticker} history not found in yfinance (404) - this is normal")
+            else:
+                logger.warning(f"Error getting stock history from yfinance for {ticker}: {error_msg}")
             return []
     
     async def _get_analytics_data(self, ticker: str) -> tuple:
@@ -533,3 +691,5 @@ class ConsumerOptionsDashboardService:
         """Close all underlying services"""
         await self.polygon_service.close()
         await self.chain_service.close()
+        if self.executor:
+            self.executor.shutdown(wait=True)
