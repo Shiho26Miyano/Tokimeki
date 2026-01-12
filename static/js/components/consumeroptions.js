@@ -171,6 +171,12 @@ class ConsumerOptionsReactDashboard {
         // Process underlying data
         this.underlying = data.underlying_data || [];
         console.log(`Processing ${this.underlying.length} underlying data points`);
+        if (this.underlying.length > 0) {
+            console.log('Sample underlying data point:', this.underlying[0]);
+            console.log('Data source:', data.data_source || 'unknown');
+        } else {
+            console.warn('No underlying data received from API. Check server logs for details.');
+        }
         
         // Process LIVE underlying snapshot (real-time price)
         this.underlyingSnapshot = data.underlying_snapshot || null;
@@ -1174,11 +1180,11 @@ class ConsumerOptionsReactDashboard {
                     <p style="font-size: 0.875rem; margin-bottom: 0.5rem;">
                         ${hasAnyData 
                             ? `Only ${this.underlying.length} data point(s) available. Need at least 2 to render chart.`
-                            : 'No underlying price data available from Polygon API.'
+                            : 'No underlying price data available. Tried Polygon API and yfinance fallback.'
                         }
                     </p>
                     <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">
-                        This may be due to API subscription limits or data availability for ${this.currentTicker}.
+                        This may be due to API subscription limits, data availability, or network issues for ${this.currentTicker}.
                     </p>
                 </div>
             `;
