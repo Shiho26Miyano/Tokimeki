@@ -615,6 +615,9 @@
                         <a class="nav-link active" id="decision-reflection-tab" data-bs-toggle="pill" data-bs-target="#decision-reflection-content" role="tab" aria-controls="decision-reflection-content" aria-selected="true">🔥 Decision Reflection</a>
                     </li>
                     <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="algorithm-pixel-game-tab" data-bs-toggle="pill" data-bs-target="#algorithm-pixel-game-content" role="tab" aria-controls="algorithm-pixel-game-content" aria-selected="false">🎮 Algorithm Pixel Game</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
                         <a class="nav-link" id="etf-dashboard-tab" data-bs-toggle="pill" data-bs-target="#etf-dashboard-content" role="tab" aria-controls="etf-dashboard-content" aria-selected="false">📈 ETF Dashboard</a>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -664,6 +667,11 @@
                         <div id="decision-reflection-dashboard" style="min-height: 500px;">
                             <!-- Decision Reflection Dashboard will render here -->
                         </div>
+                    </div>
+
+                    <!-- Algorithm Pixel Game Content -->
+                    <div class="tab-pane fade" id="algorithm-pixel-game-content" role="tabpanel" aria-labelledby="algorithm-pixel-game-tab">
+                        <div id="algorithm-pixel-game-root"></div>
                     </div>
                     
                     <div class="tab-pane fade" id="futures-exploratorium-content" role="tabpanel" aria-labelledby="futures-exploratorium-tab">
@@ -2017,6 +2025,9 @@
     <!-- AAPL Analysis Dashboard Component - Babel will process these -->
     <script type="text/babel" src="/static/js/components/aapl-weekly-tracker.js" defer></script>
     <script type="text/babel" src="/static/js/components/aapl-analysis-dashboard.js" defer></script>
+    
+    <!-- Algorithm Pixel Game Component -->
+    <script type="text/babel" src="/static/js/components/algorithm-pixel-game.jsx" defer></script>
     
     
     <!-- Futures Exploratorium React App -->
@@ -5206,6 +5217,67 @@ Recommendation: ${currentAnalysis.recommendation}`;
                             console.error('Error initializing Decision Reflection Dashboard:', error);
                         });
                     }
+                });
+            }
+        });
+    </script>
+
+    <!-- Algorithm Pixel Game Initialization -->
+    <script>
+        // Initialize Algorithm Pixel Game when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎮 Algorithm Pixel Game Loading...');
+            
+            function renderAlgorithmPixelGame() {
+                const rootElement = document.getElementById('algorithm-pixel-game-root');
+                if (!rootElement) {
+                    console.warn('Algorithm Pixel Game root element not found');
+                    setTimeout(renderAlgorithmPixelGame, 100);
+                    return;
+                }
+
+                if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+                    console.log('React not available yet for Algorithm Pixel Game, retrying...');
+                    setTimeout(renderAlgorithmPixelGame, 100);
+                    return;
+                }
+
+                if (typeof window.AlgorithmPixelGame === 'undefined') {
+                    console.log('AlgorithmPixelGame component not available yet, retrying...');
+                    setTimeout(renderAlgorithmPixelGame, 100);
+                    return;
+                }
+
+                try {
+                    console.log('Rendering Algorithm Pixel Game...');
+                    rootElement.innerHTML = '';
+                    
+                    if (ReactDOM.createRoot) {
+                        const root = ReactDOM.createRoot(rootElement);
+                        root.render(React.createElement(window.AlgorithmPixelGame));
+                    } else {
+                        ReactDOM.render(React.createElement(window.AlgorithmPixelGame), rootElement);
+                    }
+                    
+                    console.log('✅ Algorithm Pixel Game rendered successfully');
+                } catch (error) {
+                    console.error('❌ Error rendering Algorithm Pixel Game:', error);
+                    rootElement.innerHTML = `
+                        <div class="alert alert-danger m-4">
+                            <h4>Render Error</h4>
+                            <p>Failed to render Algorithm Pixel Game: <code>${error.message}</code></p>
+                            <button class="btn btn-primary" onclick="location.reload()">Reload Page</button>
+                        </div>
+                    `;
+                }
+            }
+
+            // Initialize when tab is shown
+            const algorithmGameTab = document.getElementById('algorithm-pixel-game-tab');
+            if (algorithmGameTab) {
+                algorithmGameTab.addEventListener('shown.bs.tab', function() {
+                    console.log('Algorithm Pixel Game tab shown, rendering...');
+                    renderAlgorithmPixelGame();
                 });
             }
         });
