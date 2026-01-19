@@ -559,7 +559,10 @@
 
                 <ul class="nav flex-column nav-pills" id="main-nav" role="tablist" aria-orientation="vertical">
                     <li class="nav-item" role="presentation">
-                        <a class="nav-link active" id="decision-reflection-tab" data-bs-toggle="pill" data-bs-target="#decision-reflection-content" role="tab" aria-controls="decision-reflection-content" aria-selected="true">🔥 Decision Reflection</a>
+                        <a class="nav-link active" id="lsw-game-tab" data-bs-toggle="pill" data-bs-target="#lsw-game-content" role="tab" aria-controls="lsw-game-content" aria-selected="true">🎮 LSW Game</a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="decision-reflection-tab" data-bs-toggle="pill" data-bs-target="#decision-reflection-content" role="tab" aria-controls="decision-reflection-content" aria-selected="false">🔥 Decision Reflection</a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link" id="etf-dashboard-tab" data-bs-toggle="pill" data-bs-target="#etf-dashboard-content" role="tab" aria-controls="etf-dashboard-content" aria-selected="false">📈 ETF Dashboard</a>
@@ -606,8 +609,13 @@
 
             <div class="col-md-10 py-4">
                 <div class="tab-content" id="main-tab-content">
+                    <!-- LSW Game Content -->
+                    <div class="tab-pane fade show active" id="lsw-game-content" role="tabpanel" aria-labelledby="lsw-game-tab">
+                        <div id="lsw-game-root"></div>
+                    </div>
+
                     <!-- Decision Reflection Content -->
-                    <div class="tab-pane fade show active" id="decision-reflection-content" role="tabpanel" aria-labelledby="decision-reflection-tab">
+                    <div class="tab-pane fade" id="decision-reflection-content" role="tabpanel" aria-labelledby="decision-reflection-tab">
                         <div id="decision-reflection-dashboard" style="min-height: 500px;">
                             <!-- Decision Reflection Dashboard will render here -->
                         </div>
@@ -1939,6 +1947,10 @@
     <!-- Load AAPL Dashboard components -->
     <script type="text/babel" src="/static/js/components/aapl-weekly-tracker.js"></script>
     <script type="text/babel" src="/static/js/components/aapl-analysis-dashboard.js"></script>
+    
+    <!-- LSW Game Component -->
+    <link rel="stylesheet" href="/static/js/components/lsw-game/lswGame.css">
+    <script type="text/babel" src="/static/js/components/lsw-game/LSWGamePage.jsx"></script>
     
     
     <!-- Futures Exploratorium React App -->
@@ -5053,6 +5065,71 @@ Recommendation: ${currentAnalysis.recommendation}`;
         });
     </script>
 
+    <!-- LSW Game Initialization -->
+    <script>
+        // Initialize LSW Game when DOM is loaded (default page)
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎮 LSW Game Loading (Default Page)...');
+            
+            function renderLSWGame() {
+                const rootElement = document.getElementById('lsw-game-root');
+                if (!rootElement) {
+                    console.warn('LSW game root element not found');
+                    return;
+                }
+
+                if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+                    console.log('React not available yet for LSW Game, retrying in 100ms...');
+                    setTimeout(renderLSWGame, 100);
+                    return;
+                }
+
+                if (typeof LSWGamePage === 'undefined') {
+                    console.log('LSWGamePage component not available yet, retrying in 100ms...');
+                    setTimeout(renderLSWGame, 100);
+                    return;
+                }
+
+                try {
+                    console.log('Rendering LSW Game...');
+                    rootElement.innerHTML = '';
+                    
+                    if (ReactDOM.createRoot) {
+                        const root = ReactDOM.createRoot(rootElement);
+                        root.render(React.createElement(LSWGamePage));
+                    } else {
+                        ReactDOM.render(React.createElement(LSWGamePage), rootElement);
+                    }
+                    
+                    console.log('✅ LSW Game rendered successfully');
+                } catch (error) {
+                    console.error('❌ Error rendering LSW Game:', error);
+                    rootElement.innerHTML = `
+                        <div class="alert alert-danger m-4">
+                            <h4>Render Error</h4>
+                            <p>Failed to render LSW Game: <code>${error.message}</code></p>
+                            <button class="btn btn-primary" onclick="location.reload()">Reload Page</button>
+                        </div>
+                    `;
+                }
+            }
+
+            // Initialize immediately since it's the default page
+            setTimeout(renderLSWGame, 500);
+            setTimeout(renderLSWGame, 1000);
+            setTimeout(renderLSWGame, 2000);
+
+            // Also render when tab is shown
+            const lswGameTab = document.getElementById('lsw-game-tab');
+            if (lswGameTab) {
+                lswGameTab.addEventListener('shown.bs.tab', function() {
+                    console.log('LSW Game tab shown, rendering...');
+                    renderLSWGame();
+                });
+            }
+        });
+    </script>
+
     <!-- Decision Reflection Dashboard Initialization -->
     <script>
         // Initialize Decision Reflection Dashboard when DOM is loaded
@@ -5067,10 +5144,10 @@ Recommendation: ${currentAnalysis.recommendation}`;
                     return;
                 }
                 
-                // Initialize immediately since it's the default page
+                // Initialize when tab is shown (not default page anymore)
                 if (typeof DecisionReflectionDashboard !== 'undefined') {
-                    window.decisionReflectionDashboard = new DecisionReflectionDashboard();
-                    console.log('✅ Decision Reflection Dashboard initialized');
+                    // Don't initialize immediately - wait for tab switch
+                    console.log('✅ Decision Reflection Dashboard ready');
                 } else {
                     console.error('DecisionReflectionDashboard class not found. Make sure the JS file is loaded.');
                 }
