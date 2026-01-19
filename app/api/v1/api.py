@@ -22,7 +22,7 @@ from .endpoints.consumeroptions import (
     dashboard_router as consumeroptions_dashboard_router
 )
 from .endpoints.consumeroptions import simulation as consumeroptions_simulation
-from .endpoints import quantitative_analysis, websocket, simulation, etf, decision_reflection, lsw_game
+from .endpoints import quantitative_analysis, websocket, simulation, etf, decision_reflection
 
 # Create main API router
 api_router = APIRouter()
@@ -78,9 +78,6 @@ api_router.include_router(simulation.router, prefix="/simulation", tags=["simula
 
 # Include Decision Reflection endpoints
 api_router.include_router(decision_reflection.router, prefix="/decision-reflection", tags=["decision_reflection"])
-
-# Include LSW Game endpoints
-api_router.include_router(lsw_game.router, prefix="/lsw-game", tags=["lsw_game"])
 
 # Add API version info
 @api_router.get("/")
@@ -141,13 +138,6 @@ async def api_info():
             },
             "decision_reflection": {
                 "trajectory": "/decision-reflection/trajectory"
-            },
-            "lsw_game": {
-                "solve": "/lsw-game/solve",
-                "step": "/lsw-game/step",
-                "validate": "/lsw-game/validate",
-                "examples": "/lsw-game/examples",
-                "health": "/lsw-game/health"
             }
         }
     }
