@@ -1,0 +1,141 @@
+"""
+Market Pulse API Endpoints
+"""
+from fastapi import APIRouter, HTTPException, Depends, Query
+from datetime import datetime, timedelta
+from typing import Optional, List
+import logging
+
+from app.models.market_pulse_models import (
+    MarketPulseResponse,
+    PulseHistoryResponse,
+    DailySummaryResponse
+)
+from app.services.marketpulse.pulse_service import MarketPulseService
+from app.core.dependencies import get_usage_service
+from app.services.usage_service import AsyncUsageService
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+
+def get_pulse_service() -> MarketPulseService:
+    """Dependency to get pulse service"""
+    return MarketPulseService()
+
+
+@router.get("/current", response_model=MarketPulseResponse)
+async def get_current_pulse(
+    pulse_service: MarketPulseService = Depends(get_pulse_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """
+    Get current market pulse
+    Returns real-time pulse indicators
+    """
+    try:
+        pulse_event = await pulse_service.calculate_current_pulse()
+        
+        # Convert to response model
+        indicators = [
+            {
+                'name': 'Price Velocity',
+                'value': pulse_event.get('velocity', 0),
+                'magnitude': 'high' if abs(pulse_event.get('velocity', 0)) > 2 else 'normal',
+                'description': f"Price change rate: {pulse_event.get('velocity', 0):.2f}%"
+            },
+            {
+                'name': 'Volume Surge',
+                'value': pulse_event.get('volume_surge', {}).get('surge_ratio', 1.0),
+                'magnitude': pulse_event.get('volume_surge', {}).get('magnitude', 'normal'),
+                'description': f"Volume ratio: {pulse_event.get('volume_surge', {}).get('surge_ratio', 1.0):.2f}x"
+            },
+            {
+                'name': 'Volatility Burst',
+                'value': pulse_event.get('volatility_burst', {}).get('volatility', 0),
+                'magnitude': pulse_event.get('volatility_burst', {}).get('magnitude', 'normal'),
+                'description': f"Volatility: {pulse_event.get('volatility_burst', {}).get('volatility', 0):.2f}%"
+            }
+        ]
+        
+        response = MarketPulseResponse(
+            timestamp=pulse_event['timestamp'],
+            stress_score=pulse_event.get('stress', 0),
+            regime=pulse_event.get('regime', 'calm'),
+            indicators=indicators,
+            velocity=pulse_event.get('velocity', 0),
+            volume_surge=pulse_event.get('volume_surge', {}),
+            volatility_burst=pulse_event.get('volatility_burst', {}),
+            breadth=pulse_event.get('breadth', {})
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error getting current pulse: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get market pulse: {str(e)}")
+
+
+@router.get("/history", response_model=PulseHistoryResponse)
+async def get_pulse_history(
+    days: int = Query(7, ge=1, le=30, description="Number of days of history"),
+    ticker: Optional[str] = Query(None, description="Filter by ticker"),
+    pulse_service: MarketPulseService = Depends(get_pulse_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """
+    Get historical pulse events
+    """
+    try:
+        events = await pulse_service.get_pulse_history(days=days, ticker=ticker)
+        
+        return PulseHistoryResponse(
+            events=events,
+            start_date=(datetime.now() - timedelta(days=days)).isoformat(),
+            end_date=datetime.now().isoformat(),
+            count=len(events)
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting pulse history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get pulse history: {str(e)}")
+
+
+@router.post("/calculate")
+async def trigger_pulse_calculation(
+    pulse_service: MarketPulseService = Depends(get_pulse_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """
+    Manually trigger pulse calculation and storage
+    Useful for scheduled jobs
+    """
+    try:
+        pulse_event = await pulse_service.calculate_current_pulse()
+        return {
+            "success": True,
+            "message": "Pulse calculated and stored",
+            "event": pulse_event
+        }
+    except Exception as e:
+        logger.error(f"Error calculating pulse: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to calculate pulse: {str(e)}")
+
+
+@router.get("/summary", response_model=DailySummaryResponse)
+async def get_daily_summaries(
+    days: int = Query(7, ge=1, le=30, description="Number of days"),
+    pulse_service: MarketPulseService = Depends(get_pulse_service),
+    usage_service: AsyncUsageService = Depends(get_usage_service)
+):
+    """
+    Get daily summaries (generated by agent)
+    For now, returns mock data until agent is implemented
+    """
+    # TODO: Implement agent-based summary retrieval from AWS
+    return DailySummaryResponse(
+        summaries=[],
+        count=0
+    )
+
