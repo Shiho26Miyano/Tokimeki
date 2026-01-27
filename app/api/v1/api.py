@@ -154,9 +154,11 @@ async def api_info():
             },
             "market_pulse": {
                 "current": "/market-pulse/current",
-                "history": "/market-pulse/history",
-                "calculate": "/market-pulse/calculate",
-                "summary": "/market-pulse/summary"
+                "events_today": "/market-pulse/events/today",
+                "compare": "/market-pulse/compare",
+                "compute_agent": "/market-pulse/compute-agent",
+                "learning_agent": "/market-pulse/learning-agent",
+                "performance": "/market-pulse/performance"
             }
         }
     }

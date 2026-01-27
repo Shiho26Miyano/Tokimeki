@@ -1,0 +1,44 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowListBucket",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::989513605244:user/tokimeki-pulse-writer"
+      },
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::tokimeki-market-pulse-prod",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "raw-data/*",
+            "processed-data/*",
+            "pulse-events/*",
+            "learning-results/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "AllowReadWriteObjects",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::989513605244:user/tokimeki-pulse-writer"
+      },
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::tokimeki-market-pulse-prod/raw-data/*",
+        "arn:aws:s3:::tokimeki-market-pulse-prod/processed-data/*",
+        "arn:aws:s3:::tokimeki-market-pulse-prod/pulse-events/*",
+        "arn:aws:s3:::tokimeki-market-pulse-prod/learning-results/*"
+      ]
+    }
+  ]
+}

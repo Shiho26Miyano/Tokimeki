@@ -1,148 +1,186 @@
 """
-Market Pulse Service
-Main service that orchestrates pulse calculation and storage
+Market Pulse Service (v3 - Minimal Design)
+
+Layer 3: API + Service Layer
+职责: 数据采集协调 + 读取处理结果
+技术: Python Services
+
+组件:
+- DataCollector (Layer 1): 数据采集
+- AWSStorageService (Layer 2): S3 存储
+
+数据流:
+1. Data Collector: WebSocket → Raw bars → S3 (raw-data/)
+2. AWS Agent: Reads raw-data/ → Computes pulse → Stores to processed-data/
+3. Service: Reads processed-data/ → Returns to dashboard
+
+设计原则: 删除所有不必要的部分，只保留核心功能
 """
+import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from typing import List, Dict, Optional, Any
-from app.services.marketpulse.polygon_service import MarketPulsePolygonService
-from app.services.marketpulse.pulse_calculator import PulseCalculator
+
+try:
+    from botocore.exceptions import ClientError
+except ImportError:
+    ClientError = None
+
+from app.services.marketpulse.data_collector import MarketPulseDataCollector
 from app.services.marketpulse.aws_storage import AWSStorageService
 
 logger = logging.getLogger(__name__)
 
 
 class MarketPulseService:
-    """Main service for Market Pulse calculation and management"""
+    """
+    Market Pulse Service (v3 - Minimal)
+    
+    Core responsibilities:
+    - ✅ Collect raw market data → S3
+    - ✅ Read agent-processed results from S3
+    
+    Deleted (v3):
+    - ❌ Fallback calculator (Agent always available)
+    - ❌ Historical data query
+    - ❌ Daily summary
+    - ❌ Insights
+    - ❌ Collection stats
+    """
     
     def __init__(
         self,
         polygon_api_key: str = None,
         s3_bucket: str = None,
-        dynamodb_table: str = None
+        tickers: List[str] = None,
+        use_delayed_ws: bool = None
     ):
-        self.polygon_service = MarketPulsePolygonService(polygon_api_key)
-        self.pulse_calculator = PulseCalculator()
-        self.aws_storage = AWSStorageService(s3_bucket, dynamodb_table)
+        # Data collector: collects raw data
+        # Default to 10 supported tickers for dual signal architecture
+        self.data_collector = MarketPulseDataCollector(
+            polygon_api_key=polygon_api_key,
+            s3_bucket=s3_bucket,
+            tickers=tickers or ['AAPL', 'MSFT', 'AMZN', 'NVDA', 'TSLA', 'META', 'GOOGL', 'JPM', 'XOM', 'SPY'],
+            use_delayed_ws=use_delayed_ws
+        )
         
-        # Tracked tickers for pulse calculation
-        self.tracked_tickers = ['SPY', 'QQQ', 'DIA', 'IWM']  # Major indices
+        # Storage service: for reading processed data
+        self.aws_storage = AWSStorageService(s3_bucket=s3_bucket)
+        
+        self.started = False
     
-    async def calculate_current_pulse(self) -> Dict[str, Any]:
+    def start(self):
         """
-        Calculate current market pulse
-        Returns pulse event with all indicators
+        Start the data collection service
+        Only collects raw data - computation is done by AWS Agent
+        """
+        if self.started:
+            logger.warning("PulseService already started")
+            return
+        
+        # Start data collector (WebSocket → S3)
+        self.data_collector.start()
+        self.started = True
+        
+        logger.info("✅ Market Pulse Service started - collecting raw data to S3")
+        logger.info("   → AWS Agent will process raw data and compute pulse")
+    
+    def stop(self):
+        """Stop data collection"""
+        if not self.started:
+            return
+        
+        self.data_collector.stop()
+        self.started = False
+        logger.info("Market Pulse Service stopped")
+    
+    async def calculate_current_pulse(self, ticker: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get current pulse (from agent-processed data)
+        Returns latest event or empty pulse if no data available
+        
+        Args:
+            ticker: Optional ticker symbol to filter by (e.g., 'SPY', 'QQQ')
         """
         try:
-            # Get market snapshot
-            snapshot = await self.polygon_service.get_market_snapshot(self.tracked_tickers)
+            events = self._get_today_pulse_events(ticker=ticker)
             
-            if not snapshot:
-                raise ValueError("No market data available")
+            if events:
+                latest = events[-1]
+                logger.debug(f"Using agent-processed pulse: {latest.get('timestamp')} for ticker: {ticker or 'ALL'}")
+                return latest
             
-            # Get historical data for calculations
-            ticker_data = {}
-            for ticker in self.tracked_tickers:
-                if ticker in snapshot:
-                    # Get recent aggregates for velocity/volatility
-                    aggs = await self.polygon_service.get_aggregates(
-                        ticker,
-                        multiplier=5,
-                        timespan="minute",
-                        from_date=datetime.now().date() - timedelta(days=1),
-                        to_date=datetime.now().date()
-                    )
-                    
-                    prices = [agg['close'] for agg in aggs]
-                    volumes = [agg['volume'] for agg in aggs]
-                    
-                    ticker_data[ticker] = {
-                        'ticker': ticker,
-                        'prices': prices,
-                        'volumes': volumes,
-                        'current_price': snapshot[ticker]['price'],
-                        'current_volume': snapshot[ticker]['volume']
-                    }
-            
-            # Calculate breadth (advancing vs declining)
-            grouped_daily = await self.polygon_service.get_grouped_daily()
-            breadth = self._calculate_market_breadth(grouped_daily)
-            
-            # Calculate pulse for primary ticker (SPY as market proxy)
-            primary_ticker = 'SPY'
-            if primary_ticker in ticker_data:
-                pulse_event = self.pulse_calculator.calculate_pulse_event(
-                    ticker_data[primary_ticker],
-                    {'breadth': breadth},
-                    datetime.now()
-                )
-                
-                # Store to AWS
-                self.aws_storage.store_pulse_event(pulse_event)
-                
-                return pulse_event
-            
-            raise ValueError("Primary ticker data not available")
+            # No data available - return empty pulse
+            return {
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "ticker": ticker or "MARKET",
+                "stress": 0.0,
+                "regime": "unknown",
+                "velocity": 0.0,
+                "volume_surge": {"surge_ratio": 1.0, "is_surge": False, "magnitude": "normal"},
+                "volatility_burst": {"volatility": 0.0, "is_burst": False, "magnitude": "normal"},
+                "breadth": {"breadth": "neutral"}
+            }
             
         except Exception as e:
-            logger.error(f"Error calculating pulse: {e}")
+            logger.error(f"Error getting current pulse: {e}")
             raise
     
-    def _calculate_market_breadth(self, grouped_daily: Dict[str, Any]) -> Dict[str, Any]:
-        """Calculate market breadth from grouped daily data"""
-        if not grouped_daily.get('results'):
-            return {
-                'advance_decline_ratio': 0.0,
-                'advancing_pct': 0.0,
-                'declining_pct': 0.0,
-                'breadth': 'neutral'
-            }
-        
-        results = grouped_daily['results']
-        if len(results) < 2:
-            return {
-                'advance_decline_ratio': 0.0,
-                'advancing_pct': 50.0,
-                'declining_pct': 50.0,
-                'breadth': 'neutral'
-            }
-        
-        # Calculate advancing/declining
-        # For simplicity, compare current close to previous day's close
-        # In production, you'd compare to previous day's data
-        advancing = 0
-        declining = 0
-        
-        # Sort by ticker to ensure consistent comparison
-        sorted_results = sorted(results, key=lambda x: x.get('ticker', ''))
-        
-        # Simple approach: count positive vs negative changes
-        # In production, compare to actual previous day data
-        for result in sorted_results:
-            close = result.get('close', 0)
-            high = result.get('high', close)
-            low = result.get('low', close)
-            
-            # If high > low significantly, consider it advancing
-            if high > low * 1.01:
-                advancing += 1
-            elif low < high * 0.99:
-                declining += 1
-        
-        return self.pulse_calculator.calculate_breadth(advancing, declining)
+    def get_today_events(self, ticker: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get today's pulse events (from agent-processed data)
+        Reads from: processed-data/YYYY-MM-DD/pulse-events.json
+        """
+        return self._get_today_pulse_events(ticker=ticker)
     
-    async def get_pulse_history(
-        self,
-        days: int = 7,
-        ticker: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """Get historical pulse events"""
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
-        
-        return self.aws_storage.get_pulse_events(start_date, end_date, ticker)
+    def _get_today_pulse_events(self, ticker: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Internal method: Read today's pulse events from S3
+        Merged from AgentReader (v3 simplification)
+        """
+        try:
+            today = datetime.now(timezone.utc).date()
+            date_str = today.isoformat()
+            s3_key = f"processed-data/{date_str}/pulse-events.json"
+            
+            if not self.aws_storage.s3_client or not self.aws_storage.s3_bucket:
+                logger.warning("S3 client not initialized")
+                return []
+            
+            try:
+                response = self.aws_storage.s3_client.get_object(
+                    Bucket=self.aws_storage.s3_bucket,
+                    Key=s3_key
+                )
+                
+                content = response['Body'].read().decode('utf-8')
+                data = json.loads(content)
+                
+                events = data.get('events', [])
+                
+                # Filter by ticker if specified
+                if ticker:
+                    events = [e for e in events if e.get('ticker') == ticker]
+                
+                # Sort by timestamp
+                events.sort(key=lambda x: x.get('timestamp', ''))
+                
+                logger.debug(f"Retrieved {len(events)} pulse events")
+                return events
+                
+            except Exception as e:
+                if ClientError and isinstance(e, ClientError):
+                    error_code = e.response.get('Error', {}).get('Code', '')
+                    if error_code == 'NoSuchKey':
+                        logger.debug(f"No agent-processed data found for {date_str}")
+                        return []
+                logger.error(f"Error reading pulse events: {e}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error getting today's pulse events: {e}")
+            return []
     
     async def close(self):
         """Close services"""
-        await self.polygon_service.close()
-
+        self.stop()

@@ -1,0 +1,15 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "lambda:InvokeFunction"
+            ],
+            "Resource": [
+                "arn:aws:lambda:us-east-2:989513605244:function:market-pulse-compute-agent",
+                "arn:aws:lambda:us-east-2:989513605244:function:market-pulse-learning-agent"
+            ]
+        }
+    ]
+}

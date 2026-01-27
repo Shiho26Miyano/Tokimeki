@@ -22,7 +22,7 @@ def test_aws_credentials():
     
     access_key = os.getenv('AWS_ACCESS_KEY_ID')
     secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
-    region = os.getenv('AWS_REGION', 'us-east-1')
+    region = os.getenv('AWS_REGION', 'us-east-2')
     
     if not access_key:
         print("❌ AWS_ACCESS_KEY_ID not set")
@@ -77,6 +77,80 @@ def test_s3_connection(storage: AWSStorageService):
         return True
     except Exception as e:
         print(f"❌ S3 connection failed: {e}")
+        return False
+
+def test_raw_data_write(storage: AWSStorageService):
+    """Test writing raw data to raw-data/ path (simulates data collector)"""
+    print("\n" + "=" * 60)
+    print("Testing Raw Data Write (raw-data/ path)")
+    print("=" * 60)
+    
+    if not storage.s3_bucket:
+        print("⚠️  AWS_S3_PULSE_BUCKET not set - S3 storage disabled")
+        return False
+    
+    if not storage.s3_client:
+        print("❌ S3 client not initialized")
+        return False
+    
+    try:
+        import json
+        from datetime import timezone
+        
+        # Create test raw data (simulating data collector format)
+        now = datetime.now(timezone.utc)
+        date_str = now.strftime("%Y-%m-%d")
+        timestamp_key = now.isoformat().replace(':', '-').replace('.', '-').replace('+00:00', 'Z')
+        
+        test_raw_data = {
+            "source": "test_script",
+            "ticker": "TEST",
+            "timestamp": now.isoformat().replace('+00:00', 'Z'),
+            "bar_data": {
+                "open": 500.0,
+                "high": 501.0,
+                "low": 499.0,
+                "close": 500.5,
+                "volume": 1000000,
+                "vwap": 500.2
+            },
+            "collected_at": now.isoformat().replace('+00:00', 'Z')
+        }
+        
+        # Create S3 key: raw-data/YYYY-MM-DD/ticker/timestamp.json
+        s3_key = f"raw-data/{date_str}/TEST/{timestamp_key}.json"
+        
+        print(f"📝 Writing test data to: {s3_key}")
+        
+        # Write to S3
+        storage.s3_client.put_object(
+            Bucket=storage.s3_bucket,
+            Key=s3_key,
+            Body=json.dumps(test_raw_data, default=str, ensure_ascii=False),
+            ContentType='application/json'
+        )
+        print("✅ S3 write to raw-data/ path successful!")
+        
+        # Verify the file exists
+        try:
+            response = storage.s3_client.get_object(Bucket=storage.s3_bucket, Key=s3_key)
+            content = json.loads(response['Body'].read().decode('utf-8'))
+            print(f"✅ Verified: File exists and is readable")
+            print(f"   Ticker: {content.get('ticker')}")
+            print(f"   Timestamp: {content.get('timestamp')}")
+        except Exception as e:
+            print(f"⚠️  File written but verification failed: {e}")
+        
+        # Ask if user wants to keep the test file
+        print(f"\n💡 Test file written to: s3://{storage.s3_bucket}/{s3_key}")
+        print("   You can delete it later with:")
+        print(f"   aws s3 rm s3://{storage.s3_bucket}/{s3_key}")
+        
+        return True
+    except Exception as e:
+        print(f"❌ Raw data write test failed: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def test_dynamodb_connection(storage: AWSStorageService):
@@ -203,6 +277,12 @@ def main():
     # Test S3
     s3_ok = test_s3_connection(storage)
     
+    # Test raw-data/ path write (simulates data collector)
+    if s3_ok:
+        raw_data_write_ok = test_raw_data_write(storage)
+    else:
+        raw_data_write_ok = False
+    
     # Test DynamoDB
     dynamodb_ok = test_dynamodb_connection(storage)
     
@@ -217,7 +297,8 @@ def main():
     print("\n" + "=" * 60)
     print("Test Summary")
     print("=" * 60)
-    print(f"S3: {'✓ OK' if s3_ok else '❌ Failed'}")
+    print(f"S3 Connection: {'✓ OK' if s3_ok else '❌ Failed'}")
+    print(f"Raw Data Write: {'✓ OK' if raw_data_write_ok else '❌ Failed'}")
     print(f"DynamoDB: {'✓ OK' if dynamodb_ok else '⚠️  Not configured or Failed'}")
     print(f"Store/Retrieve: {'✓ OK' if store_ok else '❌ Failed'}")
     
@@ -227,7 +308,7 @@ def main():
     else:
         print("\n❌ AWS Storage configuration has issues.")
         print("Please check the errors above and refer to:")
-        print("docs/features/aws-storage-setup.md")
+        print("docs/features/marketpulse/aws-storage-setup.md")
         return 1
 
 if __name__ == "__main__":

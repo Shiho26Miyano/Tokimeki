@@ -1,10 +1,23 @@
 """
 Market Pulse Calculator
-Calculates various pulse indicators from market data
+
+Layer 4: API Layer (Fallback Component)
+职责: 当 Agent 数据不可用时，提供实时计算能力（fallback）
+技术: Python, statistics, numpy (可选)
+
+注意: 这是 fallback 组件，主要计算由 Layer 3 (Lambda Agent) 完成
+仅在以下情况使用:
+- Agent 数据尚未生成
+- 需要实时计算（不等待 Agent）
+
+扩展点:
+- 添加更多指标计算
+- 优化计算性能
+- 支持更多 ticker
 """
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Callable
 from statistics import mean, stdev
 
 try:
@@ -17,7 +30,92 @@ logger = logging.getLogger(__name__)
 
 
 class PulseCalculator:
-    """Calculate Market Pulse indicators"""
+    """Calculate Market Pulse indicators with state management for real-time updates"""
+    
+    def __init__(self):
+        # In-memory state: store recent bars per ticker
+        # Format: {ticker: [bar1, bar2, ...]} where bar = {timestamp, open, high, low, close, volume}
+        self.ticker_bars = {}
+        self.max_bars_per_ticker = 500  # Keep last 500 bars (~8 hours of 1-min data)
+        
+        # Market breadth state (updated periodically)
+        self.market_breadth = {
+            'advance_decline_ratio': 0.0,
+            'advancing_pct': 50.0,
+            'declining_pct': 50.0,
+            'breadth': 'neutral'
+        }
+    
+    def on_bar(self, ticker: str, bar: Dict[str, Any]):
+        """
+        Callback for receiving real-time bar data from WebSocket
+        Updates internal state for pulse calculation
+        
+        Args:
+            ticker: Ticker symbol (e.g., "SPY")
+            bar: Bar data dict with keys: timestamp, open, high, low, close, volume, vwap
+        """
+        if ticker not in self.ticker_bars:
+            self.ticker_bars[ticker] = []
+        
+        # Add new bar
+        self.ticker_bars[ticker].append(bar)
+        
+        # Keep only recent bars
+        if len(self.ticker_bars[ticker]) > self.max_bars_per_ticker:
+            self.ticker_bars[ticker] = self.ticker_bars[ticker][-self.max_bars_per_ticker:]
+    
+    def update_breadth(self, breadth: Dict[str, Any]):
+        """Update market breadth data"""
+        self.market_breadth = breadth
+    
+    def compute_pulse(self, primary_ticker: str = "SPY") -> Optional[Dict[str, Any]]:
+        """
+        Compute current pulse from accumulated state
+        Returns pulse event dict or None if insufficient data
+        """
+        if primary_ticker not in self.ticker_bars:
+            return None
+        
+        bars = self.ticker_bars[primary_ticker]
+        if len(bars) < 5:  # Need at least 5 bars
+            return None
+        
+        # Extract prices and volumes
+        prices = [bar['close'] for bar in bars]
+        volumes = [bar['volume'] for bar in bars]
+        
+        # Get current values
+        current_price = prices[-1] if prices else 0
+        current_volume = volumes[-1] if volumes else 0
+        avg_volume = mean(volumes[-20:]) if len(volumes) >= 20 else current_volume
+        
+        # Calculate indicators
+        velocity = self.calculate_price_velocity(prices)
+        volume_surge = self.calculate_volume_surge(current_volume, avg_volume)
+        volatility_burst = self.calculate_volatility_burst(prices)
+        
+        # Use stored breadth or default
+        breadth = self.market_breadth
+        
+        # Calculate stress
+        stress = self.calculate_stress_index(
+            volatility_burst.get('volatility', 0),
+            volume_surge.get('surge_ratio', 1.0),
+            velocity,
+            breadth.get('breadth', 'neutral')
+        )
+        
+        return {
+            'price': current_price,
+            'volume': current_volume,
+            'velocity': velocity,
+            'volume_surge': volume_surge,
+            'volatility_burst': volatility_burst,
+            'breadth': breadth,
+            'stress': stress.get('stress_score', 0),
+            'regime': stress.get('regime', 'calm')
+        }
     
     @staticmethod
     def calculate_price_velocity(prices: List[float], window: int = 5) -> float:
