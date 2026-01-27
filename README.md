@@ -32,7 +32,8 @@ Tokimeki/
 │   │   ├── aapl_analysis_models.py # AAPL analysis data models
 │   │   ├── etf_models.py           # ETF dashboard models
 │   │   ├── options_models.py       # Options chain models
-│   │   └── simulation_models.py    # Simulation data models
+│   │   ├── simulation_models.py    # Simulation data models
+│   │   └── market_pulse_models.py  # Market Pulse data models
 │   ├── services/                   # Business logic services
 │   │   ├── ai_service.py           # AI integration (OpenRouter)
 │   │   ├── brpc_service.py         # High-performance BRPC service
@@ -125,12 +126,15 @@ Tokimeki/
 │                   ├── courses.py
 │                   ├── strategy.py
 │                   └── factor_analysis.py
+│               └── market_pulse.py  # Market Pulse API
 ├── data/                           # Data storage
 │   ├── cache/                      # Cache databases
 │   └── databases/                  # Application databases
 │       └── futurequant_trader.db
 ├── docs/                           # Documentation
-│   └── ETF_DATA_SOURCES.md         # ETF data source documentation
+│   ├── ETF_DATA_SOURCES.md         # ETF data source documentation
+│   ├── design-principles/          # Design principles
+│   └── features/marketpulse/      # Market Pulse documentation
 ├── jobs/                           # Scheduled jobs
 │   └── daily_run.py                # Daily data processing tasks
 ├── deployment/                     # Deployment configuration
@@ -143,7 +147,13 @@ Tokimeki/
 │   ├── init_database.py
 │   ├── init_golf_database.py
 │   ├── init_simulation_db.py
-│   └── generate_simulation_data.py
+│   ├── generate_simulation_data.py
+│   ├── trigger_lambda_agents.py    # Market Pulse: Trigger Lambda functions
+│   ├── diagnose_data_collection.py # Market Pulse: Diagnose data issues
+│   ├── view_s3_data.py            # Market Pulse: View S3 data
+│   ├── check_lambda_status.py      # Market Pulse: Check Lambda status
+│   ├── deploy-lambda-functions.sh  # Market Pulse: Deploy Lambda functions
+│   └── start_data_collector.py    # Market Pulse: Start data collector
 └── tests/                          # Test suite
     ├── core/
     ├── features/
@@ -186,12 +196,14 @@ static/
 │       ├── ai-platform-comparables.js
 │       ├── market-overtime.js
 │       ├── volatility-explorer.js
-│       └── hf-signal-tool.js
+│       ├── hf-signal-tool.js
+│       └── market-pulse.js          # Market Pulse dashboard
 ├── components/                    # HTML component templates
 │   ├── etf-dashboard.html
 │   ├── consumeroptions.html
 │   ├── minigolf-strategy.html
-│   └── futurequant-dashboard.html
+│   ├── futurequant-dashboard.html
+│   └── market-pulse.html            # Market Pulse dashboard
 └── img/                           # Images and icons
     ├── cute.png
     ├── demo.png
@@ -239,7 +251,17 @@ static/
 - Walk-forward analysis and performance metrics
 - Feature engineering and data pipeline
 
-### 7. **Academic Research Tools**
+### 7. **Market Pulse** ⭐ NEW
+- Real-time market monitoring with dual-agent system
+- Compute Agent: Automated signal computation every 5 minutes
+- Learning Agent: Machine learning-based signal prediction
+- Live market data collection via Polygon WebSocket
+- AWS Lambda integration for automated processing
+- Comprehensive dashboard for dual-agent signal comparison
+- S3-based storage for raw and processed data
+- See [Market Pulse Documentation](./docs/features/marketpulse/README.md) for details
+
+### 8. **Academic Research Tools**
 - AI-powered research assistant with RAG system
 - Market data APIs and statistical analysis tools
 - Document analysis and vector search
@@ -286,6 +308,7 @@ static/
 - Redis server (optional, for caching)
 - Polygon.io API key (for live market data)
 - OpenRouter API key (for AI features)
+- AWS account (for Market Pulse features: S3, Lambda, IAM)
 
 ### Installation
 
@@ -312,6 +335,12 @@ pip install -r requirements.txt
 export POLYGON_API_KEY="your_polygon_api_key"
 export OPENROUTER_API_KEY="your_openrouter_api_key"
 export REDIS_URL="redis://localhost:6379"  # Optional
+
+# Market Pulse (optional)
+export AWS_S3_PULSE_BUCKET="your-s3-bucket-name"
+export AWS_ACCESS_KEY_ID="your-aws-access-key"
+export AWS_SECRET_ACCESS_KEY="your-aws-secret-key"
+export AWS_REGION="us-east-2"
 ```
 
 5. **Initialize database**
@@ -388,6 +417,13 @@ http://localhost:8000
 ### Simulation
 - **Simulation**: `/api/v1/simulation/*` - Strategy simulation endpoints
 
+### Market Pulse
+- **Current Pulse**: `/api/v1/market-pulse/current` - Get current market pulse data
+- **Today's Events**: `/api/v1/market-pulse/events/today` - Get today's pulse events
+- **Compute Agent Data**: `/api/v1/market-pulse/compute-agent` - Get Compute Agent signals
+- **Learning Agent Data**: `/api/v1/market-pulse/learning-agent` - Get Learning Agent predictions
+- **Dual Agent Comparison**: `/api/v1/market-pulse/dual-agent` - Compare Compute vs Learning Agent signals
+
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -410,6 +446,7 @@ PORT=8000
 - **Primary**: Polygon.io (live market data for stocks, options, ETFs)
 - **Fallback**: yfinance (historical ETF data when Polygon unavailable)
 - **Caching**: Redis (optional, for performance optimization)
+- **Storage**: AWS S3 (for Market Pulse raw and processed data)
 
 ### AI Models Supported
 - **Mistral Small**: Primary AI model for analysis
@@ -418,6 +455,29 @@ PORT=8000
 - **Llama 3.1 405B**: Large language model support
 
 ## 🚀 Deployment
+
+### Market Pulse Deployment
+
+Market Pulse requires AWS infrastructure setup:
+
+1. **S3 Bucket**: Create S3 bucket for data storage
+2. **Lambda Functions**: Deploy Compute Agent and Learning Agent
+3. **IAM Permissions**: Configure IAM policies for S3 and Lambda access
+4. **EventBridge**: Set up scheduled triggers (optional, for automation)
+
+See [Market Pulse Deployment Guide](./docs/features/marketpulse/AWS-SETUP-DUAL-AGENT.md) for detailed instructions.
+
+Quick start:
+```bash
+# Deploy Lambda functions
+./scripts/deploy-lambda-functions.sh
+
+# Trigger agents manually
+python3 scripts/trigger_lambda_agents.py
+
+# Start data collector
+python3 scripts/start_data_collector.py
+```
 
 ### Railway Deployment
 ```bash
