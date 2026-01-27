@@ -66,3 +66,10 @@ htmlcov/
 # Temporary files
 *.tmp
 *.temp
+
+# Lambda deployment packages
+lambda-*.zip
+*.zip
+
+# Lambda config (if generated)
+.lambda-config

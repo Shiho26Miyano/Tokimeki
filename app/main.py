@@ -171,6 +171,21 @@ async def startup_event():
         except Exception as cleanup_error:
             logger.warning(f"Model cleanup failed (non-critical): {cleanup_error}")
         
+        # Initialize Market Pulse service (optional, non-blocking)
+        # Refactored: Only collects raw data, computation done by AWS Agent
+        try:
+            from app.services.marketpulse.pulse_service import MarketPulseService
+            pulse_service = MarketPulseService()
+            # Only auto-start if Polygon API key is available
+            if os.getenv("POLYGON_API_KEY"):
+                pulse_service.start()
+                logger.info("Market Pulse data collector started (collecting raw data to S3)")
+                logger.info("  → AWS Agent will process raw data and compute pulse")
+            else:
+                logger.info("Market Pulse service initialized (will start on first API call)")
+        except Exception as pulse_error:
+            logger.warning(f"Market Pulse service initialization failed (non-critical): {pulse_error}")
+        
         logger.info("Application startup completed successfully")
     except Exception as e:
         logger.error(f"Startup error: {str(e)}")
@@ -181,6 +196,17 @@ async def startup_event():
 async def shutdown_event():
     """Cleanup services on shutdown"""
     logger.info("Shutting down Tokimeki FastAPI application...")
+    
+    # Stop Market Pulse service
+    try:
+        from app.api.v1.endpoints.market_pulse import _pulse_service_instance
+        if _pulse_service_instance and _pulse_service_instance.started:
+            _pulse_service_instance.stop()
+            logger.info("Market Pulse service stopped")
+    except Exception as e:
+        logger.warning(f"Error stopping Market Pulse service: {e}")
+    
+    # Cleanup HTTP client
     from .core.dependencies import cleanup_http_client
     await cleanup_http_client()
 
