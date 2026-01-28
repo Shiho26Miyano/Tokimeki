@@ -349,8 +349,9 @@ def process_learning_task(date: str) -> Dict[str, Any]:
     """
     logger.info(f"🧠 Starting learning task for {date}")
     
-    # 读取 Compute Agent signals（过去 24 小时）
-    signals_by_ticker = read_compute_signals(date, hours=24)
+    # 读取 Compute Agent signals（过去 7 天 ≈ 168 小时）
+    # 增加时间窗口，让学习序列更长，模型可以使用更多历史样本
+    signals_by_ticker = read_compute_signals(date, hours=168)
     
     all_models = {}
     

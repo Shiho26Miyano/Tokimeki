@@ -588,9 +588,17 @@ async def get_dual_signal_comparison(
             }
         }
         
+    except HTTPException:
+        # Let already-constructed HTTPExceptions (like S3 client not initialized) pass through unchanged
+        raise
     except Exception as e:
-        logger.error(f"Error getting dual signal comparison: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get dual signal comparison: {str(e)}")
+        # Log full traceback to backend logs for debugging
+        logger.exception("dual-signal endpoint failed")
+        # Return non-empty, more detailed error information to the frontend
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get dual signal comparison: {type(e).__name__}: {repr(e)}"
+        )
 
 
 

@@ -45,29 +45,37 @@ class MarketPulseDashboard {
             console.log('Dual signal API response:', data);
             
             if (data.success && data.stocks && data.stocks.length > 0) {
-                // 检查数据状态
-                const dataStatus = data.data_status || {};
-                const hasComputeData = dataStatus.compute_agent_available;
-                const hasLearningData = dataStatus.learning_agent_available;
+                // Check if stocks have actual data (not just empty objects)
+                const hasAnyData = data.stocks.some(stock => {
+                    const compute = stock.compute_agent || {};
+                    const learning = stock.learning_agent || {};
+                    // Check if at least one agent has meaningful data
+                    return (compute.signal !== undefined && compute.signal !== null) ||
+                           (learning.signal !== undefined && learning.signal !== null);
+                });
                 
-                if (!hasComputeData && !hasLearningData) {
+                if (hasAnyData) {
+                    // Render the table if we have any data
+                    this.renderDualSignalTable(data.stocks);
+                    
+                    // Show informational messages based on data status (but don't block rendering)
+                    const dataStatus = data.data_status || {};
+                    const hasComputeData = dataStatus.compute_agent_available;
+                    const hasLearningData = dataStatus.learning_agent_available;
+                    
+                    if (!hasLearningData && hasComputeData) {
+                        // Learning Agent 每小时运行一次，这是正常的
+                        this.showDualSignalWarning(
+                            'ℹ️ Learning Agent 数据尚未生成（每小时运行一次）。' +
+                            '<br>Compute Agent 数据已显示。'
+                        );
+                    }
+                } else {
+                    // No meaningful data in stocks array
                     this.showDualSignalError(
                         '⚠️ 数据未就绪: Compute Agent 和 Learning Agent 都还没有运行。' +
                         '<br>💡 请检查 Lambda 函数是否已部署并正常运行。'
                     );
-                } else if (!hasComputeData) {
-                    this.showDualSignalError(
-                        '⚠️ Compute Agent 数据未就绪: 请检查 Compute Agent Lambda 是否正常运行。'
-                    );
-                } else if (!hasLearningData) {
-                    // Learning Agent 每小时运行一次，这是正常的
-                    this.renderDualSignalTable(data.stocks);
-                    this.showDualSignalWarning(
-                        'ℹ️ Learning Agent 数据尚未生成（每小时运行一次）。' +
-                        '<br>Compute Agent 数据已显示。'
-                    );
-                } else {
-                    this.renderDualSignalTable(data.stocks);
                 }
             } else {
                 this.showDualSignalError('No data available');

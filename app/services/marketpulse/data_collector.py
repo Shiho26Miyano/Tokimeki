@@ -11,8 +11,8 @@ Layer 1: Data Collection Layer
 - 添加数据验证和清洗
 """
 import logging
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from datetime import datetime, timezone, timedelta
+from typing import Dict, Any, Optional, Tuple
 import json
 
 from app.services.marketpulse.polygon_service import MarketPulsePolygonService
@@ -47,6 +47,11 @@ class MarketPulseDataCollector:
         # Default to 10 supported tickers for dual signal architecture
         self.tickers = tickers or ['AAPL', 'MSFT', 'AMZN', 'NVDA', 'TSLA', 'META', 'GOOGL', 'JPM', 'XOM', 'SPY']
         self.started = False
+        # Aggregate raw 1m bars into 5m bars before writing to S3
+        self.bar_interval_minutes = 5
+        # Per‑ticker in‑memory aggregation state for current 5m window
+        # ticker -> state dict
+        self._agg_state: Dict[str, Dict[str, Any]] = {}
         
         # Statistics
         self.bars_collected = 0
@@ -77,6 +82,12 @@ class MarketPulseDataCollector:
         if not self.started:
             return
         
+        # Flush any in‑memory aggregation state before stopping
+        try:
+            self._flush_all_aggregated_bars()
+        except Exception as e:
+            logger.warning(f"Error flushing aggregated bars on stop: {e}", exc_info=True)
+        
         self.polygon_service.stop_ws()
         self.started = False
         logger.info(f"Data Collector stopped. Total bars collected: {self.bars_collected}")
@@ -84,27 +95,11 @@ class MarketPulseDataCollector:
     def _on_raw_bar_received(self, ticker: str, bar: Dict[str, Any]):
         """
         Callback when raw bar data is received from WebSocket
-        Stores raw data directly to S3 - NO computation here
+        Aggregates incoming 1m bars into 5m bars and stores only
+        the aggregated 5m bars to S3 to reduce object count.
         """
         try:
-            # Prepare raw data document
-            raw_data = {
-                "source": "polygon_websocket",
-                "ticker": ticker,
-                "timestamp": bar.get('timestamp'),
-                "bar_data": {
-                    "open": bar.get('open'),
-                    "high": bar.get('high'),
-                    "low": bar.get('low'),
-                    "close": bar.get('close'),
-                    "volume": bar.get('volume'),
-                    "vwap": bar.get('vwap', 0)
-                },
-                "collected_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-            }
-            
-            # Store raw bar to S3
-            success = self._store_raw_bar(raw_data)
+            success = self._aggregate_and_store_5m_bar(ticker, bar)
             
             if success:
                 self.bars_collected += 1
@@ -117,6 +112,121 @@ class MarketPulseDataCollector:
                 
         except Exception as e:
             logger.error(f"Error processing raw bar: {e}", exc_info=True)
+    
+    def _get_bucket_start(self, dt: datetime) -> datetime:
+        """
+        Floor a datetime to the start of its 5‑minute bucket.
+        """
+        minute_bucket = (dt.minute // self.bar_interval_minutes) * self.bar_interval_minutes
+        return dt.replace(minute=minute_bucket, second=0, microsecond=0)
+    
+    def _aggregate_and_store_5m_bar(self, ticker: str, bar: Dict[str, Any]) -> bool:
+        """
+        Aggregate incoming 1m bar into a 5m bar.
+        We keep one in‑memory bucket per ticker and flush it to S3
+        when we see a bar from the next 5‑minute window.
+        """
+        # Parse timestamp from bar
+        timestamp = bar.get("timestamp")
+        if isinstance(timestamp, str):
+            dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        elif hasattr(timestamp, "isoformat"):
+            dt = timestamp
+        else:
+            dt = datetime.now(timezone.utc)
+        
+        bucket_start = self._get_bucket_start(dt)
+        state = self._agg_state.get(ticker)
+        
+        # If we have an existing bucket and the new bar belongs to a later bucket,
+        # flush the previous 5m bar to S3.
+        if state and state.get("bucket_start") != bucket_start:
+            self._flush_aggregated_bar(ticker, state)
+            state = None
+        
+        # Initialize state for this ticker if needed
+        if not state:
+            state = {
+                "bucket_start": bucket_start,
+                "open": bar.get("open", 0),
+                "high": bar.get("high", 0),
+                "low": bar.get("low", 0),
+                "close": bar.get("close", 0),
+                "volume": bar.get("volume", 0) or 0,
+                # For VWAP we keep numerator and denominator separately
+                "vwap_numerator": (bar.get("vwap", 0) or 0) * (bar.get("volume", 0) or 0),
+                "vwap_denominator": bar.get("volume", 0) or 0,
+                "last_timestamp": dt,
+            }
+            self._agg_state[ticker] = state
+        else:
+            # Update existing 5m bucket with this new 1m bar
+            high = bar.get("high", 0)
+            low = bar.get("low", 0)
+            close = bar.get("close", 0)
+            volume = bar.get("volume", 0) or 0
+            vwap = bar.get("vwap", 0) or 0
+            
+            state["high"] = max(state.get("high", high), high)
+            # If low 尚未初始化，使用当前 low
+            if state.get("low") is None:
+                state["low"] = low
+            else:
+                state["low"] = min(state.get("low", low), low)
+            state["close"] = close
+            state["volume"] = (state.get("volume", 0) or 0) + volume
+            state["vwap_numerator"] = state.get("vwap_numerator", 0) + vwap * volume
+            state["vwap_denominator"] = state.get("vwap_denominator", 0) + volume
+            state["last_timestamp"] = dt
+        
+        return True
+    
+    def _flush_aggregated_bar(self, ticker: str, state: Dict[str, Any]) -> None:
+        """
+        Flush a completed 5m aggregated bar to S3 using the same raw‑data schema.
+        """
+        if not state:
+            return
+        
+        total_volume = state.get("volume", 0) or 0
+        vwap_den = state.get("vwap_denominator", 0) or 0
+        if vwap_den > 0:
+            vwap_value = state.get("vwap_numerator", 0) / vwap_den
+        else:
+            vwap_value = 0
+        
+        # Use the end of the 5m window as the timestamp for the stored bar
+        bucket_start: datetime = state.get("bucket_start")
+        end_dt = bucket_start + timedelta(minutes=self.bar_interval_minutes)
+        timestamp_str = end_dt.isoformat().replace("+00:00", "Z")
+        
+        raw_data = {
+            "source": "polygon_websocket_5m_agg",
+            "ticker": ticker,
+            "timestamp": timestamp_str,
+            "bar_data": {
+                "open": state.get("open"),
+                "high": state.get("high"),
+                "low": state.get("low"),
+                "close": state.get("close"),
+                "volume": total_volume,
+                "vwap": vwap_value,
+            },
+            "collected_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        }
+        
+        self._store_raw_bar(raw_data)
+    
+    def _flush_all_aggregated_bars(self) -> None:
+        """
+        Flush all in‑memory 5m bars (called on shutdown).
+        """
+        for ticker, state in list(self._agg_state.items()):
+            try:
+                self._flush_aggregated_bar(ticker, state)
+            except Exception as e:
+                logger.warning(f"Error flushing aggregated bar for {ticker}: {e}", exc_info=True)
+        self._agg_state.clear()
     
     def _store_raw_bar(self, raw_data: Dict[str, Any]) -> bool:
         """
