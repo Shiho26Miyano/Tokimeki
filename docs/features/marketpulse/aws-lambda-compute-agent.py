@@ -213,27 +213,61 @@ def process_daily_signals(date: str) -> Dict[str, Any]:
             logger.error(f"❌ Error processing {ticker}: {e}")
             continue
     
-    logger.info(f"✅ Computed {len(all_signals)} signals for {len(SUPPORTED_TICKERS)} tickers")
+    logger.info(f"✅ Computed {len(all_signals)} latest signals for {len(SUPPORTED_TICKERS)} tickers")
     
     # 存储结果到 S3
+    # 为了在「同一天内」拥有更长的学习序列，我们不再只保留当次运行的结果，
+    # 而是将新的信号 append 到当日已有的 compute‑signals.json 中，形成时间序列。
     processed_prefix = f"processed-data/{date}/"
+    key = f"{processed_prefix}compute-signals.json"
+    
+    # 读取当天已存在的信号（如果有）
+    existing_signals = []
+    try:
+        response = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)
+        content = response["Body"].read().decode("utf-8")
+        data = json.loads(content)
+        existing_signals = data.get("signals", [])
+        logger.info(f"📥 Loaded {len(existing_signals)} existing signals for {date}")
+    except s3_client.exceptions.NoSuchKey:
+        logger.info(f"No existing compute-signals.json for {date}, creating new file")
+    except Exception as e:
+        logger.warning(f"Error reading existing compute signals: {e}")
+    
+    # 去重逻辑：按 (ticker, timestamp) 唯一
+    existing_keys = {
+        (s.get("ticker"), s.get("timestamp")) for s in existing_signals
+    }
+    
+    appended = 0
+    for signal in all_signals:
+        key_tuple = (signal.get("ticker"), signal.get("timestamp"))
+        if key_tuple not in existing_keys:
+            existing_signals.append(signal)
+            existing_keys.add(key_tuple)
+            appended += 1
+    
+    # 按时间排序，保证每个 ticker 的序列有序（方便 Learning Agent 使用）
+    existing_signals.sort(key=lambda x: (x.get("ticker", ""), x.get("timestamp", "")))
+    
+    unique_tickers = {s.get("ticker") for s in existing_signals if s.get("ticker")}
     
     signals_data = {
         "date": date,
-        "processed_at": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
-        "signals": all_signals,
-        "tickers_processed": len(all_signals),
-        "total_tickers": len(SUPPORTED_TICKERS)
+        "processed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "signals": existing_signals,
+        "tickers_processed": len(unique_tickers),
+        "total_tickers": len(SUPPORTED_TICKERS),
     }
     
     try:
         s3_client.put_object(
             Bucket=BUCKET_NAME,
-            Key=f"{processed_prefix}compute-signals.json",
+            Key=key,
             Body=json.dumps(signals_data, default=str, ensure_ascii=False, indent=2),
-            ContentType='application/json'
+            ContentType="application/json",
         )
-        logger.info(f"✅ Stored compute signals to S3")
+        logger.info(f"✅ Stored compute signals to S3 (appended {appended} new records, total {len(existing_signals)})")
     except Exception as e:
         logger.error(f"❌ Error storing signals: {e}")
         raise
@@ -241,9 +275,10 @@ def process_daily_signals(date: str) -> Dict[str, Any]:
     return {
         "success": True,
         "date": date,
-        "signals_count": len(all_signals),
-        "tickers_processed": len(all_signals),
-        "total_tickers": len(SUPPORTED_TICKERS)
+        "signals_count": len(existing_signals),
+        "tickers_processed": len(unique_tickers),
+        "total_tickers": len(SUPPORTED_TICKERS),
+        "new_signals_appended": appended,
     }
 
 

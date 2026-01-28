@@ -19,22 +19,20 @@
 
 1. 进入 **IAM** → **Policies** → **Create policy**
 2. 选择 **JSON** 标签
-3. 复制以下内容（已包含根目录权限）：
+3. 复制以下内容（精确到需要的前缀，并包含 `GetBucketLocation` 支持）：
 
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "ListBucketLimitedPrefixes",
       "Effect": "Allow",
-      "Action": [
-        "s3:ListBucket"
-      ],
+      "Action": ["s3:ListBucket"],
       "Resource": "arn:aws:s3:::tokimeki-market-pulse-prod",
       "Condition": {
         "StringLike": {
           "s3:prefix": [
-            "",
             "raw-data/*",
             "processed-data/*",
             "pulse-events/*",
@@ -44,6 +42,13 @@
       }
     },
     {
+      "Sid": "BucketLocation",
+      "Effect": "Allow",
+      "Action": ["s3:GetBucketLocation"],
+      "Resource": "arn:aws:s3:::tokimeki-market-pulse-prod"
+    },
+    {
+      "Sid": "ObjectRWInPrefixes",
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
