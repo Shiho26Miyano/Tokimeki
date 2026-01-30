@@ -36,15 +36,10 @@ _learning_agent_service_instance: Optional[LearningAgentService] = None
 
 
 def get_pulse_service() -> MarketPulseService:
-    """Dependency to get pulse service (singleton)"""
+    """Dependency to get pulse service (singleton). WebSocket is NOT auto-started; call POST /collector/start when needed."""
     global _pulse_service_instance
     if _pulse_service_instance is None:
         _pulse_service_instance = MarketPulseService()
-        # Auto-start service on first access
-        try:
-            _pulse_service_instance.start()
-        except Exception as e:
-            logger.warning(f"Failed to auto-start pulse service: {e}")
     return _pulse_service_instance
 
 
@@ -348,8 +343,8 @@ async def start_data_collector(
     usage_service: AsyncUsageService = Depends(get_usage_service)
 ):
     """
-    Manually start the data collector
-    Starts WebSocket connection and begins collecting market data to S3
+    Start the data collector (WebSocket to Polygon). Only runs when explicitly called.
+    Stays connected until disconnect or POST /collector/stop. No auto-reconnect to save cost.
     """
     try:
         if pulse_service.started:
