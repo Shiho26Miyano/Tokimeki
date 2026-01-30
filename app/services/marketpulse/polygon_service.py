@@ -485,7 +485,7 @@ class MarketPulsePolygonService:
         self.ws_connected = False
     
     def _on_ws_close(self, ws, close_status_code, close_msg):
-        """Handle WebSocket close"""
+        """Handle WebSocket close. No auto-reconnect (saves cost); call POST /collector/start again if needed."""
         logger.warning(f"WebSocket closed: {close_status_code} - {close_msg}")
         self.ws_connected = False
     

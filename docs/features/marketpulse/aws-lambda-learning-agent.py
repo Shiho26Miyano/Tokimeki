@@ -49,6 +49,10 @@ BUCKET_NAME = os.environ.get('S3_BUCKET_NAME')
 # 支持的股票列表
 SUPPORTED_TICKERS = ['AAPL', 'MSFT', 'AMZN', 'NVDA', 'TSLA', 'META', 'GOOGL', 'JPM', 'XOM', 'SPY']
 
+# 最少需要多少条 compute 信号才训练（降低后同一天内多次 Compute 即可开始学习）
+MIN_SIGNALS_TO_TRAIN = 14
+MIN_TRAINING_SAMPLES = 3
+
 
 # ============================================================================
 # 第一部分：数据读取
@@ -208,8 +212,8 @@ def train_and_predict(signals: List[Dict[str, Any]]) -> Dict[str, Any]:
             "features": {...}
         }
     """
-    if len(signals) < 20:
-        logger.warning(f"Insufficient signals for training: {len(signals)} < 20")
+    if len(signals) < MIN_SIGNALS_TO_TRAIN:
+        logger.warning(f"Insufficient signals for training: {len(signals)} < {MIN_SIGNALS_TO_TRAIN}")
         return {
             "signal_predicted": 0.0,
             "signal_actual": signals[-1].get('signal', 0.0) if signals else 0.0,
@@ -231,8 +235,8 @@ def train_and_predict(signals: List[Dict[str, Any]]) -> Dict[str, Any]:
             X_train.append(features)
             y_train.append(signals[i].get('signal', 0.0))
     
-    if len(X_train) < 10:
-        logger.warning(f"Insufficient training samples: {len(X_train)} < 10")
+    if len(X_train) < MIN_TRAINING_SAMPLES:
+        logger.warning(f"Insufficient training samples: {len(X_train)} < {MIN_TRAINING_SAMPLES}")
         return {
             "signal_predicted": 0.0,
             "signal_actual": signals[-1].get('signal', 0.0),
@@ -355,12 +359,12 @@ def process_learning_task(date: str) -> Dict[str, Any]:
     
     all_models = {}
     
-    # 对每个 ticker 训练模型
+    # 对每个 ticker 训练模型（至少 MIN_SIGNALS_TO_TRAIN 条才训练，便于同一天内出学习结果）
     for ticker in SUPPORTED_TICKERS:
         signals = signals_by_ticker.get(ticker, [])
         
-        if len(signals) < 20:
-            logger.warning(f"⚠️  Insufficient signals for {ticker}: {len(signals)} < 20")
+        if len(signals) < MIN_SIGNALS_TO_TRAIN:
+            logger.warning(f"⚠️  Insufficient signals for {ticker}: {len(signals)} < {MIN_SIGNALS_TO_TRAIN}")
             continue
         
         try:

@@ -171,20 +171,15 @@ async def startup_event():
         except Exception as cleanup_error:
             logger.warning(f"Model cleanup failed (non-critical): {cleanup_error}")
         
-        # Initialize Market Pulse service (optional, non-blocking)
-        # Refactored: Only collects raw data, computation done by AWS Agent
+        # Market Pulse: data collector is NOT auto-started (saves WebSocket cost).
+        # Start explicitly via POST /api/v1/market-pulse/collector/start when needed.
         try:
-            from app.services.marketpulse.pulse_service import MarketPulseService
-            pulse_service = MarketPulseService()
-            # Only auto-start if Polygon API key is available
             if os.getenv("POLYGON_API_KEY"):
-                pulse_service.start()
-                logger.info("Market Pulse data collector started (collecting raw data to S3)")
-                logger.info("  → AWS Agent will process raw data and compute pulse")
+                logger.info("Market Pulse: POLYGON_API_KEY set; collector available via POST /collector/start")
             else:
-                logger.info("Market Pulse service initialized (will start on first API call)")
-        except Exception as pulse_error:
-            logger.warning(f"Market Pulse service initialization failed (non-critical): {pulse_error}")
+                logger.info("Market Pulse: POLYGON_API_KEY not set; set it and call POST /collector/start to collect")
+        except Exception:
+            pass
         
         logger.info("Application startup completed successfully")
     except Exception as e:
